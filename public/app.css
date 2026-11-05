@@ -1823,3 +1823,121 @@ body.is-login .hero {
   line-height: 1.1;
   white-space: nowrap;
 }
+
+/* ==========================================================================
+   Print / PDF Export Styles (Official Audit & Traceability Certificate)
+   ========================================================================== */
+@media print {
+  #tabs,
+  #mobile-dock,
+  #toast,
+  .quick-chips-grid,
+  .checklist-chips-box,
+  .voice-mic-bar,
+  .btn-sm,
+  .secondary,
+  .passport-close-btn,
+  button,
+  .link-btn,
+  .mobile-only,
+  .hero small,
+  .brand-badge,
+  .status-indicator {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+  }
+
+  .wrap {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #main-header {
+    background: #ffffff !important;
+    border-bottom: 2px solid #183F32 !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .header-brand .brand-logo {
+    display: none !important;
+  }
+
+  .brand-name {
+    color: #183F32 !important;
+    font-size: 18pt !important;
+    font-weight: 700 !important;
+  }
+
+  .brand-org {
+    color: #4b5563 !important;
+    font-size: 10pt !important;
+  }
+
+  .header-status .status-text {
+    color: #183F32 !important;
+    font-weight: 600 !important;
+  }
+
+  .card, .watchlist-card {
+    border: 1px solid #d1d5db !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    page-break-inside: avoid;
+    margin-bottom: 14px !important;
+    padding: 12px 14px !important;
+  }
+
+  .desktop-only {
+    display: block !important;
+  }
+
+  .watchlist-table-wrap {
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  table.watchlist-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  table.watchlist-table th,
+  table.watchlist-table td {
+    border: 1px solid #e5e7eb !important;
+    padding: 6px 8px !important;
+    color: #111827 !important;
+    font-size: 9.5pt !important;
+  }
+
+  table.watchlist-table th {
+    background: #f9fafb !important;
+    font-weight: 700 !important;
+  }
+
+  .plot-code-tag {
+    background: transparent !important;
+    border: 1px solid #6b7280 !important;
+    color: #111827 !important;
+  }
+
+  .passport-overlay {
+    position: static !important;
+    background: none !important;
+    padding: 0 !important;
+  }
+
+  .passport-card {
+    box-shadow: none !important;
+    border: 2px solid #183F32 !important;
+    max-width: 100% !important;
+    padding: 24px !important;
+  }
+}

@@ -135,6 +135,18 @@ const ICONS = {
     { type: 'path', d: 'M19 10v2a7 7 0 0 1-14 0v-2' },
     { type: 'line', x1: '12', y1: '19', x2: '12', y2: '23' },
     { type: 'line', x1: '8', y1: '23', x2: '16', y2: '23' }
+  ],
+  printer: [
+    { type: 'path', d: 'M6 9V2h12v7' },
+    { type: 'path', d: 'M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2' },
+    { type: 'path', d: 'M6 14h12v8H6z' }
+  ],
+  fileText: [
+    { type: 'path', d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' },
+    { type: 'path', d: 'M14 2v6h6' },
+    { type: 'line', x1: '16', y1: '13', x2: '8', y2: '13' },
+    { type: 'line', x1: '16', y1: '17', x2: '8', y2: '17' },
+    { type: 'line', x1: '10', y1: '9', x2: '8', y2: '9' }
   ]
 };
 
@@ -672,6 +684,39 @@ function createVoiceInput(textarea) {
   return el('div', { className: 'voice-mic-bar' }, voiceBtn);
 }
 
+function compressImage(file, maxDimension = 1200, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(e.target.result);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function createPhotoUploader(photoUrlInput) {
   const fileInput = el('input', { type: 'file', accept: 'image/*', className: 'hide' });
   const previewImg = el('img', { className: 'photo-preview-img hide', alt: 'ตัวอย่างหลักฐานภาพถ่าย' });
@@ -683,18 +728,26 @@ function createPhotoUploader(photoUrlInput) {
     onclick: () => fileInput.click()
   }, icon('camera', 13), ' อัปโหลดหลักฐานภาพถ่าย');
 
-  fileInput.onchange = () => {
+  fileInput.onchange = async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
-      previewImg.src = dataUrl;
+    try {
+      const compressedDataUrl = await compressImage(file, 1200, 0.8);
+      previewImg.src = compressedDataUrl;
       previewImg.classList.remove('hide');
-      if (photoUrlInput) photoUrlInput.value = dataUrl;
-      notify('โหลดรูปภาพหลักฐานเรียบร้อย');
-    };
-    reader.readAsDataURL(file);
+      if (photoUrlInput) photoUrlInput.value = compressedDataUrl;
+      notify('ปรับขนาดและโหลดรูปภาพหลักฐานเรียบร้อย');
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        previewImg.src = dataUrl;
+        previewImg.classList.remove('hide');
+        if (photoUrlInput) photoUrlInput.value = dataUrl;
+        notify('โหลดรูปภาพหลักฐานเรียบร้อย');
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   previewWrap.append(uploadBtn, fileInput, previewImg);
@@ -735,11 +788,18 @@ function showStoryPassport(lot) {
         el('b', {}, 'การยืนยันความถูกต้องผ่านระบบกลุ่ม (Chain of Custody)'),
         el('p', { className: 'muted passport-qr-desc' }, lot.story_highlights || 'ผลผลิตอินทรีย์ผ่านการรับรองระบบควบคุมภายใน (Internal Control System: ICS) วิสาหกิจชุมชนตำบลผักไหม จ.ศรีสะเกษ')
       ),
-      el('button', {
-        type: 'button',
-        className: 'passport-close-btn',
-        onclick: () => overlay.remove()
-      }, 'ปิดหน้าต่างใบรับรอง')
+      el('div', { className: 'passport-actions row between' },
+        el('button', {
+          type: 'button',
+          className: 'btn-sm secondary',
+          onclick: () => window.print()
+        }, icon('printer', 14), ' พิมพ์ใบรับรอง (Print)'),
+        el('button', {
+          type: 'button',
+          className: 'passport-close-btn',
+          onclick: () => overlay.remove()
+        }, 'ปิดหน้าต่างใบรับรอง')
+      )
     )
   );
   overlay.append(card);
@@ -1255,7 +1315,14 @@ async function loadTab() {
           el('div', { className: 'card watchlist-card' },
             el('div', { className: 'row between' },
               el('h3', {}, icon('alert', 16), ' Priority Watch-list: การเฝ้าระวังและบริหารความเสี่ยงรายแปลง'),
-              el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'Demo Simulation' : 'ข้อมูลจริงจากระบบ')
+              el('div', { className: 'row' },
+                el('button', {
+                  type: 'button',
+                  className: 'btn-sm secondary desktop-only',
+                  onclick: () => window.print()
+                }, icon('printer', 14), ' พิมพ์รายงานตรวจกลุ่ม'),
+                el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'Demo Simulation' : 'ข้อมูลจริงจากระบบ')
+              )
             ),
             el('p', { className: 'muted card-lead' }, 'ระบบคัดกรองแปลงที่ต้องการการดูแลเร่งด่วน (ขาดการบันทึกเกิน 14 วัน / รออนุมัติปัจจัยการผลิต / ประวัติไม่สอดคล้อง) เพื่อให้เจ้าหน้าที่ ICS ติดตามได้ทันที'),
             watchlistContent
