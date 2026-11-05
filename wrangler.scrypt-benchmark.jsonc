@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ready-to-grow-scrypt-local-benchmark",
+  "main": "worker/scrypt-benchmark.js",
+  "compatibility_date": "2025-10-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "limits": { "cpu_ms": 1000 }
+}
