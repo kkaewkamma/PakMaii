@@ -33,3 +33,4 @@ CREATE TABLE IF NOT EXISTS production_lots (
 CREATE INDEX IF NOT EXISTS idx_plots_plot_code ON plots(plot_code);
 CREATE INDEX IF NOT EXISTS idx_input_requests_status ON input_requests(status);
 CREATE INDEX IF NOT EXISTS idx_production_lots_code ON production_lots(lot_code);
+

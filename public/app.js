@@ -1680,39 +1680,6 @@ async function loadTab() {
         );
         nodes.push(box);
       }
-    }
-            checklistBox,
-            el('label', {}, 'บันทึกผลตรวจและข้อเสนอแนะ', noteArea),
-          ], 'บันทึกผลการตรวจรับรองแปลง', '/reviews'));
-        } else {
-          nodes.push(el('div', { className: 'notice' }, 'ไม่พบแปลงปลูกที่สามารถตรวจได้'));
-        }
-      }
-
-      nodes.push(el('div', { className: 'notice' },
-        el('b', {}, icon('shield', 15), me.role === 'farmer' ? ' ประวัติผลการตรวจประเมินแปลงจากเจ้าหน้าที่ ICS' : ' ประวัติการตรวจประเมินแปลงทั้งหมด'),
-        el('p', { className: 'muted' }, me.role === 'farmer' ? 'รายงานผลการตรวจรับรองแปลงอินทรีย์โดยเจ้าหน้าที่ ICS ประจำกลุ่มของคุณ' : `บันทึกแล้วทั้งหมด ${rows.length} ครั้ง`)
-      ));
-
-      if (!rows.length) {
-        nodes.push(empty(me.role === 'farmer' ? 'ยังไม่มีประวัติการตรวจประเมินแปลงจากเจ้าหน้าที่ ICS' : 'ยังไม่มีบันทึกผลตรวจแปลง'));
-      }
-
-      for (const item of rows) {
-        const isPass = item.result === 'ผ่าน';
-        const pillClass = isPass ? 'pill success' : 'pill warn';
-        const resultIcon = isPass ? icon('checkCircle', 12) : icon('alert', 12);
-        const box = card(
-          el('div', { className: 'row between' },
-            el('b', {}, item.plot_name),
-            el('span', { className: pillClass }, resultIcon, item.result)
-          ),
-          item.farmer_name ? el('p', { className: 'muted' }, `เกษตรกร: ${item.farmer_name}`) : null,
-          el('p', { className: 'pre-line-text' }, item.note),
-          el('small', { className: 'muted' }, `ผู้ตรวจ: ${item.reviewer_name || 'เจ้าหน้าที่ ICS'} • ${dated(item.created_at)}`)
-        );
-        nodes.push(box);
-      }
     } else if (tab === 'risks') {
       const rows = await api('/risks');
       nodes = [
