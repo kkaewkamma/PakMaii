@@ -19,9 +19,6 @@
         <b>PakMaii — Ready to Grow (ตำบลผักไหม จ.ศรีสะเกษ)</b>
       </div>
       <div class="sim-actions-box">
-        <button type="button" id="togglePhoneBtn" class="sim-toggle-btn" title="สลับมุมมองระหว่าง LINE OA มือถือเกษตรกร กับ Dashboard เดสก์ท็อป">
-          📱 โหมดจำลองมือถือ (LINE OA / LIFF View)
-        </button>
         <button type="button" id="simWebhookBtn" class="sim-toggle-btn sim-webhook-btn" title="จำลองการส่งข้อมูลกิจกรรมผ่าน LINE Webhook สำหรับการสาธิต">
           ⚡ จำลอง LINE Webhook
         </button>
@@ -39,16 +36,14 @@
       </div>
     </div>
   </header>
-  <div id="phone-container">
-    <main class="wrap" id="main-wrap">
-      <div class="hero">
-        <h2 id="welcome">ยินดีต้อนรับ</h2>
-        <div id="identity" aria-live="polite">กำลังโหลด...</div>
-      </div>
-      <nav id="tabs" class="hide" aria-label="เมนูหลัก"></nav>
-      <section id="content" aria-live="polite"></section>
-    </main>
-  </div>
+  <main class="wrap">
+    <div class="hero">
+      <h2 id="welcome">ยินดีต้อนรับ</h2>
+      <div id="identity" aria-live="polite">กำลังโหลด...</div>
+    </div>
+    <nav id="tabs" class="hide" aria-label="เมนูหลัก"></nav>
+    <section id="content" aria-live="polite"></section>
+  </main>
   <div id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

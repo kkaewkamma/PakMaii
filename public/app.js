@@ -537,51 +537,7 @@ async function start(forceLogin = false) {
 }
 
 function setupSimulatorControls() {
-  const toggleBtn = $('#togglePhoneBtn');
   const simWebhookBtn = $('#simWebhookBtn');
-  const mainWrap = $('#main-wrap');
-  let isPhone = false;
-
-  if (toggleBtn && !toggleBtn.__bound) {
-    toggleBtn.__bound = true;
-    toggleBtn.onclick = () => {
-      isPhone = !isPhone;
-      if (isPhone) {
-        document.body.classList.add('phone-mode-active');
-        mainWrap?.classList.add('phone-frame');
-        toggleBtn.classList.add('active');
-        toggleBtn.textContent = '💻 สลับกลับมุมมองเดสก์ท็อป';
-
-        let notch = $('#phoneNotch');
-        if (!notch && mainWrap) {
-          notch = el('div', { id: 'phoneNotch', className: 'phone-notch' });
-          mainWrap.prepend(notch);
-        }
-        let lineHeader = $('#phoneLineHeader');
-        if (!lineHeader && notch) {
-          lineHeader = el('div', { id: 'phoneLineHeader', className: 'phone-line-header' },
-            el('div', { className: 'phone-line-title' },
-              el('span', { className: 'phone-line-badge' }, '✓'),
-              'Ready to Grow — ผักไหมอินทรีย์ (LINE OA)'
-            ),
-            el('button', {
-              type: 'button',
-              className: 'phone-exit-btn',
-              onclick: () => toggleBtn.click()
-            }, 'ออก')
-          );
-          notch.after(lineHeader);
-        }
-      } else {
-        document.body.classList.remove('phone-mode-active');
-        mainWrap?.classList.remove('phone-frame');
-        toggleBtn.classList.remove('active');
-        toggleBtn.textContent = '📱 โหมดจำลองมือถือ (LINE OA / LIFF View)';
-        $('#phoneNotch')?.remove();
-        $('#phoneLineHeader')?.remove();
-      }
-    };
-  }
 
   if (simWebhookBtn && !simWebhookBtn.__bound) {
     simWebhookBtn.__bound = true;
