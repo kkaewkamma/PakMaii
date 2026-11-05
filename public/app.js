@@ -778,16 +778,20 @@ function renderMobileDock() {
   const items = me.role === 'farmer'
     ? [
         { id: 'home', label: 'ภาพรวม', icon: 'sprout' },
+        { id: 'plots', label: 'แปลงปลูก', icon: 'mapPin' },
         { id: 'record', label: 'บันทึกด่วน', icon: 'calendar', highlight: true },
         { id: 'approval', label: 'ขอปัจจัย', icon: 'clipboard' },
-        { id: 'reviews', label: 'ตรวจแปลง', icon: 'shield' }
+        { id: 'reviews', label: 'ตรวจแปลง', icon: 'shield' },
+        { id: 'lots', label: 'ล็อต', icon: 'package' }
       ]
     : me.role === 'ics'
     ? [
         { id: 'home', label: 'ภาพรวม', icon: 'sprout' },
+        { id: 'plots', label: 'แปลงเกษตร', icon: 'mapPin' },
         { id: 'risks', label: 'เฝ้าระวังเสี่ยง', icon: 'alert', highlight: true },
-        { id: 'approval', label: 'พิจารณาคำขอ', icon: 'clipboard' },
-        { id: 'reviews', label: 'ตรวจแปลง', icon: 'shield' }
+        { id: 'approval', label: 'คำขอ', icon: 'clipboard' },
+        { id: 'reviews', label: 'ตรวจแปลง', icon: 'shield' },
+        { id: 'lots', label: 'ล็อต', icon: 'package' }
       ]
     : [
         { id: 'invites', label: 'คำเชิญ', icon: 'user' },
@@ -1013,34 +1017,221 @@ async function loadTab() {
       const pendingCount = approvals.filter(item => item.status === 'pending').length;
 
       if (me.role === 'ics') {
-        const [metrics, watchlist] = (demoBackend && demoUser)
-          ? await Promise.all([api('/metrics').catch(() => null), api('/watchlist').catch(() => [])])
-          : [null, []];
-        const totalMembers = metrics?.totalMembers ?? 65;
-        const totalPlots = metrics?.totalPlots ?? 120;
-        const pendingInput = metrics?.pendingInputRequests ?? (pendingCount || 8);
-        const riskAlerts = metrics?.riskAlerts ?? 12;
-        const groupReadiness = metrics?.groupReadiness ?? 86;
-        const watchRows = (watchlist && watchlist.length) ? watchlist : [
-          { code: 'A-03', farmer: 'Demo Farmer 01', crop: 'ข้าวหอมมะลิ 105', conversion: 'Year 1', status: 'ขาดการบันทึกกิจกรรม 14 วัน', severity: 'risk', action: 'ติดตามด่วน', targetTab: 'record' },
-          { code: 'B-01', farmer: 'Demo Farmer 02', crop: 'ถั่วเหลืองอินทรีย์แฟร์เทรด', conversion: 'Year 2', status: 'มีคำขอปัจจัยการผลิตรออนุมัติ', severity: 'warning', action: 'พิจารณาคำขอ', targetTab: 'approval' },
-          { code: 'C-12', farmer: 'Demo Farmer 03', crop: 'ปอเทือง (Sunn Hemp)', conversion: 'Year 1', status: 'ประวัติไม่สอดคล้อง', severity: 'risk', action: 'นัดตรวจแปลง', targetTab: 'reviews' },
-          { code: 'D-05', farmer: 'Demo Farmer 04', crop: 'ข้าวหอมมะลิอินทรีย์', conversion: 'Certified EU Organic', status: 'ปกติ (ผ่านเกณฑ์อินทรีย์)', severity: 'normal', action: 'ดูใบรับรอง', targetTab: 'lots' }
-        ];
+        let totalMembers = 0;
+        let totalPlots = plots.length;
+        let pendingInput = pendingCount;
+        let riskAlerts = 0;
+        let groupReadiness = 100;
+        let watchRows = [];
+        const isDemo = Boolean(demoBackend && demoUser);
+
+        if (isDemo) {
+          const [metrics, watchlist] = await Promise.all([
+            api('/metrics').catch(() => null),
+            api('/watchlist').catch(() => [])
+          ]);
+          totalMembers = metrics?.totalMembers ?? 65;
+          totalPlots = metrics?.totalPlots ?? 120;
+          pendingInput = metrics?.pendingInputRequests ?? (pendingCount || 8);
+          riskAlerts = metrics?.riskAlerts ?? 12;
+          groupReadiness = metrics?.groupReadiness ?? 86;
+          watchRows = (watchlist && watchlist.length) ? watchlist : [
+            { code: 'A-03', farmer: 'Demo Farmer 01', crop: 'ข้าวหอมมะลิ 105', conversion: 'Year 1', status: 'ขาดการบันทึกกิจกรรม 14 วัน', severity: 'risk', action: 'ติดตามด่วน', targetTab: 'record' },
+            { code: 'B-01', farmer: 'Demo Farmer 02', crop: 'ถั่วเหลืองอินทรีย์แฟร์เทรด', conversion: 'Year 2', status: 'มีคำขอปัจจัยการผลิตรออนุมัติ', severity: 'warning', action: 'พิจารณาคำขอ', targetTab: 'approval' },
+            { code: 'C-12', farmer: 'Demo Farmer 03', crop: 'ปอเทือง (Sunn Hemp)', conversion: 'Year 1', status: 'ประวัติไม่สอดคล้อง', severity: 'risk', action: 'นัดตรวจแปลง', targetTab: 'reviews' },
+            { code: 'D-05', farmer: 'Demo Farmer 04', crop: 'ข้าวหอมมะลิอินทรีย์', conversion: 'Certified EU Organic', status: 'ปกติ (ผ่านเกณฑ์อินทรีย์)', severity: 'normal', action: 'ดูใบรับรอง', targetTab: 'lots' }
+          ];
+        } else {
+          // REAL PRODUCTION DATA: Calculated strictly from real API responses
+          const since14 = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
+          const farmerIdSet = new Set();
+
+          plots.forEach(p => {
+            if (p.farmer_id || p.farmer) farmerIdSet.add(p.farmer_id || p.farmer);
+            const plotActs = activities.filter(a => a.plot_id === p.id);
+            const hasRecentAct = plotActs.some(a => a.activity_date >= since14);
+            const hasPending = approvals.some(a => a.plot_id === p.id && a.status === 'pending');
+
+            if (!hasRecentAct) {
+              riskAlerts++;
+              watchRows.push({
+                plot_id: p.id,
+                code: p.plot_code || `P-${p.id}`,
+                farmer: p.farmer_name || p.farmer || `เกษตรกร #${p.farmer_id || p.id}`,
+                crop: p.crop || '-',
+                conversion: p.conversion_year || 'Year 1',
+                status: 'ขาดการบันทึกกิจกรรมเกิน 14 วัน',
+                severity: 'risk',
+                action: 'ติดตามด่วน',
+                targetTab: 'record'
+              });
+            } else if (hasPending) {
+              watchRows.push({
+                plot_id: p.id,
+                code: p.plot_code || `P-${p.id}`,
+                farmer: p.farmer_name || p.farmer || `เกษตรกร #${p.farmer_id || p.id}`,
+                crop: p.crop || '-',
+                conversion: p.conversion_year || 'Year 1',
+                status: 'มีคำขอปัจจัยการผลิตรออนุมัติ',
+                severity: 'warning',
+                action: 'พิจารณาคำขอ',
+                targetTab: 'approval'
+              });
+            }
+          });
+
+          totalMembers = farmerIdSet.size;
+          groupReadiness = plots.length > 0
+            ? Math.max(0, Math.round(((plots.length - riskAlerts) / plots.length) * 100))
+            : 100;
+        }
 
         const readinessFillClass = groupReadiness >= 95 ? 'fill-98' : groupReadiness >= 92 ? 'fill-94' : groupReadiness >= 89 ? 'fill-90' : 'fill-86';
+
+        const buildWatchlistActionButtons = (w) => {
+          const actionRow = el('div', { className: 'row' });
+          if (w.pendingApprovalId) {
+            actionRow.append(
+              el('button', {
+                type: 'button',
+                className: 'btn-sm',
+                onclick: async () => {
+                  try {
+                    await api(`/approvals/${w.pendingApprovalId}`, 'PATCH', {
+                      status: 'approved',
+                      comment: 'อนุมัติสูตรปุ๋ยหมักอินทรีย์ตามเกณฑ์มาตรฐาน PGS & ICS'
+                    });
+                    notify(`อนุมัติคำขอปัจจัยแปลง ${w.code} เรียบร้อย`);
+                    await loadTab();
+                  } catch (err) {
+                    if (!err.handled) notify(err.message);
+                  }
+                }
+              }, icon('check', 13), ' อนุมัติทันที'),
+              el('button', {
+                type: 'button',
+                className: 'secondary btn-sm',
+                onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
+              }, 'ตรวจสอบ')
+            );
+          } else if (w.code === 'C-12' && w.severity === 'risk') {
+            actionRow.append(
+              el('button', {
+                type: 'button',
+                className: 'btn-sm',
+                onclick: async () => {
+                  try {
+                    await api('/reviews', 'POST', {
+                      plot_id: w.plot_id || 3,
+                      result: 'ผ่าน',
+                      note: 'ตรวจแปลง C-12 เรียบร้อย เกษตรกรไถกลบปอเทืองตามเกณฑ์มาตรฐาน PGS'
+                    });
+                    notify('บันทึกผลตรวจแปลง C-12 ผ่านเกณฑ์เรียบร้อย');
+                    await loadTab();
+                  } catch (err) {
+                    if (!err.handled) notify(err.message);
+                  }
+                }
+              }, icon('shield', 13), ' ยืนยันผลตรวจผ่าน'),
+              el('button', {
+                type: 'button',
+                className: 'secondary btn-sm',
+                onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
+              }, 'บันทึกตรวจ')
+            );
+          } else if (w.code === 'A-03' && w.severity === 'risk' && demoUser) {
+            actionRow.append(
+              el('button', {
+                type: 'button',
+                className: 'btn-sm secondary',
+                onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
+              }, icon('user', 12), ' สลับเป็นเกษตรกร A-03')
+            );
+          } else {
+            actionRow.append(
+              el('button', {
+                type: 'button',
+                className: 'btn-sm secondary',
+                onclick: async () => { tab = w.targetTab || 'lots'; renderTabs(); await loadTab(); }
+              }, w.action)
+            );
+          }
+          return actionRow;
+        };
+
+        let watchlistContent;
+        if (!watchRows.length) {
+          watchlistContent = empty('ไม่พบแปลงที่มีความเสี่ยงในระบบ สมาชิกทุกคนบันทึกข้อมูลและปฏิบัติตามมาตรฐาน');
+        } else {
+          // 1. Desktop Table View (visible on > 640px)
+          const desktopTable = el('div', { className: 'watchlist-table-wrap desktop-only' },
+            el('table', { className: 'watchlist-table' },
+              el('thead', {},
+                el('tr', {},
+                  el('th', {}, 'รหัสแปลง'),
+                  el('th', {}, 'เกษตรกรผู้ดูแล'),
+                  el('th', {}, 'พืช & ระยะปรับเปลี่ยน'),
+                  el('th', {}, 'สถานะความเสี่ยง'),
+                  el('th', {}, 'การดำเนินการ')
+                )
+              ),
+              el('tbody', {},
+                ...watchRows.map(w => {
+                  const badgeClass = w.severity === 'risk' ? 'badge-risk' : w.severity === 'warning' ? 'badge-warning' : 'badge-normal';
+                  const badgePrefix = '● ';
+                  return el('tr', {},
+                    el('td', {}, el('b', { className: 'plot-code-tag' }, w.code)),
+                    el('td', {}, w.farmer),
+                    el('td', {}, `${w.crop} (${w.conversion})`),
+                    el('td', {}, el('span', { className: badgeClass }, badgePrefix + w.status)),
+                    el('td', {}, buildWatchlistActionButtons(w))
+                  );
+                })
+              )
+            )
+          );
+
+          // 2. Mobile Card View (visible on <= 640px, NO horizontal scrolling!)
+          const mobileCards = el('div', { className: 'watchlist-cards mobile-only' },
+            ...watchRows.map(w => {
+              const badgeClass = w.severity === 'risk' ? 'badge-risk' : w.severity === 'warning' ? 'badge-warning' : 'badge-normal';
+              const badgePrefix = '● ';
+              return el('div', { className: `watchlist-card-item severity-${w.severity}` },
+                el('div', { className: 'watchlist-card-top' },
+                  el('b', { className: 'plot-code-tag' }, w.code),
+                  el('span', { className: badgeClass }, badgePrefix + w.status)
+                ),
+                el('div', { className: 'watchlist-card-body' },
+                  el('div', { className: 'watchlist-meta-item' },
+                    icon('user', 14),
+                    el('b', {}, w.farmer)
+                  ),
+                  el('div', { className: 'watchlist-meta-item' },
+                    icon('leaf', 14),
+                    el('span', {}, `${w.crop} • ${w.conversion}`)
+                  )
+                ),
+                el('div', { className: 'watchlist-card-actions' },
+                  buildWatchlistActionButtons(w)
+                )
+              );
+            })
+          );
+
+          watchlistContent = el('div', {}, desktopTable, mobileCards);
+        }
 
         nodes = [
           el('div', { className: 'grid' },
             card(
               el('div', { className: 'stat-label' }, icon('users', 14), 'สมาชิกกลุ่มเกษตรกร'),
               el('div', { className: 'stat' }, `${totalMembers} ราย`),
-              el('small', { className: 'muted' }, 'วิสาหกิจชุมชนผักไหม')
+              el('small', { className: 'muted' }, isDemo ? 'วิสาหกิจชุมชนผักไหม (Demo)' : 'สมาชิกในความรับผิดชอบ')
             ),
             card(
               el('div', { className: 'stat-label' }, icon('mapPin', 14), 'แปลงปลูกทั้งหมด'),
               el('div', { className: 'stat' }, `${totalPlots} แปลง`),
-              el('small', { className: 'muted' }, 'รวมพื้นที่ 380 ไร่')
+              el('small', { className: 'muted' }, isDemo ? 'รวมพื้นที่ 380 ไร่' : 'แปลงในความดูแล')
             ),
             card(
               el('div', { className: 'stat-label' }, icon('clock', 14), 'คำขอปัจจัยรอตรวจ'),
@@ -1063,104 +1254,10 @@ async function loadTab() {
           el('div', { className: 'card watchlist-card' },
             el('div', { className: 'row between' },
               el('h3', {}, icon('alert', 16), ' Priority Watch-list: การเฝ้าระวังและบริหารความเสี่ยงรายแปลง'),
-              el('span', { className: 'pill warn' }, 'การควบคุมความเสี่ยงเพื่อรักษามาตรฐานกลุ่ม')
+              el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'Demo Simulation' : 'ข้อมูลจริงจากระบบ')
             ),
             el('p', { className: 'muted card-lead' }, 'ระบบคัดกรองแปลงที่ต้องการการดูแลเร่งด่วน (ขาดการบันทึกเกิน 14 วัน / รออนุมัติปัจจัยการผลิต / ประวัติไม่สอดคล้อง) เพื่อให้เจ้าหน้าที่ ICS ติดตามได้ทันที'),
-            el('div', { className: 'watchlist-table-wrap' },
-              el('table', { className: 'watchlist-table' },
-                el('thead', {},
-                  el('tr', {},
-                    el('th', {}, 'รหัสแปลง'),
-                    el('th', {}, 'เกษตรกรผู้ดูแล'),
-                    el('th', {}, 'พืช & ระยะปรับเปลี่ยน'),
-                    el('th', {}, 'สถานะความเสี่ยง'),
-                    el('th', {}, 'การดำเนินการ')
-                  )
-                ),
-                el('tbody', {},
-                  ...watchRows.map(w => {
-                    const badgeClass = w.severity === 'risk' ? 'badge-risk' : w.severity === 'warning' ? 'badge-warning' : 'badge-normal';
-                    const badgePrefix = w.severity === 'risk' ? '● ' : w.severity === 'warning' ? '● ' : '● ';
-                    const actionCell = el('div', { className: 'row' });
-
-                    if (w.pendingApprovalId) {
-                      actionCell.append(
-                        el('button', {
-                          type: 'button',
-                          className: 'btn-sm',
-                          onclick: async () => {
-                            try {
-                              await api(`/approvals/${w.pendingApprovalId}`, 'PATCH', {
-                                status: 'approved',
-                                comment: 'อนุมัติสูตรปุ๋ยหมักอินทรีย์ตามเกณฑ์มาตรฐาน PGS & ICS'
-                              });
-                              notify(`อนุมัติคำขอปัจจัยแปลง ${w.code} เรียบร้อย`);
-                              await loadTab();
-                            } catch (err) {
-                              if (!err.handled) notify(err.message);
-                            }
-                          }
-                        }, icon('check', 13), ' อนุมัติทันที'),
-                        el('button', {
-                          type: 'button',
-                          className: 'secondary btn-sm',
-                          onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
-                        }, 'ตรวจสอบ')
-                      );
-                    } else if (w.code === 'C-12' && w.severity === 'risk') {
-                      actionCell.append(
-                        el('button', {
-                          type: 'button',
-                          className: 'btn-sm',
-                          onclick: async () => {
-                            try {
-                              await api('/reviews', 'POST', {
-                                plot_id: w.plot_id || 3,
-                                result: 'ผ่าน',
-                                note: 'ตรวจแปลง C-12 เรียบร้อย เกษตรกรไถกลบปอเทืองตามเกณฑ์มาตรฐาน PGS'
-                              });
-                              notify('บันทึกผลตรวจแปลง C-12 ผ่านเกณฑ์เรียบร้อย');
-                              await loadTab();
-                            } catch (err) {
-                              if (!err.handled) notify(err.message);
-                            }
-                          }
-                        }, icon('shield', 13), ' ยืนยันผลตรวจผ่าน'),
-                        el('button', {
-                          type: 'button',
-                          className: 'secondary btn-sm',
-                          onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
-                        }, 'บันทึกตรวจ')
-                      );
-                    } else if (w.code === 'A-03' && w.severity === 'risk' && demoUser) {
-                      actionCell.append(
-                        el('button', {
-                          type: 'button',
-                          className: 'btn-sm secondary',
-                          onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
-                        }, icon('user', 12), ' สลับเป็นเกษตรกร A-03')
-                      );
-                    } else {
-                      actionCell.append(
-                        el('button', {
-                          type: 'button',
-                          className: 'btn-sm secondary',
-                          onclick: async () => { tab = w.targetTab || 'lots'; renderTabs(); await loadTab(); }
-                        }, w.action)
-                      );
-                    }
-
-                    return el('tr', {},
-                      el('td', {}, el('b', { className: 'plot-code-tag' }, w.code)),
-                      el('td', {}, w.farmer),
-                      el('td', {}, `${w.crop} (${w.conversion})`),
-                      el('td', {}, el('span', { className: badgeClass }, badgePrefix + w.status)),
-                      el('td', {}, actionCell)
-                    );
-                  })
-                )
-              )
-            )
+            watchlistContent
           )
         ];
       } else {

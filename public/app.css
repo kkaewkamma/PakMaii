@@ -5,7 +5,7 @@
    ========================================================================== */
 
 :root {
-  --font-sans: "Inter", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter", "Noto Sans Thai", "Sarabun", "Prompt", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
   /* Premium AgriTech Palette */
@@ -1594,7 +1594,97 @@ body.is-login .hero {
 }
 
 /* ==========================================================================
-   Mobile Quick Action Dock & Responsive Navigation
+   Responsive Visibility Helpers (Desktop vs Mobile)
+   ========================================================================== */
+.desktop-only {
+  display: block;
+}
+
+.mobile-only {
+  display: none;
+}
+
+/* ==========================================================================
+   Priority 2: Responsive ICS Watch-list Cards (Zero Horizontal Scroll on Mobile)
+   ========================================================================== */
+.watchlist-cards {
+  display: none;
+}
+
+.watchlist-card-item {
+  background: var(--surface-white);
+  border: 1px solid var(--card-border);
+  border-left: 4px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.15s ease;
+}
+
+.watchlist-card-item.severity-risk {
+  border-left-color: var(--danger-dot);
+  background: linear-gradient(180deg, #fffafa 0%, #ffffff 100%);
+}
+
+.watchlist-card-item.severity-warning {
+  border-left-color: var(--warning-dot);
+  background: linear-gradient(180deg, #fffdf7 0%, #ffffff 100%);
+}
+
+.watchlist-card-item.severity-normal {
+  border-left-color: var(--forest-green);
+  background: linear-gradient(180deg, #f8fdfb 0%, #ffffff 100%);
+}
+
+.watchlist-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.watchlist-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.watchlist-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.watchlist-meta-item svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.watchlist-farmer-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.watchlist-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--card-border);
+}
+
+.watchlist-card-actions .btn-sm {
+  min-height: 44px;
+}
+
+/* ==========================================================================
+   Priority 1 & 4: Mobile Dock Navigation & Touch Accessibility
    ========================================================================== */
 .mobile-dock {
   display: none;
@@ -1602,23 +1692,72 @@ body.is-login .hero {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--slate-200);
-  padding: 6px 12px calc(8px + env(safe-area-inset-bottom, 12px));
+  background: rgba(247, 246, 239, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--card-border);
+  padding: 4px 6px calc(6px + env(safe-area-inset-bottom, 12px));
   z-index: 100;
-  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 -4px 16px rgba(38, 53, 45, 0.08);
   justify-content: space-around;
   align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mobile-dock::-webkit-scrollbar {
+  display: none;
 }
 
 @media (max-width: 640px) {
-  .mobile-dock:not(.hide) {
-    display: flex;
+  /* Priority 1: Hide horizontal tab bar after login on screens <= 640px */
+  body:not(.is-login) nav#tabs {
+    display: none !important;
   }
+
+  /* Priority 1: Show Mobile Dock as primary navigation */
+  .mobile-dock:not(.hide) {
+    display: flex !important;
+  }
+
+  /* Priority 1: Prevent content obscuring by fixed bottom dock */
   main.wrap {
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 16px));
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 16px));
+  }
+
+  /* Priority 2: Toggle desktop table and mobile cards */
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Priority 4: 44px minimum touch target for mobile ergonomics */
+  button, .secondary, .btn-sm {
+    min-height: 44px !important;
+    padding: 10px 14px !important;
+    font-size: 13.5px !important;
+  }
+
+  .chip-btn {
+    min-height: 44px !important;
+  }
+
+  .switcher-pill {
+    min-height: 44px !important;
+    padding: 8px 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+
+  .link-btn {
+    min-height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
   }
 }
 
@@ -1627,46 +1766,48 @@ body.is-login .hero {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   background: transparent;
   border: none;
-  border-radius: var(--radius-md);
-  padding: 6px 10px;
-  color: var(--slate-500);
-  font-size: 11px;
+  border-radius: var(--radius-sm);
+  padding: 6px 3px;
+  color: var(--text-secondary);
+  font-size: 10.5px;
   font-weight: 500;
-  min-width: 58px;
-  min-height: 48px;
+  flex: 1 1 0;
+  min-width: 48px;
+  min-height: 48px; /* 48px touch target */
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
   box-shadow: none;
+  text-align: center;
 }
 
 .dock-btn:hover {
-  background: var(--slate-100);
-  color: var(--slate-800);
+  background: var(--soft-sage-bg);
+  color: var(--deep-forest);
 }
 
 .dock-btn.active {
-  color: var(--primary-700);
+  color: var(--forest-green);
   font-weight: 700;
 }
 
 .dock-btn.active svg {
-  stroke: var(--primary-600);
+  stroke: var(--forest-green);
   stroke-width: 2.4;
 }
 
 .dock-btn.dock-highlight {
-  background: var(--primary-50);
-  color: var(--primary-800);
-  border: 1px solid var(--primary-100);
+  background: rgba(36, 91, 69, 0.08);
+  color: var(--forest-green);
+  border: 1px solid rgba(36, 91, 69, 0.15);
 }
 
 .dock-btn.dock-highlight.active {
-  background: var(--primary-700);
+  background: var(--forest-green);
   color: var(--white);
-  border-color: var(--primary-700);
+  border-color: var(--forest-green);
 }
 
 .dock-btn.dock-highlight.active svg {
@@ -1675,4 +1816,5 @@ body.is-login .hero {
 
 .dock-label {
   line-height: 1.1;
+  white-space: nowrap;
 }
