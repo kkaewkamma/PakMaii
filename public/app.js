@@ -789,11 +789,25 @@ function showStoryPassport(lot) {
         el('p', { className: 'muted passport-qr-desc' }, lot.story_highlights || 'ผลผลิตอินทรีย์ผ่านการรับรองระบบควบคุมภายใน (Internal Control System: ICS) วิสาหกิจชุมชนตำบลผักไหม จ.ศรีสะเกษ')
       ),
       el('div', { className: 'passport-actions row between' },
-        el('button', {
-          type: 'button',
-          className: 'btn-sm secondary',
-          onclick: () => window.print()
-        }, icon('printer', 14), ' พิมพ์ใบรับรอง (Print)'),
+        el('div', { className: 'row' },
+          el('button', {
+            type: 'button',
+            className: 'btn-sm secondary',
+            onclick: () => window.print()
+          }, icon('printer', 14), ' พิมพ์ใบรับรอง (Print)'),
+          el('button', {
+            type: 'button',
+            className: 'btn-sm secondary',
+            onclick: () => {
+              const text = `[ใบรับรองตรวจสอบย้อนกลับเกษตรอินทรีย์ ผักไหม]\n` +
+                `ล็อตผลผลิต: ${lot.code || lot.lot_code || 'L-12'}\n` +
+                `ผลผลิต: ${lot.crop || 'ข้าวหอมมะลิ 105'}\n` +
+                `ปริมาณ: ${lot.total_bags_or_kg || `${lot.quantity} กก.`}\n` +
+                `มาตรฐาน: รับรองระบบควบคุมภายใน PGS & ICS วิสาหกิจชุมชนตำบลผักไหม จ.ศรีสะเกษ`;
+              window.open(`https://line.me/R/msg/text/?${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+            }
+          }, icon('message', 14), ' แชร์เข้า LINE')
+        ),
         el('button', {
           type: 'button',
           className: 'passport-close-btn',
@@ -804,6 +818,35 @@ function showStoryPassport(lot) {
   );
   overlay.append(card);
   document.body.append(overlay);
+}
+
+function sharePlotRiskToLine(w) {
+  const text = `[แจ้งเตือนมาตรฐานเกษตรอินทรีย์ ผักไหม (PGS/ICS)]\n` +
+    `แปลง: ${w.code} (${w.crop || 'อินทรีย์'})\n` +
+    `เกษตรกร: ${w.farmer}\n` +
+    `สถานะ: ${w.status}\n` +
+    `คำแนะนำ: กรุณาเข้าบันทึกกิจกรรมในแปลงผ่านระบบ Ready to Grow เพื่อรักษามาตรฐานกลุ่ม\n` +
+    `เข้าใช้งาน: ${window.location.origin}`;
+  const url = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function exportCsv(filename, headers, rows) {
+  const escapeCsv = (str) => `"${String(str ?? '').replace(/"/g, '""')}"`;
+  const content = [
+    headers.map(escapeCsv).join(','),
+    ...rows.map(row => row.map(escapeCsv).join(','))
+  ].join('\r\n');
+  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  notify(`ดาวน์โหลดไฟล์ ${filename} เรียบร้อย`);
 }
 
 function currentTabs() {
@@ -1197,7 +1240,12 @@ async function loadTab() {
                 type: 'button',
                 className: 'btn-sm secondary',
                 onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
-              }, icon('shield', 13), ' ' + (w.action || 'บันทึกตรวจแปลง'))
+              }, icon('shield', 13), ' ' + (w.action || 'บันทึกตรวจแปลง')),
+              el('button', {
+                type: 'button',
+                className: 'btn-sm secondary',
+                onclick: () => sharePlotRiskToLine(w)
+              }, icon('message', 13), ' แจ้งเตือน LINE')
             );
           } else if (w.code === 'A-03' && w.severity === 'risk' && demoUser) {
             actionRow.append(
@@ -1205,7 +1253,25 @@ async function loadTab() {
                 type: 'button',
                 className: 'btn-sm secondary',
                 onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
-              }, icon('user', 12), ' สลับเป็นเกษตรกร A-03')
+              }, icon('user', 12), ' สลับเป็นเกษตรกร A-03'),
+              el('button', {
+                type: 'button',
+                className: 'btn-sm secondary',
+                onclick: () => sharePlotRiskToLine(w)
+              }, icon('message', 13), ' แจ้งเตือน LINE')
+            );
+          } else if (w.severity === 'risk') {
+            actionRow.append(
+              el('button', {
+                type: 'button',
+                className: 'btn-sm secondary',
+                onclick: async () => { tab = w.targetTab || 'lots'; renderTabs(); await loadTab(); }
+              }, w.action),
+              el('button', {
+                type: 'button',
+                className: 'btn-sm secondary',
+                onclick: () => sharePlotRiskToLine(w)
+              }, icon('message', 13), ' แจ้งเตือน LINE')
             );
           } else {
             actionRow.append(
@@ -1499,14 +1565,36 @@ async function loadTab() {
           inputField('area', 'ขนาดพื้นที่ / รายละเอียด (เช่น 2 ไร่, แปลงโซน A)', 'text', false),
         ], 'บันทึกแปลงปลูก', '/plots'));
       }
-      if (!plots.length) {
-        nodes.push(empty(me.role === 'farmer' ? 'ยังไม่มีแปลงปลูก เริ่มต้นด้วยการเพิ่มแปลงแรกด้านบน' : 'ไม่พบแปลงปลูกของเกษตรกรในความดูแล'));
+      if (me.role !== 'farmer' && plots.length) {
+        nodes.push(
+          el('div', { className: 'row between search-actions-row' },
+            el('b', { className: 'muted' }, `แปลงทั้งหมดในความดูแล (${plots.length} แปลง)`),
+            el('button', {
+              type: 'button',
+              className: 'btn-sm secondary',
+              onclick: () => {
+                const headers = ['รหัสแปลง', 'ชื่อแปลง', 'พืชที่ปลูก', 'ขนาดพื้นที่', 'ระยะปรับเปลี่ยน', 'เจ้าของแปลง', 'วันที่สร้าง'];
+                const dataRows = plots.map(p => [
+                  p.plot_code || `P-${p.id}`,
+                  p.name || '-',
+                  p.crop || '-',
+                  p.area || '-',
+                  p.conversion_year || 'Year 1',
+                  p.owner || p.farmer || '-',
+                  dated(p.created_at)
+                ]);
+                exportCsv(`pakmaii-plots-${new Date().toISOString().slice(0, 10)}.csv`, headers, dataRows);
+              }
+            }, icon('fileText', 13), ' ส่งออกข้อมูลแปลง (CSV/Excel)')
+          )
+        );
       }
-      for (const plot of plots) {
+
+      const buildPlotCard = (plot) => {
         const conversionYear = plot.conversion_year || 'Year 1';
 
         if (me.role !== 'farmer') {
-          nodes.push(card(
+          return card(
             el('div', { className: 'row between' },
               el('b', {}, `${plot.plot_code ? `[${plot.plot_code}] ` : ''}${plot.name}`),
               el('span', { className: 'pill success' }, icon('leaf', 11), plot.crop)
@@ -1524,8 +1612,7 @@ async function loadTab() {
                 onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
               }, icon('shield', 13), ' บันทึกผลตรวจแปลงนี้')
             )
-          ));
-          continue;
+          );
         }
 
         let editBox = null;
@@ -1600,7 +1687,34 @@ async function loadTab() {
           toggleBtn.replaceChildren(icon('x', 13), document.createTextNode(' ปิดฟอร์มแก้ไข'));
         };
 
-        nodes.push(box);
+        return box;
+      };
+
+      if (!plots.length) {
+        nodes.push(empty(me.role === 'farmer' ? 'ยังไม่มีแปลงปลูก เริ่มต้นด้วยการเพิ่มแปลงแรกด้านบน' : 'ไม่พบแปลงปลูกของเกษตรกรในความดูแล'));
+      } else {
+        const cardsList = el('div', { className: 'cards-list' }, ...plots.map(buildPlotCard));
+        if (plots.length > 2) {
+          const searchInput = el('input', {
+            type: 'search',
+            placeholder: 'ค้นหาชื่อแปลง, รหัสแปลง, หรือพืชที่ปลูก...',
+            oninput: (e) => {
+              const q = e.target.value.trim().toLowerCase();
+              const filtered = plots.filter(p =>
+                !q ||
+                String(p.name || '').toLowerCase().includes(q) ||
+                String(p.crop || '').toLowerCase().includes(q) ||
+                String(p.owner || '').toLowerCase().includes(q) ||
+                String(p.plot_code || '').toLowerCase().includes(q)
+              );
+              cardsList.replaceChildren(
+                ...(!filtered.length ? [empty('ไม่พบแปลงที่ตรงกับคำค้นหา')] : filtered.map(buildPlotCard))
+              );
+            }
+          });
+          nodes.push(el('div', { className: 'search-filter-box' }, icon('search', 15), searchInput));
+        }
+        nodes.push(cardsList);
       }
     } else if (tab === 'record') {
       const rows = await api('/activities');
@@ -1943,6 +2057,29 @@ async function loadTab() {
         el('b', {}, icon('shield', 15), me.role === 'farmer' ? ' ประวัติผลการตรวจประเมินแปลงจากเจ้าหน้าที่ ICS' : ' ประวัติการตรวจประเมินแปลงทั้งหมด'),
         el('p', { className: 'muted' }, me.role === 'farmer' ? 'รายงานผลการตรวจรับรองแปลงอินทรีย์โดยเจ้าหน้าที่ ICS ประจำกลุ่มของคุณ' : `บันทึกแล้วทั้งหมด ${rows.length} ครั้ง`)
       ));
+
+      if (me.role !== 'farmer' && rows.length) {
+        nodes.push(
+          el('div', { className: 'row between search-actions-row' },
+            el('small', { className: 'muted' }, 'ข้อมูลประวัติการตรวจรับรองตามเกณฑ์มาตรฐาน PGS/ICS'),
+            el('button', {
+              type: 'button',
+              className: 'btn-sm secondary',
+              onclick: () => {
+                const headers = ['ลำดับ', 'ชื่อแปลง', 'ผลตรวจ', 'บันทึกและข้อเสนอแนะ', 'วันที่ตรวจ'];
+                const dataRows = rows.map(r => [
+                  r.id,
+                  r.plot_name || '-',
+                  r.result || '-',
+                  r.note || '-',
+                  dated(r.created_at)
+                ]);
+                exportCsv(`pakmaii-inspections-${new Date().toISOString().slice(0, 10)}.csv`, headers, dataRows);
+              }
+            }, icon('fileText', 13), ' ส่งออกผลตรวจ (CSV/Excel)')
+          )
+        );
+      }
 
       if (!rows.length) {
         nodes.push(empty(me.role === 'farmer' ? 'ยังไม่มีประวัติการตรวจประเมินแปลงจากเจ้าหน้าที่ ICS' : 'ยังไม่มีบันทึกผลตรวจแปลง'));
