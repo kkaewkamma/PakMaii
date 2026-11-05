@@ -565,50 +565,132 @@ nav#tabs button.active {
   border: 1px solid var(--danger-border);
 }
 
-/* Farmer Status Header Banner */
+/* Farmer Status Header Banner & Traffic-Light PGS Compliance */
 .farmer-status-card {
   border-radius: var(--radius-lg);
-  padding: 16px 18px;
-  margin-bottom: 14px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
   border: 1px solid var(--slate-200);
   background: var(--white);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
 }
 
 .farmer-status-card.risk {
-  border-left: 4px solid var(--danger-dot);
-  background: #fef8f8;
+  border-left: 5px solid var(--danger-dot);
+  background: linear-gradient(180deg, #fffafa 0%, #ffffff 100%);
+  border-color: var(--danger-border);
 }
 
 .farmer-status-card.warn {
-  border-left: 4px solid var(--warning-dot);
-  background: #fffdf5;
+  border-left: 5px solid var(--warning-dot);
+  background: linear-gradient(180deg, #fffdf7 0%, #ffffff 100%);
+  border-color: var(--warning-border);
 }
 
 .farmer-status-card.normal {
-  border-left: 4px solid var(--primary-600);
-  background: #f7fdf9;
+  border-left: 5px solid var(--primary-600);
+  background: linear-gradient(180deg, #f8fdfb 0%, #ffffff 100%);
+  border-color: var(--primary-100);
 }
 
 .farmer-status-header {
+  margin-bottom: 6px;
+}
+
+.status-badge-row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
 }
 
-.farmer-status-header b {
-  font-size: 14.5px;
-  font-weight: 600;
+.farmer-status-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 10px 0 6px;
   color: var(--slate-900);
+  letter-spacing: -0.01em;
 }
 
-.farmer-status-card p {
-  margin: 4px 0 12px;
-  font-size: 13px;
+.farmer-status-desc {
+  font-size: 13.5px;
+  line-height: 1.6;
   color: var(--slate-600);
+  margin: 0 0 14px;
+}
+
+.farmer-advice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.farmer-advice-box.advice-risk {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+}
+
+.farmer-advice-box.advice-warn {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+}
+
+.farmer-advice-box.advice-normal {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+}
+
+.farmer-quick-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+
+.quick-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-stat-sub {
+  font-size: 11px;
+  color: var(--slate-500);
+  font-weight: 500;
+}
+
+.quick-stat-item b {
+  font-size: 13px;
+  color: var(--slate-800);
+}
+
+.farmer-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pulse {
+  animation: pulse-ring 2s infinite;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
 
 /* ==========================================================================
@@ -923,24 +1005,55 @@ textarea {
   background: var(--white) !important;
   color: var(--slate-700) !important;
   border: 1px solid var(--slate-200) !important;
-  border-radius: var(--radius-sm) !important;
+  border-radius: var(--radius-md) !important;
   padding: 8px 12px !important;
-  font-size: 12.5px !important;
+  font-size: 13px !important;
   font-weight: 500 !important;
   box-shadow: var(--shadow-xs) !important;
-  min-height: 38px !important;
+  min-height: 42px !important;
   text-align: left;
   display: flex !important;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .chip-btn:hover {
   background: var(--slate-50) !important;
   color: var(--slate-900) !important;
   border-color: var(--slate-300) !important;
+  transform: translateY(-1px);
+}
+
+.chip-btn.active {
+  background: var(--primary-50) !important;
+  border-color: var(--primary-600) !important;
+  color: var(--primary-900) !important;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2) !important;
+}
+
+.chip-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: var(--slate-100);
+  color: var(--slate-600);
+  flex-shrink: 0;
+}
+
+.chip-btn.active .chip-tag {
+  background: var(--primary-100);
+  color: var(--primary-800);
+}
+
+.chip-text {
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chip-amber {
@@ -1344,4 +1457,122 @@ body.is-login .hero {
   display: inline-block;
   vertical-align: middle;
   flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Skeleton Loading State
+   ========================================================================== */
+.skeleton-loader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 360px;
+  padding: 6px 0;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(90deg, var(--slate-100) 25%, var(--slate-200) 50%, var(--slate-100) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s infinite ease-in-out;
+}
+
+.skeleton-title {
+  width: 65%;
+  height: 18px;
+}
+
+.skeleton-subtitle {
+  width: 90%;
+  height: 13px;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ==========================================================================
+   Mobile Quick Action Dock & Responsive Navigation
+   ========================================================================== */
+.mobile-dock {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--slate-200);
+  padding: 6px 12px calc(8px + env(safe-area-inset-bottom, 12px));
+  z-index: 100;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
+  justify-content: space-around;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .mobile-dock:not(.hide) {
+    display: flex;
+  }
+  main.wrap {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 16px));
+  }
+}
+
+.dock-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  color: var(--slate-500);
+  font-size: 11px;
+  font-weight: 500;
+  min-width: 58px;
+  min-height: 48px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: none;
+}
+
+.dock-btn:hover {
+  background: var(--slate-100);
+  color: var(--slate-800);
+}
+
+.dock-btn.active {
+  color: var(--primary-700);
+  font-weight: 700;
+}
+
+.dock-btn.active svg {
+  stroke: var(--primary-600);
+  stroke-width: 2.4;
+}
+
+.dock-btn.dock-highlight {
+  background: var(--primary-50);
+  color: var(--primary-800);
+  border: 1px solid var(--primary-100);
+}
+
+.dock-btn.dock-highlight.active {
+  background: var(--primary-700);
+  color: var(--white);
+  border-color: var(--primary-700);
+}
+
+.dock-btn.dock-highlight.active svg {
+  stroke: var(--white);
+}
+
+.dock-label {
+  line-height: 1.1;
 }

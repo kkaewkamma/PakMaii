@@ -38,11 +38,17 @@
   <main class="wrap">
     <div class="hero">
       <h2 id="welcome">ยินดีต้อนรับ</h2>
-      <div id="identity" aria-live="polite">กำลังโหลด...</div>
+      <div id="identity" aria-live="polite">
+        <div class="skeleton-loader" aria-hidden="true">
+          <div class="skeleton-line skeleton-title"></div>
+          <div class="skeleton-line skeleton-subtitle"></div>
+        </div>
+      </div>
     </div>
     <nav id="tabs" class="hide" aria-label="เมนูหลัก"></nav>
     <section id="content" aria-live="polite"></section>
   </main>
+  <nav id="mobile-dock" class="mobile-dock hide" aria-label="เมนูลัดบนมือถือ"></nav>
   <div id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
