@@ -952,8 +952,8 @@ async function loadTab() {
             )
           ),
           el('div', { className: 'notice', style: 'margin-top:16px' },
-            el('b', {}, icon('alert', 15), ' 📋 Priority Watch-list: แปลงเฝ้าระวังพิเศษ (Slide 11 Scenario)'),
-            el('p', { className: 'muted' }, 'การคัดกรองความเสี่ยงอัตโนมัติประจำงวดตรวจรับรองมาตรฐานเกษตรอินทรีย์ PGS/EU Fairtrade'),
+            el('b', {}, icon('alert', 15), ' 🚨 Priority Watch-list: ลดความเสี่ยงไม่ให้ปัญหาของสมาชิกคนหนึ่งกระทบต่อการรับรองทั้งกลุ่ม'),
+            el('p', { className: 'muted' }, 'ระบบคัดกรองความเสี่ยงอัตโนมัติ เพื่อให้เจ้าหน้าที่ ICS ติดตามแก้ไขได้ทันท่วงทีก่อนรอบตรวจรับรองมาตรฐานอินทรีย์'),
             el('div', { className: 'watchlist-table-wrap' },
               el('table', { className: 'watchlist-table' },
                 el('thead', {},
@@ -961,7 +961,7 @@ async function loadTab() {
                     el('th', {}, 'รหัสแปลง'),
                     el('th', {}, 'เกษตรกร'),
                     el('th', {}, 'พืช & ระยะปรับเปลี่ยน'),
-                    el('th', {}, 'สถานะตรวจจับ (Risk Detection)'),
+                    el('th', {}, 'สัญญาณความเสี่ยงที่ตรวจพบ'),
                     el('th', {}, 'การดำเนินการ (Action)')
                   )
                 ),
@@ -969,29 +969,29 @@ async function loadTab() {
                   el('tr', {},
                     el('td', {}, el('b', {}, 'A-03')),
                     el('td', {}, 'Demo Farmer 01'),
-                    el('td', {}, 'ข้าวหอมมะลิ 105 (ปี 1) • ⚠️ เสี่ยงแล้ง'),
+                    el('td', {}, 'ข้าวหอมมะลิ 105 (ปี 1)'),
                     el('td', {}, el('span', { className: 'badge-risk' }, '🔴 ขาดการบันทึกกิจกรรม 14 วัน')),
                     el('td', {}, el('button', { type: 'button', className: 'btn-sm secondary', onclick: async () => { tab = 'record'; renderTabs(); await loadTab(); } }, 'ติดตามด่วน'))
                   ),
                   el('tr', {},
                     el('td', {}, el('b', {}, 'B-01')),
                     el('td', {}, 'Demo Farmer 02'),
-                    el('td', {}, 'ถั่วเหลืองแฟร์เทรด (ปี 2) • ปกติ'),
-                    el('td', {}, el('span', { className: 'badge-warning' }, '🟠 มีคำขอปัจจัยการผลิตรออนุมัติ')),
+                    el('td', {}, 'ถั่วเหลืองอินทรีย์ (ปี 2)'),
+                    el('td', {}, el('span', { className: 'badge-warning' }, '🟠 มีคำขอใช้ปุ๋ยหมักรออนุมัติ')),
                     el('td', {}, el('button', { type: 'button', className: 'btn-sm', onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); } }, 'พิจารณาคำขอ'))
                   ),
                   el('tr', {},
                     el('td', {}, el('b', {}, 'C-12')),
                     el('td', {}, 'Demo Farmer 03'),
-                    el('td', {}, 'ปอเทือง Sunn Hemp (ปี 1) • ⚠️ เสี่ยงแล้ง'),
-                    el('td', {}, el('span', { className: 'badge-risk' }, '🔴 ประวัติไม่สอดคล้อง')),
+                    el('td', {}, 'ปอเทือง Sunn Hemp (ปี 1)'),
+                    el('td', {}, el('span', { className: 'badge-risk' }, '🔴 ประวัติกิจกรรมไม่สอดคล้อง')),
                     el('td', {}, el('button', { type: 'button', className: 'btn-sm secondary', onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); } }, 'นัดตรวจแปลง'))
                   ),
                   el('tr', {},
                     el('td', {}, el('b', {}, 'D-05')),
                     el('td', {}, 'Demo Farmer 04'),
-                    el('td', {}, 'ข้าวหอมมะลิ (Certified EU) • ปกติ'),
-                    el('td', {}, el('span', { className: 'badge-normal' }, '🟢 ปกติ')),
+                    el('td', {}, 'ข้าวหอมมะลิ (Certified EU)'),
+                    el('td', {}, el('span', { className: 'badge-normal' }, '🟢 ปกติ (ผ่านเกณฑ์อินทรีย์)')),
                     el('td', {}, el('button', { type: 'button', className: 'btn-sm secondary', onclick: async () => { tab = 'lots'; renderTabs(); await loadTab(); } }, 'ดูใบรับรอง'))
                   )
                 )
@@ -1025,10 +1025,10 @@ async function loadTab() {
 
       if (demoUser) {
         nodes.unshift(el('div', { className: 'notice demo-tip' },
-          el('b', {}, icon('info', 15), 'ระบบเกษตรประณีตตำบลผักไหม (Spark Hack Season #2):'),
+          el('b', {}, icon('info', 15), 'โจทย์: ปลูกของดี — รักษามาตรฐานสินค้าเกษตรอินทรีย์ (วิสาหกิจชุมชนผักไหม)'),
           me.role === 'farmer'
-            ? 'คุณอยู่ในบทบาท Farmer (เกษตรกร) สามารถกดปุ่ม Quick Select วงจรเกษตรผักไหม (ข้าวหอมมะลิ/ถั่วเหลือง/แหนแดง/ปอเทือง/ธนาคารน้ำ) และกดไมโครโฟนเพื่อพูดภาษาไทยได้'
-            : 'คุณอยู่ในบทบาท ICS Officer ควบคุมภายในและตรวจรับรองมาตรฐานอินทรีย์ ตรวจสอบ Watch-list ด้านล่างและพิจารณาอนุมัติคำขอปัจจัยการผลิต'
+            ? 'คุณอยู่ในบทบาท Farmer (เกษตรกร) ช่วยลดภาระการจดกระดาษ บันทึกง่ายผ่าน LINE ด้วยปุ่มลัดรอบเกษตรอินทรีย์หรือกดไมค์พูดภาษาไทย พร้อมยื่นขออนุมัติปุ๋ยหมักก่อนใช้จริง'
+            : 'คุณอยู่ในบทบาท ICS (ผู้ตรวจรับรอง) ช่วยตรวจสอบข้อมูลรวดเร็ว คัดกรองความเสี่ยงแบบ Real-time ก่อนส่งตรวจรับรอง ป้องกันไม่ให้ปัญหาของสมาชิกคนหนึ่งกระทบต่อการรับรองมาตรฐานทั้งกลุ่ม'
         ));
       }
     } else if (tab === 'farmers') {
