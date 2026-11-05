@@ -340,21 +340,73 @@
       if (method === 'POST' && path === '/logout') return { ok: true };
 
       if (method === 'GET' && path === '/metrics') {
-        return clone(store.metrics || {
+        const since = isoDay(new Date(now().getTime() - 14 * 86_400_000));
+        const pending1to4 = store.approvals.filter(a => a.status === 'pending' && a.plot_id >= 1 && a.plot_id <= 4).length;
+        const plot1HasRecent = store.activities.some(a => a.plot_id === 1 && a.activity_date >= since);
+        const plot3HasPass = store.reviews.some(r => r.plot_id === 3 && r.result === 'ผ่าน');
+        const resolvedRisks = (plot1HasRecent ? 1 : 0) + (plot3HasPass ? 1 : 0) + (1 - Math.min(1, pending1to4));
+        const pendingInputRequests = Math.max(0, 7 + pending1to4);
+        const riskAlerts = Math.max(0, 12 - resolvedRisks);
+        const groupReadiness = Math.min(99, 86 + resolvedRisks * 4);
+        return {
           totalMembers: 65,
           totalPlots: 120,
-          pendingInputRequests: 8,
-          riskAlerts: 12,
-          groupReadiness: 86
-        });
+          pendingInputRequests,
+          riskAlerts,
+          groupReadiness
+        };
       }
       if (method === 'GET' && path === '/watchlist') {
-        return [
-          { code: 'A-03', farmer: 'Demo Farmer 01', crop: 'ข้าวหอมมะลิ 105', conversion: 'Year 1', status: 'ขาดการบันทึกกิจกรรม 14 วัน', severity: 'risk', action: 'ติดตามด่วน / แจ้งเตือน LINE' },
-          { code: 'B-01', farmer: 'Demo Farmer 02', crop: 'ถั่วเหลืองอินทรีย์แฟร์เทรด', conversion: 'Year 2', status: 'มีคำขอปัจจัยการผลิตรออนุมัติ', severity: 'warning', action: 'พิจารณาคำขอปุ๋ยหมัก' },
-          { code: 'C-12', farmer: 'Demo Farmer 03', crop: 'ปอเทือง (Sunn Hemp)', conversion: 'Year 1', status: 'ประวัติไม่สอดคล้อง', severity: 'risk', action: 'นัดเข้าตรวจแปลงซ้ำ' },
-          { code: 'D-05', farmer: 'Demo Farmer 04', crop: 'ข้าวหอมมะลิอินทรีย์', conversion: 'Certified EU Organic', status: 'ปกติ', severity: 'normal', action: 'ผ่านการรับรอง PGS' }
-        ];
+        const since = isoDay(new Date(now().getTime() - 14 * 86_400_000));
+        return [1, 2, 3, 4].map(pid => {
+          const p = store.plots.find(x => x.id === pid);
+          if (!p) return null;
+          const f = byId.get(p.owner_id);
+          const pActs = store.activities.filter(a => a.plot_id === pid);
+          const pApps = store.approvals.filter(a => a.plot_id === pid);
+          const pRevs = store.reviews.filter(r => r.plot_id === pid);
+          const pendingApp = pApps.find(a => a.status === 'pending');
+          const hasRecentAct = pActs.some(a => a.activity_date >= since);
+          const hasPassRev = pRevs.some(r => r.result === 'ผ่าน');
+          const hasInconsistent = pActs.some(a => String(a.details).includes('ไม่สอดคล้อง')) && !hasPassRev;
+
+          let status = 'ปกติ (ผ่านเกณฑ์อินทรีย์)';
+          let severity = 'normal';
+          let action = 'ดูใบรับรอง';
+          let targetTab = 'lots';
+
+          if (!hasRecentAct) {
+            status = 'ขาดการบันทึกกิจกรรม 14 วัน';
+            severity = 'risk';
+            action = 'ติดตามด่วน';
+            targetTab = 'record';
+          } else if (pendingApp) {
+            status = 'มีคำขอปัจจัยการผลิตรออนุมัติ';
+            severity = 'warning';
+            action = 'พิจารณาคำขอ';
+            targetTab = 'approval';
+          } else if (hasInconsistent) {
+            status = 'ประวัติไม่สอดคล้อง';
+            severity = 'risk';
+            action = 'นัดตรวจแปลง';
+            targetTab = 'reviews';
+          }
+
+          return {
+            plot_id: p.id,
+            code: p.plot_code || `P-0${pid}`,
+            farmer: f ? f.name : '-',
+            farmer_code: f ? f.agencyCode : '-',
+            crop: p.crop,
+            conversion: p.conversion_year || 'Year 1',
+            status,
+            severity,
+            action,
+            targetTab,
+            pendingApprovalId: pendingApp ? pendingApp.id : null,
+            pendingInputName: pendingApp ? pendingApp.input_name : null
+          };
+        }).filter(Boolean);
       }
       if (method === 'GET' && path === '/plots') {
         return clone(store.plots.filter(plot => owners.has(plot.owner_id)).sort(byIdDesc)

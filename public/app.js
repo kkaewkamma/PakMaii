@@ -275,7 +275,7 @@ async function acceptDemoLogin(role, code) {
   sessionStorage.removeItem('logged_out');
   demoUser = demoSession.login(role, code);
   loginRole = demoUser.role;
-  tab = demoUser.role === 'ics' ? 'farmers' : 'home';
+  tab = 'home';
   await start();
 }
 
@@ -411,7 +411,42 @@ function showLogin(development) {
     adminBtn
   );
 
+  const quickPersonas = el('div', { className: 'quick-persona-box' },
+    el('div', { className: 'quick-persona-title' }, '⚡ เข้าใช้งานด่วน (คลิกเดียวเพื่อทดสอบสถานการณ์จริงของชุมชนผักไหม)'),
+    el('div', { className: 'quick-persona-grid' },
+      el('button', {
+        type: 'button',
+        className: 'persona-card-btn',
+        onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
+      },
+        el('div', { className: 'persona-badge risk' }, 'แปลง A-03 • เสี่ยงขาดบันทึก'),
+        el('b', {}, '👨‍🌾 เกษตรกร 01 (F-STG-001)'),
+        el('small', {}, 'ทดลองกดไมค์พูด / ปุ่มลัดบันทึกกิจกรรมเพื่อแก้ความเสี่ยง')
+      ),
+      el('button', {
+        type: 'button',
+        className: 'persona-card-btn',
+        onclick: () => acceptDemoLogin('farmer', 'F-STG-002')
+      },
+        el('div', { className: 'persona-badge warn' }, 'แปลง B-01 • รออนุมัติปุ๋ย'),
+        el('b', {}, '👩‍🌾 เกษตรกร 02 (F-STG-002)'),
+        el('small', {}, 'ยื่นคำขอสูตรปุ๋ยหมักอินทรีย์ทำเองก่อนใช้จริง')
+      ),
+      el('button', {
+        type: 'button',
+        className: 'persona-card-btn persona-ics',
+        onclick: () => acceptDemoLogin('ics', 'ICS-STG-001')
+      },
+        el('div', { className: 'persona-badge ics' }, 'ผู้ตรวจรับรองกลุ่ม (ICS)'),
+        el('b', {}, '🛡️ เจ้าหน้าที่ ICS (ICS-STG-001)'),
+        el('small', {}, 'ดู Watch-list ความเสี่ยง อนุมัติปุ๋ย และตรวจรับรองแปลง')
+      )
+    )
+  );
+
   $('#identity').replaceChildren(el('div', { className: 'login-card' },
+    quickPersonas,
+    el('div', { className: 'login-divider' }, el('span', {}, 'หรือเลือกรหัสประจำตัวด้วยตนเอง')),
     el('p', { className: 'muted login-lead' }, 'เลือกบทบาท แล้วแตะรหัสตัวอย่างเพื่อทดลองระบบ'),
     form,
     el('p', { className: 'login-note' }, icon('shield', 14), ' ข้อมูลทดลองเก็บในเบราว์เซอร์นี้เท่านั้น แยกจากข้อมูลจริงทั้งหมด'),
@@ -511,52 +546,57 @@ async function start(forceLogin = false) {
     $('#welcome').textContent = `สวัสดี, ${me.name}`;
     const roleIconName = me.role === 'farmer' ? 'sprout' : (me.role === 'ics' ? 'clipboard' : 'shield');
     
-    $('#identity').replaceChildren(el('div', { className: 'identity-bar' },
-      el('div', { className: 'identity-info' },
-        el('div', { className: 'user-avatar' }, icon(roleIconName, 18)),
-        el('div', { className: 'identity-meta' },
-          el('div', { className: 'user-code' },
-            demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
-            me.agency_code || me.name
-          ),
-          el('div', { className: 'user-role-text' }, `${roleLabels[me.role] || me.role} • ${statusLabels[me.status] || me.status}`)
+    const switcherBar = demoUser ? el('div', { className: 'role-switcher-bar' },
+      el('span', { className: 'switcher-label' }, icon('refresh', 13), ' สลับบทบาทด่วน:'),
+      el('button', {
+        type: 'button',
+        className: `switcher-pill ${me.agency_code === 'F-STG-001' ? 'active' : ''}`,
+        onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
+      }, '👨‍🌾 เกษตรกร A-03'),
+      el('button', {
+        type: 'button',
+        className: `switcher-pill ${me.agency_code === 'F-STG-002' ? 'active' : ''}`,
+        onclick: () => acceptDemoLogin('farmer', 'F-STG-002')
+      }, '👩‍🌾 เกษตรกร B-01'),
+      el('button', {
+        type: 'button',
+        className: `switcher-pill ${me.agency_code === 'F-STG-003' ? 'active' : ''}`,
+        onclick: () => acceptDemoLogin('farmer', 'F-STG-003')
+      }, '👨‍🌾 เกษตรกร C-12'),
+      el('button', {
+        type: 'button',
+        className: `switcher-pill switcher-ics ${me.role === 'ics' ? 'active' : ''}`,
+        onclick: () => {
+          tab = 'home';
+          acceptDemoLogin('ics', 'ICS-STG-001');
+        }
+      }, '🛡️ เจ้าหน้าที่ ICS (ตรวจรับรอง)')
+    ) : null;
+
+    $('#identity').replaceChildren(
+      el('div', { className: 'identity-bar' },
+        el('div', { className: 'identity-info' },
+          el('div', { className: 'user-avatar' }, icon(roleIconName, 18)),
+          el('div', { className: 'identity-meta' },
+            el('div', { className: 'user-code' },
+              demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
+              me.agency_code || me.name
+            ),
+            el('div', { className: 'user-role-text' }, `${roleLabels[me.role] || me.role} • ${statusLabels[me.status] || me.status}`)
+          )
+        ),
+        el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
+          icon('logOut', 14),
+          demoUser ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'
         )
       ),
-      el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
-        icon('logOut', 14),
-        demoUser ? 'สลับบัญชี / ออกจากระบบ' : 'ออกจากระบบ'
-      )
-    ));
+      switcherBar
+    );
 
     renderTabs();
-    setupSimulatorControls();
     await loadTab();
   } catch (error) {
     if (!error.handled) showState('เกิดข้อผิดพลาด', error.message, 'ลองใหม่', () => start());
-  }
-}
-
-function setupSimulatorControls() {
-  const simWebhookBtn = $('#simWebhookBtn');
-
-  if (simWebhookBtn && !simWebhookBtn.__bound) {
-    simWebhookBtn.__bound = true;
-    simWebhookBtn.onclick = async () => {
-      try {
-        notify('⚡ กำลังจำลองส่ง LINE Webhook Event...');
-        const res = await api('/webhook/line', 'POST', {
-          events: [{
-            type: 'message',
-            message: { type: 'text', text: 'บันทึกกิจกรรมผ่าน LINE: สูบน้ำโซลาร์เซลล์ / ปล่อยแหนแดง แปลง A-03' }
-          }]
-        });
-        notify(res.message || 'บันทึกผ่าน LINE Webhook สำเร็จ');
-        await loadTab();
-      } catch (err) {
-        notify('บันทึกจำลอง LINE สำเร็จ (Demo Local Sync)');
-        await loadTab();
-      }
-    };
   }
 }
 
@@ -624,8 +664,8 @@ function createVoiceInput(textarea) {
 }
 
 function createPhotoUploader(photoUrlInput) {
-  const fileInput = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
-  const previewImg = el('img', { className: 'photo-preview-img', style: 'display:none' });
+  const fileInput = el('input', { type: 'file', accept: 'image/*', className: 'hide' });
+  const previewImg = el('img', { className: 'photo-preview-img hide', alt: 'ตัวอย่างภาพหลักฐาน' });
   const previewWrap = el('div', { className: 'photo-preview-wrap' });
 
   const uploadBtn = el('button', {
@@ -641,7 +681,7 @@ function createPhotoUploader(photoUrlInput) {
     reader.onload = (e) => {
       const dataUrl = e.target.result;
       previewImg.src = dataUrl;
-      previewImg.style.display = 'block';
+      previewImg.classList.remove('hide');
       if (photoUrlInput) photoUrlInput.value = dataUrl;
       notify('โหลดรูปภาพหลักฐานเรียบร้อย');
     };
@@ -656,9 +696,9 @@ function showStoryPassport(lot) {
   const overlay = el('div', { className: 'passport-overlay' });
   const card = el('div', { className: 'passport-card' },
     el('div', { className: 'passport-header' },
-      el('span', { className: 'passport-badge' }, '🌿 EU Organic & Fairtrade Passport'),
-      el('h3', { style: 'margin:4px 0 0;color:#fff' }, 'ใบรับรองความโปร่งใสล็อต ' + (lot.code || lot.lot_code || 'L-12')),
-      el('small', { style: 'color:#a7f3d0' }, 'กลุ่มวิสาหกิจชุมชนเกษตรอินทรีย์ตำบลผักไหม จ.ศรีสะเกษ')
+      el('span', { className: 'passport-badge' }, '🌿 ใบรับรองตรวจสอบย้อนกลับ (Traceability Passport)'),
+      el('h3', { className: 'passport-title' }, 'ล็อตผลผลิตอินทรีย์ ' + (lot.code || lot.lot_code || 'L-12')),
+      el('small', { className: 'passport-subtitle' }, 'วิสาหกิจชุมชนเกษตรอินทรีย์ตำบลผักไหม จ.ศรีสะเกษ')
     ),
     el('div', { className: 'passport-body' },
       el('div', { className: 'passport-row' },
@@ -674,23 +714,23 @@ function showStoryPassport(lot) {
         el('span', {}, lot.total_bags_or_kg || `${lot.quantity} กก.`)
       ),
       el('div', { className: 'passport-row' },
-        el('b', {}, '💧 แหล่งน้ำ & ดิน:'),
-        el('span', {}, 'ธนาคารน้ำใต้ดิน + แหนแดงตรึงไนโตรเจน')
+        el('b', {}, '🧪 ปัจจัยการผลิต:'),
+        el('span', {}, 'ผ่านการอนุมัติสูตรอินทรีย์ 100% (ไร้สารเคมี)')
       ),
       el('div', { className: 'passport-row' },
-        el('b', {}, '🛡️ การรับรองมาตรฐาน:'),
-        el('span', { className: 'badge-normal' }, '✓ ผ่านการตรวจรับรอง ICS 100%')
+        el('b', {}, '🛡️ การรับรองกลุ่ม:'),
+        el('span', { className: 'badge-normal' }, '✓ ผ่านการตรวจรับรอง ICS & PGS')
       ),
       el('div', { className: 'passport-qr' },
-        el('div', { style: 'font-size:36px;margin-bottom:6px' }, '📱 [QR CODE]'),
-        el('b', {}, 'Scan for Full Farm Story'),
-        el('p', { className: 'muted', style: 'margin:4px 0 0;font-size:11.5px' }, lot.story_highlights || 'ใช้แหนแดงบำรุงดิน ปลอดสารเคมี 100% มาตรฐาน EU Fairtrade จากกลุ่มเกษตรกรตำบลผักไหม จ.ศรีสะเกษ ธนาคารน้ำใต้ดินแก้แล้ง')
+        el('div', { className: 'passport-qr-icon' }, '📱 [QR CODE]'),
+        el('b', {}, 'ตรวจสอบย้อนกลับระดับแปลง'),
+        el('p', { className: 'muted passport-qr-desc' }, lot.story_highlights || 'ใช้แหนแดงบำรุงดิน ปลอดสารเคมี 100% ตรวจสอบและรับรองโดยระบบควบคุมภายใน (ICS) วิสาหกิจชุมชนตำบลผักไหม จ.ศรีสะเกษ')
       ),
       el('button', {
         type: 'button',
         className: 'passport-close-btn',
         onclick: () => overlay.remove()
-      }, 'ปิดหน้าต่าง Story Passport')
+      }, 'ปิดหน้าต่างใบรับรอง')
     )
   );
   overlay.append(card);
@@ -914,19 +954,29 @@ async function loadTab() {
       const pendingCount = approvals.filter(item => item.status === 'pending').length;
 
       if (me.role === 'ics') {
-        const metrics = (demoBackend && demoUser) ? await api('/metrics').catch(() => null) : null;
+        const [metrics, watchlist] = (demoBackend && demoUser)
+          ? await Promise.all([api('/metrics').catch(() => null), api('/watchlist').catch(() => [])])
+          : [null, []];
         const totalMembers = metrics?.totalMembers ?? 65;
         const totalPlots = metrics?.totalPlots ?? 120;
         const pendingInput = metrics?.pendingInputRequests ?? (pendingCount || 8);
         const riskAlerts = metrics?.riskAlerts ?? 12;
         const groupReadiness = metrics?.groupReadiness ?? 86;
+        const watchRows = (watchlist && watchlist.length) ? watchlist : [
+          { code: 'A-03', farmer: 'Demo Farmer 01', crop: 'ข้าวหอมมะลิ 105', conversion: 'Year 1', status: 'ขาดการบันทึกกิจกรรม 14 วัน', severity: 'risk', action: 'ติดตามด่วน', targetTab: 'record' },
+          { code: 'B-01', farmer: 'Demo Farmer 02', crop: 'ถั่วเหลืองอินทรีย์แฟร์เทรด', conversion: 'Year 2', status: 'มีคำขอปัจจัยการผลิตรออนุมัติ', severity: 'warning', action: 'พิจารณาคำขอ', targetTab: 'approval' },
+          { code: 'C-12', farmer: 'Demo Farmer 03', crop: 'ปอเทือง (Sunn Hemp)', conversion: 'Year 1', status: 'ประวัติไม่สอดคล้อง', severity: 'risk', action: 'นัดตรวจแปลง', targetTab: 'reviews' },
+          { code: 'D-05', farmer: 'Demo Farmer 04', crop: 'ข้าวหอมมะลิอินทรีย์', conversion: 'Certified EU Organic', status: 'ปกติ (ผ่านเกณฑ์อินทรีย์)', severity: 'normal', action: 'ดูใบรับรอง', targetTab: 'lots' }
+        ];
+
+        const readinessFillClass = groupReadiness >= 95 ? 'fill-98' : groupReadiness >= 92 ? 'fill-94' : groupReadiness >= 89 ? 'fill-90' : 'fill-86';
 
         nodes = [
           el('div', { className: 'grid' },
             card(
               el('div', { className: 'stat-label' }, icon('users', 14), 'สมาชิกกลุ่มเกษตรกร'),
               el('div', { className: 'stat' }, `${totalMembers} ราย`),
-              el('small', { className: 'muted' }, 'ต.ผักไหม จ.ศรีสะเกษ')
+              el('small', { className: 'muted' }, 'วิสาหกิจชุมชนผักไหม')
             ),
             card(
               el('div', { className: 'stat-label' }, icon('mapPin', 14), 'แปลงปลูกทั้งหมด'),
@@ -935,71 +985,142 @@ async function loadTab() {
             ),
             card(
               el('div', { className: 'stat-label' }, icon('clock', 14), 'คำขอปัจจัยรอตรวจ'),
-              el('div', { className: 'stat', style: 'color:var(--amber-700)' }, `${pendingInput} รายการ`),
+              el('div', { className: 'stat stat-amber' }, `${pendingInput} รายการ`),
               el('small', { className: 'muted' }, 'สูตรปุ๋ย/น้ำหมักอินทรีย์')
             ),
             card(
               el('div', { className: 'stat-label' }, icon('alert', 14), 'สัญญาณความเสี่ยง'),
-              el('div', { className: 'stat', style: 'color:var(--rose-700)' }, `${riskAlerts} จุด`),
+              el('div', { className: 'stat stat-rose' }, `${riskAlerts} จุด`),
               el('small', { className: 'muted' }, 'ขาดบันทึก / ไม่สอดคล้อง')
             ),
             card(
               el('div', { className: 'stat-label' }, icon('shield', 14), 'ความพร้อมรับรองกลุ่ม (ICS)'),
-              el('div', { className: 'stat', style: 'color:var(--primary)' }, `${groupReadiness}%`),
+              el('div', { className: 'stat stat-primary' }, `${groupReadiness}%`),
               el('div', { className: 'readiness-bar-box' },
-                el('div', { className: 'readiness-bar-fill', style: `width:${groupReadiness}%` })
+                el('div', { className: `readiness-bar-fill ${readinessFillClass}` })
               )
             )
           ),
-          el('div', { className: 'notice', style: 'margin-top:16px' },
-            el('b', {}, icon('alert', 15), ' 🚨 Priority Watch-list: ลดความเสี่ยงไม่ให้ปัญหาของสมาชิกคนหนึ่งกระทบต่อการรับรองทั้งกลุ่ม'),
-            el('p', { className: 'muted' }, 'ระบบคัดกรองความเสี่ยงอัตโนมัติ เพื่อให้เจ้าหน้าที่ ICS ติดตามแก้ไขได้ทันท่วงทีก่อนรอบตรวจรับรองมาตรฐานอินทรีย์'),
+          el('div', { className: 'card watchlist-card' },
+            el('div', { className: 'row between' },
+              el('h3', {}, icon('alert', 17), ' 🚨 Priority Watch-list: เฝ้าระวังความเสี่ยงรายแปลงแบบ Real-time'),
+              el('span', { className: 'pill warn' }, 'ป้องกันสมาชิกทำผิดเกณฑ์กระทบทั้งกลุ่ม')
+            ),
+            el('p', { className: 'muted card-lead' }, 'ระบบคัดกรองความเสี่ยงอัตโนมัติ (ขาดการบันทึกเกิน 14 วัน / รออนุมัติปุ๋ยหมัก / ประวัติไม่สอดคล้อง) เพื่อให้เจ้าหน้าที่ ICS เข้าช่วยเหลือและอนุมัติได้ทันที'),
             el('div', { className: 'watchlist-table-wrap' },
               el('table', { className: 'watchlist-table' },
                 el('thead', {},
                   el('tr', {},
                     el('th', {}, 'รหัสแปลง'),
-                    el('th', {}, 'เกษตรกร'),
-                    el('th', {}, 'พืช & ระยะปรับเปลี่ยน'),
-                    el('th', {}, 'สัญญาณความเสี่ยงที่ตรวจพบ'),
-                    el('th', {}, 'การดำเนินการ (Action)')
+                    el('th', {}, 'เกษตรกรผู้ดูแล'),
+                    el('th', {}, 'พืชอินทรีย์ & ระยะปรับเปลี่ยน'),
+                    el('th', {}, 'สถานะความเสี่ยง (อัปเดตสด)'),
+                    el('th', {}, 'การจัดการ (Action)')
                   )
                 ),
                 el('tbody', {},
-                  el('tr', {},
-                    el('td', {}, el('b', {}, 'A-03')),
-                    el('td', {}, 'Demo Farmer 01'),
-                    el('td', {}, 'ข้าวหอมมะลิ 105 (ปี 1)'),
-                    el('td', {}, el('span', { className: 'badge-risk' }, '🔴 ขาดการบันทึกกิจกรรม 14 วัน')),
-                    el('td', {}, el('button', { type: 'button', className: 'btn-sm secondary', onclick: async () => { tab = 'record'; renderTabs(); await loadTab(); } }, 'ติดตามด่วน'))
-                  ),
-                  el('tr', {},
-                    el('td', {}, el('b', {}, 'B-01')),
-                    el('td', {}, 'Demo Farmer 02'),
-                    el('td', {}, 'ถั่วเหลืองอินทรีย์ (ปี 2)'),
-                    el('td', {}, el('span', { className: 'badge-warning' }, '🟠 มีคำขอใช้ปุ๋ยหมักรออนุมัติ')),
-                    el('td', {}, el('button', { type: 'button', className: 'btn-sm', onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); } }, 'พิจารณาคำขอ'))
-                  ),
-                  el('tr', {},
-                    el('td', {}, el('b', {}, 'C-12')),
-                    el('td', {}, 'Demo Farmer 03'),
-                    el('td', {}, 'ปอเทือง Sunn Hemp (ปี 1)'),
-                    el('td', {}, el('span', { className: 'badge-risk' }, '🔴 ประวัติกิจกรรมไม่สอดคล้อง')),
-                    el('td', {}, el('button', { type: 'button', className: 'btn-sm secondary', onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); } }, 'นัดตรวจแปลง'))
-                  ),
-                  el('tr', {},
-                    el('td', {}, el('b', {}, 'D-05')),
-                    el('td', {}, 'Demo Farmer 04'),
-                    el('td', {}, 'ข้าวหอมมะลิ (Certified EU)'),
-                    el('td', {}, el('span', { className: 'badge-normal' }, '🟢 ปกติ (ผ่านเกณฑ์อินทรีย์)')),
-                    el('td', {}, el('button', { type: 'button', className: 'btn-sm secondary', onclick: async () => { tab = 'lots'; renderTabs(); await loadTab(); } }, 'ดูใบรับรอง'))
-                  )
+                  ...watchRows.map(w => {
+                    const badgeClass = w.severity === 'risk' ? 'badge-risk' : w.severity === 'warning' ? 'badge-warning' : 'badge-normal';
+                    const badgePrefix = w.severity === 'risk' ? '🔴 ' : w.severity === 'warning' ? '🟠 ' : '🟢 ';
+                    const actionCell = el('div', { className: 'row' });
+
+                    if (w.pendingApprovalId) {
+                      actionCell.append(
+                        el('button', {
+                          type: 'button',
+                          className: 'btn-sm',
+                          onclick: async () => {
+                            try {
+                              await api(`/approvals/${w.pendingApprovalId}`, 'PATCH', {
+                                status: 'approved',
+                                comment: 'อนุมัติสูตรปุ๋ยหมักอินทรีย์ผ่านเกณฑ์ PGS เรียบร้อย'
+                              });
+                              notify(`✓ อนุมัติคำขอปัจจัยแปลง ${w.code} สำเร็จ! สถานะแปลงเปลี่ยนเป็นปกติ`);
+                              await loadTab();
+                            } catch (err) {
+                              if (!err.handled) notify(err.message);
+                            }
+                          }
+                        }, icon('check', 13), ' อนุมัติทันที'),
+                        el('button', {
+                          type: 'button',
+                          className: 'secondary btn-sm',
+                          onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
+                        }, 'ดูรายละเอียด')
+                      );
+                    } else if (w.code === 'C-12' && w.severity === 'risk') {
+                      actionCell.append(
+                        el('button', {
+                          type: 'button',
+                          className: 'btn-sm',
+                          onclick: async () => {
+                            try {
+                              await api('/reviews', 'POST', {
+                                plot_id: w.plot_id || 3,
+                                result: 'ผ่าน',
+                                note: 'ลงพื้นที่ตรวจสอบแปลง C-12 ยืนยันการไถกลบปอเทืองตามเกณฑ์อินทรีย์ PGS เรียบร้อย'
+                              });
+                              notify('✓ บันทึกผลตรวจแปลง C-12 ผ่านเกณฑ์! ความเสี่ยงคลี่คลาย');
+                              await loadTab();
+                            } catch (err) {
+                              if (!err.handled) notify(err.message);
+                            }
+                          }
+                        }, icon('shield', 13), ' ยืนยันผลตรวจผ่าน'),
+                        el('button', {
+                          type: 'button',
+                          className: 'secondary btn-sm',
+                          onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
+                        }, 'ไปหน้าตรวจแปลง')
+                      );
+                    } else if (w.code === 'A-03' && w.severity === 'risk' && demoUser) {
+                      actionCell.append(
+                        el('button', {
+                          type: 'button',
+                          className: 'btn-sm secondary',
+                          onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
+                        }, '👨‍🌾 สลับเป็นเกษตรกร A-03 เพื่อบันทึก')
+                      );
+                    } else {
+                      actionCell.append(
+                        el('button', {
+                          type: 'button',
+                          className: 'btn-sm secondary',
+                          onclick: async () => { tab = w.targetTab || 'lots'; renderTabs(); await loadTab(); }
+                        }, w.action)
+                      );
+                    }
+
+                    return el('tr', {},
+                      el('td', {}, el('b', { className: 'plot-code-tag' }, w.code)),
+                      el('td', {}, w.farmer),
+                      el('td', {}, `${w.crop} (${w.conversion})`),
+                      el('td', {}, el('span', { className: badgeClass }, badgePrefix + w.status)),
+                      el('td', {}, actionCell)
+                    );
+                  })
                 )
               )
             )
           )
         ];
       } else {
+        const myPlot = plots[0];
+        const since14 = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
+        const hasRecentAct = activities.some(a => a.activity_date >= since14);
+        const hasPendingApp = pendingCount > 0;
+        const statusBannerClass = !hasRecentAct ? 'farmer-status-card risk' : hasPendingApp ? 'farmer-status-card warn' : 'farmer-status-card normal';
+        const statusTitle = !hasRecentAct
+          ? `🔴 แจ้งเตือน: แปลง ${myPlot?.plot_code || ''} ขาดการบันทึกกิจกรรมเกิน 14 วัน`
+          : hasPendingApp
+            ? `🟠 สถานะแปลง ${myPlot?.plot_code || ''}: มีคำขอใช้ปุ๋ยหมักอินทรีย์รอเจ้าหน้าที่ ICS อนุมัติ`
+            : `🟢 สถานะแปลง ${myPlot?.plot_code || ''}: ปกติ — ปฏิบัติตามมาตรฐานเกษตรอินทรีย์ครบถ้วน`;
+        const statusDesc = !hasRecentAct
+          ? 'กรุณาบันทึกกิจกรรมการดูแลแปลง เพื่อไม่ให้กระทบต่อการรับรองมาตรฐานเกษตรอินทรีย์ของกลุ่มวิสาหกิจชุมชนผักไหม'
+          : hasPendingApp
+            ? 'คุณได้ยื่นคำขออนุมัติปัจจัยการผลิตแล้ว สามารถสลับไปบทบาทเจ้าหน้าที่ ICS เพื่อทดลองกดอนุมัติได้ทันที'
+            : 'ข้อมูลการเพาะปลูกและปัจจัยการผลิตของคุณสอดคล้องกับมาตรฐาน PGS & ICS พร้อมสำหรับการตรวจสอบรับรองกลุ่ม';
+
         const statIcons = {
           'แปลงปลูก': 'mapPin',
           'กิจกรรม': 'calendar',
@@ -1008,6 +1129,30 @@ async function loadTab() {
           'ผลตรวจแปลง': 'shield'
         };
         nodes = [
+          el('div', { className: statusBannerClass },
+            el('div', { className: 'farmer-status-header' },
+              el('b', {}, statusTitle),
+              myPlot?.conversion_year ? el('span', { className: 'pill' }, `🌱 ${myPlot.conversion_year}`) : null
+            ),
+            el('p', {}, statusDesc),
+            el('div', { className: 'row' },
+              el('button', {
+                type: 'button',
+                className: 'btn-sm',
+                onclick: async () => { tab = 'record'; renderTabs(); await loadTab(); }
+              }, icon('calendar', 14), ' 🎙️ บันทึกกิจกรรมด่วน (กดพูด/ปุ่มลัด)'),
+              el('button', {
+                type: 'button',
+                className: 'secondary btn-sm',
+                onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
+              }, icon('clipboard', 14), ' 🧪 ขออนุมัติสูตรปุ๋ยหมักก่อนใช้'),
+              el('button', {
+                type: 'button',
+                className: 'secondary btn-sm',
+                onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
+              }, icon('shield', 14), ' ดูผลตรวจแปลง ICS')
+            )
+          ),
           el('div', { className: 'grid' },
             [['แปลงปลูก', plots.length],
              ['กิจกรรม', activities.length],
@@ -1027,8 +1172,8 @@ async function loadTab() {
         nodes.unshift(el('div', { className: 'notice demo-tip' },
           el('b', {}, icon('info', 15), 'โจทย์: ปลูกของดี — รักษามาตรฐานสินค้าเกษตรอินทรีย์ (วิสาหกิจชุมชนผักไหม)'),
           me.role === 'farmer'
-            ? 'คุณอยู่ในบทบาท Farmer (เกษตรกร) ช่วยลดภาระการจดกระดาษ บันทึกง่ายผ่าน LINE ด้วยปุ่มลัดรอบเกษตรอินทรีย์หรือกดไมค์พูดภาษาไทย พร้อมยื่นขออนุมัติปุ๋ยหมักก่อนใช้จริง'
-            : 'คุณอยู่ในบทบาท ICS (ผู้ตรวจรับรอง) ช่วยตรวจสอบข้อมูลรวดเร็ว คัดกรองความเสี่ยงแบบ Real-time ก่อนส่งตรวจรับรอง ป้องกันไม่ให้ปัญหาของสมาชิกคนหนึ่งกระทบต่อการรับรองมาตรฐานทั้งกลุ่ม'
+            ? 'ลดภาระงานเอกสารซ้ำซ้อน: เกษตรกรบันทึกกิจกรรมง่ายด้วยปุ่มลัดหรือพูดด้วยเสียงภาษาไทย และส่งตรวจสูตรปุ๋ยหมักก่อนใช้จริง'
+            : 'ลดความเสี่ยงระดับกลุ่ม: เจ้าหน้าที่ ICS ตรวจพบแปลงที่ขาดการบันทึกหรือรออนุมัติปัจจัยได้ทันที ป้องกันไม่ให้ข้อผิดพลาดของสมาชิกคนเดียวกระทบทั้งกลุ่ม'
         ));
       }
     } else if (tab === 'farmers') {
@@ -1083,10 +1228,6 @@ async function loadTab() {
       }
       for (const plot of plots) {
         const conversionYear = plot.conversion_year || 'Year 1';
-        const waterStatus = plot.water_source_status || 'Normal';
-        const isWaterLow = String(waterStatus).toLowerCase().includes('low') || String(waterStatus).includes('เสี่ยง');
-        const waterBadgeClass = isWaterLow ? 'badge-risk' : 'badge-normal';
-        const waterBadgeText = isWaterLow ? '⚠️ เสี่ยงแล้ง (ต้องการธนาคารน้ำใต้ดิน)' : '💧 แหล่งน้ำปกติ';
 
         if (me.role !== 'farmer') {
           nodes.push(card(
@@ -1094,9 +1235,9 @@ async function loadTab() {
               el('b', {}, `${plot.plot_code ? `[${plot.plot_code}] ` : ''}${plot.name}`),
               el('span', { className: 'pill success' }, icon('leaf', 11), plot.crop)
             ),
-            el('div', { style: 'margin:6px 0;display:flex;gap:6px;flex-wrap:wrap' },
-              el('span', { className: 'pill' }, '🌱 ' + conversionYear),
-              el('span', { className: waterBadgeClass }, waterBadgeText)
+            el('div', { className: 'plot-badges-row' },
+              el('span', { className: 'pill' }, '🌱 ระยะปรับเปลี่ยน: ' + conversionYear),
+              el('span', { className: 'badge-normal' }, '🛡️ ระบบควบคุมภายใน PGS & ICS')
             ),
             el('p', {}, `ขนาดพื้นที่: ${plot.area || 'ไม่ระบุ'}`),
             el('p', { className: 'muted' }, `เจ้าของแปลง: ${plot.owner || '-'}`),
@@ -1118,13 +1259,13 @@ async function loadTab() {
             el('b', {}, `${plot.plot_code ? `[${plot.plot_code}] ` : ''}${plot.name}`),
             el('span', { className: 'pill success' }, icon('leaf', 11), plot.crop)
           ),
-          el('div', { style: 'margin:6px 0;display:flex;gap:6px;flex-wrap:wrap' },
-            el('span', { className: 'pill' }, '🌱 ' + conversionYear),
-            el('span', { className: waterBadgeClass }, waterBadgeText)
+          el('div', { className: 'plot-badges-row' },
+            el('span', { className: 'pill' }, '🌱 ระยะปรับเปลี่ยน: ' + conversionYear),
+            el('span', { className: 'badge-normal' }, '🛡️ มาตรฐานอินทรีย์กลุ่มผักไหม')
           ),
           el('p', {}, `ขนาดพื้นที่: ${plot.area || 'ไม่ระบุ'}`),
           el('small', { className: 'muted' }, `สร้างเมื่อ ${dated(plot.created_at)}`),
-          el('div', { className: 'row', style: 'margin-top:12px' },
+          el('div', { className: 'row mt-12' },
             toggleBtn,
             el('button', {
               type: 'button',
@@ -1189,16 +1330,17 @@ async function loadTab() {
       const rows = await api('/activities');
       if (me.role === 'farmer') {
         if (plots.length) {
+          const todayIso = new Date().toISOString().slice(0, 10);
           const detailsArea = el('textarea', { name: 'details', required: true, placeholder: 'ระบุการปฏิบัติงาน เช่น ชนิดปุ๋ยอินทรีย์ อัตราส่วน แหนแดง ปอเทือง สภาพแปลง หรือปัญหาที่พบ' });
           const photoInput = el('input', { name: 'photo_url', type: 'url', placeholder: 'https:// หรือใช้ปุ่มถ่ายภาพด้านล่าง' });
 
           const quickPresets = [
-            { label: '🌾 ปลูกข้าวหอมมะลิ 105', kind: 'ปลูก', details: 'ปลูกข้าวหอมมะลิ 105 อินทรีย์ แปลงพักน้ำธนาคารน้ำใต้ดิน' },
-            { label: '🌱 ปลูกถั่วเหลืองหลังนา', kind: 'ปลูก', details: 'ปลูกถั่วเหลืองอินทรีย์แฟร์เทรดหลังนา เพิ่มไนโตรเจนในดิน' },
-            { label: '🌿 ปล่อยแหนแดงบำรุงดิน', kind: 'ใส่ปุ๋ย', details: 'ปล่อยแหนแดง (Azolla) ในแปลงนา เพื่อตรึงไนโตรเจนและคลุมวัชพืช' },
-            { label: '🚜 ไถกลบปอเทอง (90 วัน)', kind: 'กำจัดวัชพืช', details: 'ไถกลบปอเทืองอายุ 90 วัน เพื่อเป็นปุ๋ยพืชสดบำรุงดินก่อนทำนา' },
-            { label: '🧪 พ่นปุ๋ยหมักอินทรีย์', kind: 'ใส่ปุ๋ย', details: 'ฉีดพ่นปุ๋ยหมักอินทรีย์สูตรใบสะเดาและจุลินทรีย์หน่อกล้วย' },
-            { label: '💧 สูบน้ำโซลาร์เซลล์ / ธนาคารน้ำ', kind: 'ให้น้ำ', details: 'สูบน้ำด้วยระบบพลังงานแสงอาทิตย์จากบ่อธนาคารน้ำใต้ดิน บำรุงแปลง' }
+            { label: '🌾 ปลูกข้าวหอมมะลิ 105', kind: 'ปลูก', details: 'ปลูกข้าวหอมมะลิ 105 อินทรีย์ ตามมาตรฐานกลุ่มวิสาหกิจชุมชนผักไหม' },
+            { label: '🌱 ปลูกถั่วเหลืองหลังนา', kind: 'ปลูก', details: 'ปลูกถั่วเหลืองอินทรีย์แฟร์เทรดหลังนา บำรุงดินและเพิ่มไนโตรเจนตามธรรมชาติ' },
+            { label: '🌿 ปล่อยแหนแดงบำรุงดิน', kind: 'ใส่ปุ๋ย', details: 'ปล่อยแหนแดง (Azolla) ในแปลงนา เพื่อตรึงไนโตรเจนและคลุมวัชพืชแทนสารเคมี' },
+            { label: '🚜 ไถกลบปอเทือง (90 วัน)', kind: 'กำจัดวัชพืช', details: 'ไถกลบปอเทืองอายุ 90 วัน เพื่อเป็นปุ๋ยพืชสดบำรุงดินก่อนทำนา' },
+            { label: '🧪 พ่นปุ๋ยหมักอินทรีย์', kind: 'ใส่ปุ๋ย', details: 'ฉีดพ่นปุ๋ยหมักอินทรีย์สูตรใบสะเดาและจุลินทรีย์หน่อกล้วยที่ผ่านการอนุมัติแล้ว' },
+            { label: '🛡️ ดูแลแนวกันชนแปลงอินทรีย์', kind: 'ป้องกันกำจัดศัตรูพืช', details: 'ตรวจสอบแนวกันชนรอบแปลงและกำจัดวัชพืชด้วยแรงงานคน ปลอดสารเคมี 100%' }
           ];
 
           const chipsGrid = el('div', { className: 'quick-chips-grid' },
@@ -1221,11 +1363,11 @@ async function loadTab() {
 
           const formNode = dataForm('recordForm', [
             el('h3', {}, icon('calendar', 16), ' บันทึกกิจกรรมในแปลงปลูก (Easy Record)'),
-            el('small', { className: 'muted', style: 'display:block;margin-bottom:6px' }, 'กดปุ่มลัดรอบเกษตรประณีตผักไหมเพื่อกรอกข้อมูลรวดเร็ว:'),
+            el('small', { className: 'muted helper-label' }, 'แตะปุ่มลัดรอบเกษตรอินทรีย์ผักไหม หรือกดไมค์พูดภาษาไทยเพื่อบันทึกข้อมูลทันที:'),
             chipsGrid,
             plotSelect(),
             selectField('kind', 'ประเภทกิจกรรม', ['ปลูก', 'ให้น้ำ', 'ใส่ปุ๋ย', 'กำจัดวัชพืช', 'ป้องกันกำจัดศัตรูพืช', 'เก็บเกี่ยว', 'อื่นๆ'].map(value => ({ value, label: value }))),
-            inputField('activity_date', 'วันที่ทำกิจกรรม', 'date'),
+            inputField('activity_date', 'วันที่ทำกิจกรรม', 'date', true, todayIso),
             el('label', {},
               'รายละเอียดกิจกรรม',
               detailsArea,
@@ -1236,7 +1378,7 @@ async function loadTab() {
               photoInput,
               createPhotoUploader(photoInput)
             ),
-          ], 'บันทึกกิจกรรม', '/activities');
+          ], 'บันทึกกิจกรรมเข้าสู่ระบบกลุ่ม', '/activities');
 
           nodes.push(formNode);
         } else {
@@ -1278,24 +1420,41 @@ async function loadTab() {
           const inputNameField = el('input', { name: 'input_name', type: 'text', required: true, placeholder: 'เช่น ปุ๋ยหมักอินทรีย์ (ทำเอง), สารสกัดสะเดา' });
           const detailsField = el('textarea', { name: 'details', required: true, placeholder: 'ระบุแหล่งที่มา ส่วนประกอบ และวัตถุประสงค์การใช้เพื่อความโปร่งใส' });
 
-          const presetBtn = el('button', {
-            type: 'button',
-            className: 'chip-btn',
-            style: 'margin-bottom:10px;background:var(--amber-50)!important;border-color:var(--amber-200)!important;color:var(--amber-700)!important',
-            onclick: () => {
-              inputNameField.value = 'ปุ๋ยหมักอินทรีย์ (ทำเอง)';
-              detailsField.value = 'สูตร: ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน ป้องกันหนอนเจาะฝักและเพลี้ยไฟ มาตรฐานอินทรีย์ PGS';
-              notify('ใส่สูตรแนะนำเรียบร้อย');
+          const presetFormulas = [
+            {
+              label: '⚡ สูตรน้ำหมักสมุนไพร: ใบสะเดา + พริก + กากน้ำตาล (หมัก 7 วัน)',
+              name: 'น้ำหมักสมุนไพรไล่แมลง (ทำเอง)',
+              details: 'สูตร: ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน ใช้ป้องกันหนอนเจาะฝักและเพลี้ยไฟ ปลอดสารเคมีสังเคราะห์ 100%'
+            },
+            {
+              label: '🌱 สูตรปุ๋ยหมัก: มูลวัวนมอินทรีย์ + แกลบดำ + จุลินทรีย์หน่อกล้วย',
+              name: 'ปุ๋ยหมักอินทรีย์บำรุงดิน (ทำเอง)',
+              details: 'สูตร: มูลวัวในฟาร์มอินทรีย์ + แกลบดำ + รำอ่อน + จุลินทรีย์หน่อกล้วย หมักกลับกองครบ 30 วัน'
             }
-          }, '⚡ ใช้สูตรแนะนำ: ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน');
+          ];
+
+          const formulaBtns = el('div', { className: 'formula-presets-box' },
+            el('small', { className: 'muted helper-label' }, 'แตะเลือกสูตรมาตรฐานของกลุ่มวิสาหกิจชุมชนผักไหม:'),
+            ...presetFormulas.map(f =>
+              el('button', {
+                type: 'button',
+                className: 'chip-btn chip-amber',
+                onclick: () => {
+                  inputNameField.value = f.name;
+                  detailsField.value = f.details;
+                  notify(`เลือกสูตร: ${f.name}`);
+                }
+              }, f.label)
+            )
+          );
 
           nodes.push(dataForm('approvalForm', [
-            el('h3', {}, icon('clipboard', 16), ' ส่งคำขออนุมัติปัจจัยการผลิต (Input Approval)'),
-            presetBtn,
+            el('h3', {}, icon('clipboard', 16), ' ส่งคำขออนุมัติปัจจัยการผลิตก่อนใช้จริง (Input Approval)'),
+            formulaBtns,
             plotSelect(),
             el('label', {}, 'ชื่อปัจจัยการผลิต', inputNameField),
             el('label', {}, 'ส่วนประกอบ สูตรการผลิต และวิธีใช้', detailsField),
-          ], 'ยื่นคำขออนุมัติ', '/approvals'));
+          ], 'ยื่นคำขอให้ ICS ตรวจสอบ', '/approvals'));
         } else {
           nodes.push(el('div', { className: 'notice' }, 'กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถส่งคำขออนุมัติปัจจัยการผลิตได้'));
         }
@@ -1333,19 +1492,37 @@ async function loadTab() {
           box.append(el('div', { className: 'comment-box' },
             el('b', {}, icon('message', 13), ' ความเห็นของเจ้าหน้าที่ ICS: '),
             el('span', {}, item.comment),
-            item.reviewed_at ? el('small', { className: 'muted', style: 'display:block;margin-top:4px' }, `พิจารณาเมื่อ ${dated(item.reviewed_at)}`) : null
+            item.reviewed_at ? el('small', { className: 'muted block-meta' }, `พิจารณาเมื่อ ${dated(item.reviewed_at)}`) : null
           ));
         }
 
         // ICS inline decision UI
         if (me.role === 'ics' && isPending) {
           let decisionForm = null;
-          const openDecideBtn = el('button', { type: 'button', className: 'btn-sm', style: 'margin-top:10px' }, icon('clipboard', 13), ' พิจารณาคำขอนี้');
-          box.append(el('div', { className: 'row' }, openDecideBtn));
+          const quickApproveBtn = el('button', {
+            type: 'button',
+            className: 'btn-sm',
+            onclick: async () => {
+              try {
+                await api(`/approvals/${item.id}`, 'PATCH', {
+                  status: 'approved',
+                  comment: 'ผ่านเกณฑ์มาตรฐานเกษตรอินทรีย์ PGS อนุญาตให้ใช้ในแปลงได้'
+                });
+                notify(`✓ อนุมัติ "${item.input_name}" เรียบร้อย`);
+                await loadTab();
+              } catch (err) {
+                if (!err.handled) notify(err.message);
+              }
+            }
+          }, icon('check', 13), ' อนุมัติทันที (1-Click)');
+
+          const openDecideBtn = el('button', { type: 'button', className: 'secondary btn-sm' }, icon('clipboard', 13), ' ระบุความเห็น / ไม่อนุมัติ');
+          const actionRow = el('div', { className: 'row mt-10' }, quickApproveBtn, openDecideBtn);
+          box.append(actionRow);
 
           openDecideBtn.onclick = () => {
-            if (decisionForm) { decisionForm.remove(); decisionForm = null; openDecideBtn.style.display = ''; return; }
-            openDecideBtn.style.display = 'none';
+            if (decisionForm) { decisionForm.remove(); decisionForm = null; actionRow.classList.remove('hide'); return; }
+            actionRow.classList.add('hide');
 
             let selectedStatus = 'approved';
             const approveBtn = el('button', { type: 'button', className: 'btn-sm' }, icon('check', 13), ' อนุมัติ');
@@ -1359,12 +1536,12 @@ async function loadTab() {
             const cancelBtn = el('button', {
               type: 'button',
               className: 'secondary btn-sm',
-              onclick: () => { decisionForm.remove(); decisionForm = null; openDecideBtn.style.display = ''; }
+              onclick: () => { decisionForm.remove(); decisionForm = null; actionRow.classList.remove('hide'); }
             }, 'ยกเลิก');
 
             decisionForm = el('form', { className: 'decision-box' },
               el('h4', {}, 'ผลการพิจารณาคำขอปัจจัยการผลิต'),
-              el('div', { className: 'row', style: 'margin-bottom:10px' }, approveBtn, rejectBtn),
+              el('div', { className: 'row mb-10' }, approveBtn, rejectBtn),
               el('label', {}, 'ความเห็น / ข้อเสนอแนะของเจ้าหน้าที่ ICS:', commentArea),
               el('div', { className: 'row' }, confirmBtn, cancelBtn)
             );
@@ -1395,44 +1572,43 @@ async function loadTab() {
       const rows = await api('/lots');
       if (me.role === 'farmer') {
         if (plots.length) {
+          const todayIso = new Date().toISOString().slice(0, 10);
           nodes.push(dataForm('lotForm', [
             el('h3', {}, icon('package', 16), ' เพิ่มล็อตผลผลิตใหม่ (Lot Traceability)'),
             plotSelect(),
             inputField('code', 'รหัสล็อต (เช่น L-12, LOT-2026-001)'),
             inputField('crop', 'ชนิดผลผลิต (เช่น ข้าวหอมมะลิ 105, ถั่วเหลืองอินทรีย์)'),
-            inputField('harvest_date', 'วันที่เก็บเกี่ยว', 'date'),
+            inputField('harvest_date', 'วันที่เก็บเกี่ยว', 'date', true, todayIso),
             inputField('quantity', 'ปริมาณผลผลิต (กิโลกรัม)', 'number'),
-          ], 'บันทึกข้อมูลล็อต', '/lots'));
+          ], 'บันทึกข้อมูลล็อตผลผลิต', '/lots'));
         } else {
           nodes.push(el('div', { className: 'notice' }, 'กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถบันทึกล็อตผลผลิตได้'));
         }
       }
 
       nodes.push(el('div', { className: 'notice' },
-        el('b', {}, icon('package', 15), ' 🌾 Supply Chain Traceability & Story Passport (ตำบลผักไหม)'),
-        el('p', { className: 'muted' }, 'แปลงปลูก (A-03, A-04) ➔ ล็อตผลผลิต (L-12) ➔ ตรวจสอบรับรองโดย ICS ➔ ผ่านการรับรอง EU Fairtrade'),
+        el('b', {}, icon('package', 15), ' 🌾 การตรวจสอบย้อนกลับระดับแปลงสู่ล็อตผลผลิต (Lot Traceability)'),
+        el('p', { className: 'muted' }, 'เชื่อมโยงข้อมูลตั้งแต่แปลงปลูก ➔ ประวัติกิจกรรม ➔ ปัจจัยการผลิตที่อนุมัติ ➔ การรับรองโดยเจ้าหน้าที่ ICS'),
         el('small', { className: 'muted' }, `รวมทั้งหมด ${rows.length} ล็อตผลผลิต`)
       ));
 
       if (!rows.length) nodes.push(empty('ยังไม่มีข้อมูลล็อตผลผลิต'));
 
       for (const item of rows) {
-        const isLot12 = item.code === 'L-12' || item.lot_code === 'L-12';
         const box = card(
           el('div', { className: 'row between' },
-            el('b', { style: 'font-size:16px;color:var(--primary)' }, `ล็อต ${item.code || item.lot_code}`),
-            el('span', { className: 'badge-normal' }, icon('checkCircle', 11), ' รับรองมาตรฐาน EU Fairtrade')
+            el('b', { className: 'lot-title-text' }, `ล็อต ${item.code || item.lot_code}`),
+            el('span', { className: 'badge-normal' }, icon('checkCircle', 11), ' ผ่านการตรวจรับรอง ICS')
           ),
           el('p', {}, `🌾 ชนิดผลผลิต: ${item.crop}`),
           el('p', {}, `📍 แปลงต้นทาง: ${item.linked_plots ? item.linked_plots : item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
           el('p', { className: 'muted' }, `⚖️ ปริมาณ: ${item.total_bags_or_kg || `${item.quantity} กก.`} • เก็บเกี่ยวเมื่อ: ${dated(item.harvest_date)}`),
-          el('div', { className: 'row', style: 'margin-top:12px' },
+          el('div', { className: 'row mt-12' },
             el('button', {
               type: 'button',
-              className: 'btn-sm',
-              style: 'background:linear-gradient(135deg, #059669, #10b981)!important;color:#fff!important',
+              className: 'btn-sm passport-trigger-btn',
               onclick: () => showStoryPassport(item)
-            }, '📱 ดู QR Code Story Passport (สำหรับผู้บริโภค)')
+            }, '📱 เปิดดูใบรับรอง QR Traceability Passport')
           )
         );
         nodes.push(box);
@@ -1441,16 +1617,40 @@ async function loadTab() {
       const rows = await api('/reviews');
       if (me.role === 'ics') {
         if (plots.length) {
+          const noteArea = el('textarea', { name: 'note', required: true, placeholder: 'บันทึกรายละเอียดการตรวจแปลง ข้อสังเกต หรือข้อกำหนดให้เกษตรกรปรับปรุง' });
+          const checklistItems = [
+            '✓ แนวกันชนรอบแปลงปลอดภัย ไม่มีการปนเปื้อน',
+            '✓ ไม่พบการใช้สารเคมีสังเคราะห์หรือปุ๋ยเคมีต้องห้าม',
+            '✓ เกษตรกรจดบันทึกกิจกรรมสม่ำเสมอและสอดคล้องกับสภาพแปลงจริง',
+            '✓ ปัจจัยการผลิตทุกชนิดผ่านการอนุมัติจาก ICS ก่อนใช้งาน'
+          ];
+          const checklistBox = el('div', { className: 'checklist-chips-box' },
+            el('small', { className: 'muted helper-label' }, 'แตะหัวข้อมาตรฐาน PGS เพื่อบันทึกผลตรวจอย่างรวดเร็ว:'),
+            el('div', { className: 'quick-chips-grid' },
+              ...checklistItems.map(itemText =>
+                el('button', {
+                  type: 'button',
+                  className: 'chip-btn',
+                  onclick: () => {
+                    noteArea.value = (noteArea.value ? noteArea.value + '\n' : '') + itemText;
+                    notify('เพิ่มรายการตรวจ PGS แล้ว');
+                  }
+                }, itemText)
+              )
+            )
+          );
+
           nodes.push(dataForm('reviewForm', [
-            el('h3', {}, icon('shield', 16), ' บันทึกผลการตรวจประเมินแปลง'),
+            el('h3', {}, icon('shield', 16), ' บันทึกผลการตรวจประเมินแปลง (ICS Inspection)'),
             plotSelect(),
             selectField('result', 'ผลการตรวจประเมิน', [
-              { value: 'ผ่าน', label: 'ผ่านเกณฑ์มาตรฐาน' },
+              { value: 'ผ่าน', label: 'ผ่านเกณฑ์มาตรฐานเกษตรอินทรีย์' },
               { value: 'ต้องแก้ไข', label: 'ต้องแก้ไขปรับปรุง' },
               { value: 'ติดตามเพิ่มเติม', label: 'ต้องติดตามเพิ่มเติม' },
             ]),
-            el('label', {}, 'บันทึกผลตรวจและข้อเสนอแนะ', el('textarea', { name: 'note', required: true, placeholder: 'บันทึกรายละเอียดการตรวจแปลง ข้อสังเกต หรือข้อกำหนดให้เกษตรกรปรับปรุง' })),
-          ], 'บันทึกผลการตรวจ', '/reviews'));
+            checklistBox,
+            el('label', {}, 'บันทึกผลตรวจและข้อเสนอแนะ', noteArea),
+          ], 'บันทึกผลการตรวจรับรองแปลง', '/reviews'));
         } else {
           nodes.push(el('div', { className: 'notice' }, 'ไม่พบแปลงปลูกที่สามารถตรวจได้'));
         }
@@ -1475,7 +1675,7 @@ async function loadTab() {
             el('span', { className: pillClass }, resultIcon, item.result)
           ),
           item.farmer_name ? el('p', { className: 'muted' }, `เกษตรกร: ${item.farmer_name}`) : null,
-          el('p', {}, item.note),
+          el('p', { className: 'pre-line-text' }, item.note),
           el('small', { className: 'muted' }, `ผู้ตรวจ: ${item.reviewer_name || 'เจ้าหน้าที่ ICS'} • ${dated(item.created_at)}`)
         );
         nodes.push(box);
@@ -1505,7 +1705,7 @@ async function loadTab() {
           el('p', {}, isPending
             ? `มีคำขอปัจจัยการผลิต "${item.input_name || '-'}" รอการพิจารณาตรวจสอบ`
             : 'ไม่พบบันทึกกิจกรรมการเกษตรในแปลงนี้ติดต่อกันเกิน 14 วัน อาจเสี่ยงต่อการละเลยหรือแปลงขาดการดูแล'),
-          el('div', { className: 'row', style: 'margin-top:8px' },
+          el('div', { className: 'row mt-8' },
             isPending ? el('button', {
               type: 'button',
               className: 'secondary btn-sm',
@@ -1518,37 +1718,6 @@ async function loadTab() {
           )
         );
         nodes.push(box);
-      }
-    } else if (tab === 'lots') {
-      const rows = await api('/lots');
-      if (me.role === 'farmer') {
-        if (plots.length) {
-          nodes.push(dataForm('lotForm', [
-            el('h3', {}, icon('package', 16), ' เพิ่มล็อตผลผลิตใหม่'),
-            plotSelect(),
-            inputField('code', 'รหัสล็อต (เช่น LOT-2026-001)'),
-            inputField('crop', 'ชนิดผลผลิต (เช่น ข้าวหอมมะลิ, มะเขือเทศ)'),
-            inputField('harvest_date', 'วันที่เก็บเกี่ยว', 'date'),
-            inputField('quantity', 'ปริมาณผลผลิต (กิโลกรัม)', 'number'),
-          ], 'บันทึกข้อมูลล็อต', '/lots'));
-        } else {
-          nodes.push(el('div', { className: 'notice' }, 'กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถบันทึกล็อตผลผลิตได้'));
-        }
-      }
-      nodes.push(el('div', { className: 'notice' },
-        el('b', {}, icon('package', 15), me.role === 'farmer' ? ' ล็อตผลผลิตของคุณ' : ' รายการล็อตผลผลิตของเกษตรกรในความดูแล'),
-        el('p', { className: 'muted' }, `รวมทั้งหมด ${rows.length} ล็อต`)
-      ));
-      if (!rows.length) nodes.push(empty('ยังไม่มีข้อมูลล็อตผลผลิต'));
-      for (const item of rows) {
-        nodes.push(card(
-          el('div', { className: 'row between' },
-            el('b', {}, item.code),
-            el('span', { className: 'pill' }, icon('package', 11), `${item.quantity} กก.`)
-          ),
-          el('p', {}, `${item.crop} • แปลง: ${item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
-          el('small', { className: 'muted' }, `เก็บเกี่ยวเมื่อ ${dated(item.harvest_date)}`)
-        ));
       }
     }
     if (!nodes.length) nodes = [empty()];
