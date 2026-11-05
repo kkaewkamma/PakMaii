@@ -560,10 +560,15 @@ nav#tabs button.active svg {
   transition: width 0.3s ease;
 }
 
+.readiness-bar-fill.fill-0 { width: 0%; }
+.readiness-bar-fill.fill-25 { width: 25%; }
+.readiness-bar-fill.fill-50 { width: 50%; }
+.readiness-bar-fill.fill-75 { width: 75%; }
 .readiness-bar-fill.fill-86 { width: 86%; }
 .readiness-bar-fill.fill-90 { width: 90%; }
 .readiness-bar-fill.fill-94 { width: 94%; }
 .readiness-bar-fill.fill-98 { width: 98%; }
+.readiness-bar-fill.fill-100 { width: 100%; }
 
 /* ==========================================================================
    Watch-list & Tabular Layout (Enterprise Table)

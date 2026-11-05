@@ -197,3 +197,4 @@ graph TD
 | **Broken Demo Mode Authentication** | Altering exact strings checked by `test/demo-mode.test.js` | Preserve all literal strings required by tests (`'เข้าสู่ระบบทดลองใช้งาน'`, `'รหัสประจำตัว Demo'`, `'Admin Login'`, role buttons). |
 | **LIFF SDK Initialization Breakdown** | Re-calling `liff.init()` or bypassing `ensureLiff()` | Keep `ensureLiff()` memoization pattern strictly untouched. |
 | **Broken Staging & Secret Sync** | Modifying backend or staging bindings | Zero modifications to `worker/`, `d1/`, migrations, or secret management scripts. |
+

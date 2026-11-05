@@ -1021,7 +1021,7 @@ async function loadTab() {
         let totalPlots = plots.length;
         let pendingInput = pendingCount;
         let riskAlerts = 0;
-        let groupReadiness = 100;
+        let groupReadiness = null;
         let watchRows = [];
         const isDemo = Boolean(demoBackend && demoUser);
 
@@ -1047,17 +1047,19 @@ async function loadTab() {
           const farmerIdSet = new Set();
 
           plots.forEach(p => {
-            if (p.farmer_id || p.farmer) farmerIdSet.add(p.farmer_id || p.farmer);
+            const farmerKey = p.owner_id || p.farmer_id || p.owner || p.farmer;
+            if (farmerKey) farmerIdSet.add(farmerKey);
+            const farmerDisplayName = p.owner || p.farmer_name || p.farmer || (p.owner_id ? `เกษตรกร #${p.owner_id}` : `เกษตรกร #${p.id}`);
             const plotActs = activities.filter(a => a.plot_id === p.id);
             const hasRecentAct = plotActs.some(a => a.activity_date >= since14);
-            const hasPending = approvals.some(a => a.plot_id === p.id && a.status === 'pending');
+            const pendingForPlot = approvals.find(a => a.plot_id === p.id && a.status === 'pending');
 
             if (!hasRecentAct) {
               riskAlerts++;
               watchRows.push({
                 plot_id: p.id,
-                code: p.plot_code || `P-${p.id}`,
-                farmer: p.farmer_name || p.farmer || `เกษตรกร #${p.farmer_id || p.id}`,
+                code: p.plot_code || p.name || `P-${p.id}`,
+                farmer: farmerDisplayName,
                 crop: p.crop || '-',
                 conversion: p.conversion_year || 'Year 1',
                 status: 'ขาดการบันทึกกิจกรรมเกิน 14 วัน',
@@ -1065,17 +1067,18 @@ async function loadTab() {
                 action: 'ติดตามด่วน',
                 targetTab: 'record'
               });
-            } else if (hasPending) {
+            } else if (pendingForPlot) {
               watchRows.push({
                 plot_id: p.id,
-                code: p.plot_code || `P-${p.id}`,
-                farmer: p.farmer_name || p.farmer || `เกษตรกร #${p.farmer_id || p.id}`,
+                code: p.plot_code || p.name || `P-${p.id}`,
+                farmer: farmerDisplayName,
                 crop: p.crop || '-',
                 conversion: p.conversion_year || 'Year 1',
                 status: 'มีคำขอปัจจัยการผลิตรออนุมัติ',
                 severity: 'warning',
                 action: 'พิจารณาคำขอ',
-                targetTab: 'approval'
+                targetTab: 'approval',
+                pendingApprovalId: pendingForPlot.id
               });
             }
           });
@@ -1083,10 +1086,24 @@ async function loadTab() {
           totalMembers = farmerIdSet.size;
           groupReadiness = plots.length > 0
             ? Math.max(0, Math.round(((plots.length - riskAlerts) / plots.length) * 100))
-            : 100;
+            : null;
         }
 
-        const readinessFillClass = groupReadiness >= 95 ? 'fill-98' : groupReadiness >= 92 ? 'fill-94' : groupReadiness >= 89 ? 'fill-90' : 'fill-86';
+        let readinessFillClass = 'fill-0';
+        if (groupReadiness !== null) {
+          if (groupReadiness >= 98) readinessFillClass = 'fill-98';
+          else if (groupReadiness >= 94) readinessFillClass = 'fill-94';
+          else if (groupReadiness >= 90) readinessFillClass = 'fill-90';
+          else if (groupReadiness >= 85) readinessFillClass = 'fill-86';
+          else if (groupReadiness >= 75) readinessFillClass = 'fill-75';
+          else if (groupReadiness >= 50) readinessFillClass = 'fill-50';
+          else if (groupReadiness >= 25) readinessFillClass = 'fill-25';
+          else readinessFillClass = 'fill-0';
+        }
+        const readinessStatText = groupReadiness !== null ? `${groupReadiness}%` : 'รอประเมิน';
+        const readinessSubtext = groupReadiness !== null
+          ? (isDemo ? 'ความพร้อมรับรองกลุ่ม (เกณฑ์ PGS)' : 'ประเมินจากแปลงที่ไม่มีจุดเสี่ยง')
+          : 'รอข้อมูลแปลงในความดูแล';
 
         const buildWatchlistActionButtons = (w) => {
           const actionRow = el('div', { className: 'row' });
@@ -1114,30 +1131,13 @@ async function loadTab() {
                 onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
               }, 'ตรวจสอบ')
             );
-          } else if (w.code === 'C-12' && w.severity === 'risk') {
+          } else if (w.targetTab === 'reviews' || w.action === 'นัดตรวจแปลง' || w.action === 'บันทึกตรวจ') {
             actionRow.append(
               el('button', {
                 type: 'button',
-                className: 'btn-sm',
-                onclick: async () => {
-                  try {
-                    await api('/reviews', 'POST', {
-                      plot_id: w.plot_id || 3,
-                      result: 'ผ่าน',
-                      note: 'ตรวจแปลง C-12 เรียบร้อย เกษตรกรไถกลบปอเทืองตามเกณฑ์มาตรฐาน PGS'
-                    });
-                    notify('บันทึกผลตรวจแปลง C-12 ผ่านเกณฑ์เรียบร้อย');
-                    await loadTab();
-                  } catch (err) {
-                    if (!err.handled) notify(err.message);
-                  }
-                }
-              }, icon('shield', 13), ' ยืนยันผลตรวจผ่าน'),
-              el('button', {
-                type: 'button',
-                className: 'secondary btn-sm',
+                className: 'btn-sm secondary',
                 onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
-              }, 'บันทึกตรวจ')
+              }, icon('shield', 13), ' ' + (w.action || 'บันทึกตรวจแปลง'))
             );
           } else if (w.code === 'A-03' && w.severity === 'risk' && demoUser) {
             actionRow.append(
@@ -1226,12 +1226,12 @@ async function loadTab() {
             card(
               el('div', { className: 'stat-label' }, icon('users', 14), 'สมาชิกกลุ่มเกษตรกร'),
               el('div', { className: 'stat' }, `${totalMembers} ราย`),
-              el('small', { className: 'muted' }, isDemo ? 'วิสาหกิจชุมชนผักไหม (Demo)' : 'สมาชิกในความรับผิดชอบ')
+              el('small', { className: 'muted' }, totalMembers > 0 ? (isDemo ? 'วิสาหกิจชุมชนผักไหม (Demo)' : 'สมาชิกในความรับผิดชอบ') : 'รอการมอบหมายสมาชิก')
             ),
             card(
               el('div', { className: 'stat-label' }, icon('mapPin', 14), 'แปลงปลูกทั้งหมด'),
               el('div', { className: 'stat' }, `${totalPlots} แปลง`),
-              el('small', { className: 'muted' }, isDemo ? 'รวมพื้นที่ 380 ไร่' : 'แปลงในความดูแล')
+              el('small', { className: 'muted' }, totalPlots > 0 ? (isDemo ? 'รวมพื้นที่ 380 ไร่' : 'แปลงในความดูแล') : 'ยังไม่มีแปลงในระบบ')
             ),
             card(
               el('div', { className: 'stat-label' }, icon('clock', 14), 'คำขอปัจจัยรอตรวจ'),
@@ -1241,14 +1241,15 @@ async function loadTab() {
             card(
               el('div', { className: 'stat-label' }, icon('alert', 14), 'สัญญาณความเสี่ยง'),
               el('div', { className: 'stat stat-rose' }, `${riskAlerts} จุด`),
-              el('small', { className: 'muted' }, 'ขาดบันทึก / ไม่สอดคล้อง')
+              el('small', { className: 'muted' }, riskAlerts > 0 ? 'ขาดบันทึก / ไม่สอดคล้อง' : 'ไม่พบจุดเสี่ยง')
             ),
             card(
               el('div', { className: 'stat-label' }, icon('shield', 14), 'ความพร้อมรับรองกลุ่ม (ICS)'),
-              el('div', { className: 'stat stat-primary' }, `${groupReadiness}%`),
-              el('div', { className: 'readiness-bar-box' },
+              el('div', { className: 'stat stat-primary' }, readinessStatText),
+              el('div', { className: 'readiness-bar-box', 'aria-label': `ความพร้อม ${readinessStatText}` },
                 el('div', { className: `readiness-bar-fill ${readinessFillClass}` })
-              )
+              ),
+              el('small', { className: 'muted' }, readinessSubtext)
             )
           ),
           el('div', { className: 'card watchlist-card' },
