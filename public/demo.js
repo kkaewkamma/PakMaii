@@ -81,30 +81,181 @@
   function isoDay(date) { return date.toISOString().slice(0, 10); }
 
   function seed(now) {
-    const crops = ['ผักกาดหอม', 'คะน้า', 'พริกขี้หนู', 'มะเขือเทศ', 'ข้าวหอมมะลิ'];
-    const store = { version: STORE_VERSION, seq: { plots: 0, activities: 0, approvals: 0, lots: 0, reviews: 0 }, plots: [], activities: [], approvals: [], lots: [], reviews: [] };
+    const crops = ['ข้าวหอมมะลิ 105', 'ถั่วเหลืองอินทรีย์แฟร์เทรด', 'ปอเทือง (Sunn Hemp)', 'ข้าวหอมมะลิอินทรีย์', 'ถั่วเหลืองสลับข้าว'];
+    const cropTypes = ['Jasmine Rice', 'Fairtrade Organic Soybean', 'Sunn Hemp', 'Jasmine Rice', 'Fairtrade Organic Soybean'];
+    const plotCodes = ['A-03', 'B-01', 'C-12', 'D-05', 'A-04'];
+    const conversionYears = ['Year 1', 'Year 2', 'Year 1', 'Certified EU Organic', 'Year 3'];
+    const waterStatuses = ['Low - Groundwater Bank / Solar Pump needed', 'Normal', 'Low - Groundwater Bank / Solar Pump needed', 'Normal', 'Normal'];
+
+    const store = {
+      version: STORE_VERSION,
+      seq: { plots: 0, activities: 0, approvals: 0, lots: 0, reviews: 0 },
+      metrics: {
+        totalMembers: 65,
+        totalPlots: 120,
+        pendingInputRequests: 8,
+        riskAlerts: 12,
+        groupReadiness: 86,
+      },
+      plots: [],
+      activities: [],
+      approvals: [],
+      lots: [],
+      reviews: []
+    };
     const stamp = now.toISOString();
     const daysAgo = days => isoDay(new Date(now.getTime() - days * 86_400_000));
+
     ACCOUNTS.filter(account => account.role === 'farmer').forEach((farmer, index) => {
       const n = index + 1;
       const plotId = ++store.seq.plots;
-      store.plots.push({ id: plotId, owner_id: farmer.id, name: `แปลงอินทรีย์ ${pad(n, 2)}`, crop: crops[index % crops.length], area: `${1 + (n % 4)} ไร่`, created_at: stamp });
-      if (n % 5 !== 0) {
-        store.activities.push({ id: ++store.seq.activities, plot_id: plotId, user_id: farmer.id, kind: 'ให้น้ำ', details: 'ให้น้ำระบบน้ำหยดช่วงเช้า', activity_date: daysAgo(2 + (n % 6)), photo_url: null, created_at: stamp });
+      const plotCode = index < 5 ? plotCodes[index] : `P-${pad(n, 2)}`;
+      const crop = crops[index % crops.length];
+      const cropType = cropTypes[index % cropTypes.length];
+      const conversionYear = conversionYears[index % conversionYears.length];
+      const waterStatus = waterStatuses[index % waterStatuses.length];
+      const plotNameStr = index < 5 ? `แปลง ${plotCode} (${crop})` : `แปลงอินทรีย์ ${pad(n, 2)}`;
+
+      store.plots.push({
+        id: plotId,
+        owner_id: farmer.id,
+        name: plotNameStr,
+        plot_code: plotCode,
+        crop: crop,
+        crop_type: cropType,
+        conversion_year: conversionYear,
+        water_source_status: waterStatus,
+        area: `${1 + (n % 4)} ไร่`,
+        created_at: stamp
+      });
+
+      // Plot A-03 (index 0): Inactive 14 days (risk alert)
+      if (index === 0) {
+        store.activities.push({
+          id: ++store.seq.activities,
+          plot_id: plotId,
+          user_id: farmer.id,
+          kind: 'ให้น้ำ',
+          details: 'สูบน้ำโซลาร์เซลล์ / ธนาคารน้ำใต้ดิน บำรุงต้นกล้าข้าวหอมมะลิ',
+          activity_date: daysAgo(16),
+          photo_url: null,
+          created_at: stamp
+        });
+      } else if (index === 1) {
+        // Plot B-01: Activity 3 days ago + Pending Input Request
+        store.activities.push({
+          id: ++store.seq.activities,
+          plot_id: plotId,
+          user_id: farmer.id,
+          kind: 'ปลูกถั่วเหลืองหลังนา',
+          details: 'หยอดเมล็ดถั่วเหลืองอินทรีย์แฟร์เทรด ความชื้นดินเหมาะสม',
+          activity_date: daysAgo(3),
+          photo_url: null,
+          created_at: stamp
+        });
+        store.approvals.push({
+          id: ++store.seq.approvals,
+          plot_id: plotId,
+          user_id: farmer.id,
+          input_name: 'ปุ๋ยหมักอินทรีย์ (ทำเอง)',
+          details: 'ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน ป้องกันหนอนเจาะฝัก',
+          formula_details: 'ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน',
+          expected_use_date: daysAgo(-3),
+          status: 'pending',
+          reviewer_id: null,
+          reviewed_at: null,
+          comment: null,
+          created_at: stamp
+        });
+      } else if (index === 2) {
+        // Plot C-12: Inconsistent log history
+        store.activities.push({
+          id: ++store.seq.activities,
+          plot_id: plotId,
+          user_id: farmer.id,
+          kind: 'ไถกลบปอเทอง (90 วัน)',
+          details: 'ไถกลบหลังเก็บเกี่ยว 2 วัน (ไม่สอดคล้องกับรอบพักดินและมาตรฐานอินทรีย์)',
+          activity_date: daysAgo(2),
+          photo_url: null,
+          created_at: stamp
+        });
+      } else {
+        // Other plots: Normal periodic activities
+        if (n % 5 !== 0) {
+          store.activities.push({
+            id: ++store.seq.activities,
+            plot_id: plotId,
+            user_id: farmer.id,
+            kind: index % 2 === 0 ? 'ปล่อยแหนแดง' : 'พ่นปุ๋ยหมักอินทรีย์',
+            details: 'ดูแลแปลงเกษตรประณีตตำบลผักไหม ตามมาตรฐาน PGS',
+            activity_date: daysAgo(2 + (n % 6)),
+            photo_url: null,
+            created_at: stamp
+          });
+        }
       }
-      if (n % 5 === 1) {
-        store.approvals.push({ id: ++store.seq.approvals, plot_id: plotId, user_id: farmer.id, input_name: 'ปุ๋ยหมักมูลไส้เดือน', details: 'ผลิตเองจากมูลไส้เดือน ใช้ 200 กรัมต่อต้น ทุก 15 วัน', status: 'pending', reviewer_id: null, reviewed_at: null, comment: null, created_at: stamp });
+
+      if (n % 5 === 1 && index !== 1) {
+        store.approvals.push({
+          id: ++store.seq.approvals,
+          plot_id: plotId,
+          user_id: farmer.id,
+          input_name: 'ปุ๋ยหมักมูลไส้เดือน',
+          details: 'ผลิตเองจากมูลไส้เดือน ใช้ 200 กรัมต่อต้น ทุก 15 วัน',
+          formula_details: 'มูลไส้เดือน 100% หมักอินทรีย์',
+          expected_use_date: daysAgo(-5),
+          status: 'pending',
+          reviewer_id: null,
+          reviewed_at: null,
+          comment: null,
+          created_at: stamp
+        });
       }
-      if (n % 5 === 2) {
-        store.lots.push({ id: ++store.seq.lots, plot_id: plotId, code: `LOT-DEMO-${pad(n, 3)}`, crop: crops[index % crops.length], harvest_date: daysAgo(10), quantity: 120, created_at: stamp });
+
+      if (index === 0 || index === 1) {
+        // Traceability lot L-12 linked to A-03 and A-04
+        if (index === 0) {
+          store.lots.push({
+            id: ++store.seq.lots,
+            plot_id: plotId,
+            code: 'L-12',
+            lot_code: 'L-12',
+            crop: 'ข้าวหอมมะลิ 105 & ถั่วเหลืองอินทรีย์แฟร์เทรด',
+            crop_type: 'Jasmine Rice & Fairtrade Soybean',
+            harvest_date: daysAgo(10),
+            quantity: 50,
+            linked_plots: 'A-03, A-04',
+            total_bags_or_kg: '5 ราย / 50 กก.',
+            ics_review_status: 'approved',
+            story_highlights: 'ใช้แหนแดงบำรุงดิน ปลอดสารเคมี 100% มาตรฐาน EU Fairtrade จากกลุ่มเกษตรกรตำบลผักไหม จ.ศรีสะเกษ ธนาคารน้ำใต้ดินแก้แล้ง',
+            created_at: stamp
+          });
+        }
+      } else if (n % 5 === 2) {
+        store.lots.push({
+          id: ++store.seq.lots,
+          plot_id: plotId,
+          code: `LOT-DEMO-${pad(n, 3)}`,
+          lot_code: `LOT-DEMO-${pad(n, 3)}`,
+          crop: crops[index % crops.length],
+          crop_type: cropTypes[index % cropTypes.length],
+          harvest_date: daysAgo(10),
+          quantity: 120,
+          linked_plots: plotCode,
+          total_bags_or_kg: '120 กก.',
+          ics_review_status: 'approved',
+          story_highlights: 'แปลงอินทรีย์ตำบลผักไหม มาตรฐาน PGS',
+          created_at: stamp
+        });
       }
+
       if (n % 5 === 1) {
         store.reviews.push({
           id: ++store.seq.reviews,
           plot_id: plotId,
           reviewer_id: 910101 + Math.floor(index / 5),
           result: 'ผ่าน',
-          note: 'ตรวจแปลงประจำรอบการผลิต สภาพแปลงสมบูรณ์ แนวกันชนปลอดภัย มีการจดบันทึกสม่ำเสมอ',
+          note: 'ตรวจแปลงประจำรอบการผลิต สภาพแปลงสมบูรณ์ แนวกันชนปลอดภัย มีการจดบันทึกสม่ำเสมอ แหล่งน้ำปลอดภัย',
           created_at: daysAgo(5),
         });
       }
@@ -188,6 +339,23 @@
       if (method === 'GET' && path === '/me') return publicUser(account);
       if (method === 'POST' && path === '/logout') return { ok: true };
 
+      if (method === 'GET' && path === '/metrics') {
+        return clone(store.metrics || {
+          totalMembers: 65,
+          totalPlots: 120,
+          pendingInputRequests: 8,
+          riskAlerts: 12,
+          groupReadiness: 86
+        });
+      }
+      if (method === 'GET' && path === '/watchlist') {
+        return [
+          { code: 'A-03', farmer: 'Demo Farmer 01', crop: 'ข้าวหอมมะลิ 105', conversion: 'Year 1', status: 'ขาดการบันทึกกิจกรรม 14 วัน', severity: 'risk', action: 'ติดตามด่วน / แจ้งเตือน LINE' },
+          { code: 'B-01', farmer: 'Demo Farmer 02', crop: 'ถั่วเหลืองอินทรีย์แฟร์เทรด', conversion: 'Year 2', status: 'มีคำขอปัจจัยการผลิตรออนุมัติ', severity: 'warning', action: 'พิจารณาคำขอปุ๋ยหมัก' },
+          { code: 'C-12', farmer: 'Demo Farmer 03', crop: 'ปอเทือง (Sunn Hemp)', conversion: 'Year 1', status: 'ประวัติไม่สอดคล้อง', severity: 'risk', action: 'นัดเข้าตรวจแปลงซ้ำ' },
+          { code: 'D-05', farmer: 'Demo Farmer 04', crop: 'ข้าวหอมมะลิอินทรีย์', conversion: 'Certified EU Organic', status: 'ปกติ', severity: 'normal', action: 'ผ่านการรับรอง PGS' }
+        ];
+      }
       if (method === 'GET' && path === '/plots') {
         return clone(store.plots.filter(plot => owners.has(plot.owner_id)).sort(byIdDesc)
           .map(plot => (account.role === 'ics' ? { ...plot, owner: farmerName(plot.owner_id) } : plot)));
@@ -261,10 +429,40 @@
         store.activities.push(item); save(store);
         return { id: item.id };
       }
+      if (method === 'POST' && path === '/webhook/line') {
+        const firstFarmerPlot = store.plots.find(p => owners.has(p.owner_id)) || store.plots[0];
+        const textMessage = input.message || 'บันทึกกิจกรรมผ่าน LINE OA สำเร็จ (สูบน้ำโซลาร์เซลล์ / แหนแดง)';
+        const item = {
+          id: ++store.seq.activities,
+          plot_id: firstFarmerPlot ? firstFarmerPlot.id : 1,
+          user_id: account.id,
+          kind: input.kind || 'บันทึกผ่าน LINE OA',
+          details: textMessage,
+          activity_date: isoDay(now()),
+          photo_url: input.photo_url || null,
+          created_at: now().toISOString()
+        };
+        store.activities.push(item);
+        save(store);
+        return { ok: true, message: 'LINE Webhook mapped to activity log', activity: item };
+      }
       if (method === 'POST' && path === '/approvals') {
         requireRole(account, 'farmer', 'เฉพาะเกษตรกร');
         const plot = ownPlot(store, account, input.plot_id);
-        const item = { id: ++store.seq.approvals, plot_id: plot.id, user_id: account.id, input_name: text(input.input_name, 'ชื่อปัจจัยการผลิต', 200), details: text(input.details, 'รายละเอียด', 2000), status: 'pending', reviewer_id: null, reviewed_at: null, comment: null, created_at: now().toISOString() };
+        const item = {
+          id: ++store.seq.approvals,
+          plot_id: plot.id,
+          user_id: account.id,
+          input_name: text(input.input_name, 'ชื่อปัจจัยการผลิต', 200),
+          details: text(input.details, 'รายละเอียด', 2000),
+          formula_details: optionalText(input.formula_details, 'สูตรการผลิต', 2000),
+          expected_use_date: optionalText(input.expected_use_date, 'วันที่คาดว่าจะใช้', 20),
+          status: 'pending',
+          reviewer_id: null,
+          reviewed_at: null,
+          comment: null,
+          created_at: now().toISOString()
+        };
         store.approvals.push(item); save(store);
         return { id: item.id };
       }

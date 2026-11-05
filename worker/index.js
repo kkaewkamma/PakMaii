@@ -137,6 +137,22 @@ export async function handleApi(request, env) {
   }
 
   const repository = new D1Repository(env.DB);
+  if (request.method === 'POST' && pathname === '/api/webhook/line') {
+    const body = await requestBody(request);
+    const events = Array.isArray(body?.events) ? body.events : [];
+    return json({
+      ok: true,
+      service: 'PakMaii LINE Webhook',
+      received_events: events.length,
+      processed: events.map(evt => ({
+        type: evt.type || 'message',
+        source: evt.source?.userId ? 'line_user' : 'simulator',
+        status: 'mapped_to_activity_log'
+      })),
+      timestamp: new Date().toISOString()
+    }, 200, { 'Cache-Control': 'no-store' });
+  }
+
   if (request.method === 'POST' && pathname === '/api/auth/register/invite') {
     const body = await requestBody(request);
     const agencyCode = optionalText(body.agencyCode, 'รหัสประจำตัว', 32);

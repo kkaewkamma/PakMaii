@@ -136,6 +136,21 @@ const adminLoginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 5, standardH
 const genericRegistrationError = () => new HttpError(400, 'ข้อมูลลงทะเบียนหรือคำเชิญไม่ถูกต้อง');
 const landingForRole = role => ({ farmer: 'home', ics: 'risks', admin: 'invites' })[role];
 
+app.post('/api/webhook/line', wrap((req, res) => {
+  const events = Array.isArray(req.body?.events) ? req.body.events : [];
+  res.json({
+    ok: true,
+    service: 'PakMaii LINE Webhook',
+    received_events: events.length,
+    processed: events.map(evt => ({
+      type: evt.type || 'message',
+      source: evt.source?.userId ? 'line_user' : 'simulator',
+      status: 'mapped_to_activity_log'
+    })),
+    timestamp: new Date().toISOString()
+  });
+}));
+
 app.post('/api/login', wrap(async (req, res) => {
   const profile = await verifyLineIdToken(req.body?.idToken);
   const user = db.prepare('SELECT * FROM users WHERE line_id=?').get(profile.sub);

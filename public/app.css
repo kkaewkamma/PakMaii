@@ -882,3 +882,401 @@ body.is-login .hero {
     transition: none !important;
   }
 }
+
+/* ==========================================================================
+   Spark Hack Season #2 — Ready to Grow / PakMaii Upgrades
+   ========================================================================== */
+
+/* Simulator Toggle Bar */
+.sim-bar-wrap {
+  padding-top: 12px;
+}
+
+.sim-brand-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-icon {
+  font-size: 16px;
+}
+
+.sim-actions-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sim-webhook-btn {
+  background: #0ea5e9 !important;
+  color: #ffffff !important;
+}
+
+.sim-toggle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(6, 78, 59, 0.95);
+  backdrop-filter: blur(8px);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sim-toggle-btn {
+  background: #10b981 !important;
+  color: #064e3b !important;
+  font-weight: 700 !important;
+  border: none !important;
+  padding: 6px 14px !important;
+  border-radius: var(--radius-full) !important;
+  font-size: 13px !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.sim-toggle-btn:hover {
+  background: #34d399 !important;
+  transform: translateY(-1px);
+}
+
+.sim-toggle-btn.active {
+  background: #fbbf24 !important;
+  color: #78350f !important;
+}
+
+/* Mobile Phone Frame Simulator */
+.phone-mode-active {
+  background: #18181b;
+  min-height: 100vh;
+  padding: 20px 10px;
+}
+
+.phone-mode-active header {
+  display: none;
+}
+
+.phone-frame {
+  max-width: 420px;
+  margin: 0 auto;
+  background: #f6f8f5;
+  border-radius: 40px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 12px #27272a, 0 0 0 14px #3f3f46;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 844px;
+}
+
+.phone-notch {
+  width: 140px;
+  height: 24px;
+  background: #27272a;
+  margin: 0 auto;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  position: relative;
+  z-index: 100;
+}
+
+.phone-line-header {
+  background: #06c755;
+  color: #ffffff;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.phone-line-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.phone-line-badge {
+  background: #ffffff;
+  color: #06c755;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.phone-exit-btn {
+  background: rgba(0, 0, 0, 0.2) !important;
+  color: #fff !important;
+  border: none !important;
+  padding: 4px 10px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  min-height: 26px !important;
+}
+
+/* Quick Record Action Buttons */
+.quick-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+
+.chip-btn {
+  background: var(--slate-100) !important;
+  color: var(--slate-700) !important;
+  border: 1px solid var(--slate-200) !important;
+  border-radius: var(--radius-full) !important;
+  padding: 6px 12px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease;
+  min-height: 32px !important;
+  text-align: left;
+}
+
+.chip-btn:hover {
+  background: var(--primary-light) !important;
+  color: var(--primary) !important;
+  border-color: var(--primary-border) !important;
+  transform: translateY(-1px);
+}
+
+/* Voice Input Microphone Button */
+.voice-mic-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.voice-btn {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+  color: #fff !important;
+  border-radius: var(--radius-md) !important;
+  padding: 8px 16px !important;
+  font-weight: 600 !important;
+  font-size: 13.5px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
+  cursor: pointer;
+  border: none !important;
+  transition: all 0.2s ease;
+}
+
+.voice-btn:hover {
+  filter: brightness(1.08);
+}
+
+.voice-btn.recording {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.35) !important;
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+/* Photo Upload Preview Box */
+.photo-preview-wrap {
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.photo-preview-img {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 2px solid var(--primary-border);
+  box-shadow: var(--shadow-xs);
+}
+
+/* KPI Group Readiness Bar */
+.readiness-bar-box {
+  margin-top: 10px;
+  background: var(--slate-100);
+  border-radius: 999px;
+  height: 12px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--slate-200);
+}
+
+.readiness-bar-fill {
+  background: linear-gradient(90deg, #10b981, #059669);
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s ease;
+}
+
+/* Watchlist & Scenarios Table */
+.watchlist-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--slate-200);
+  background: #fff;
+  margin-top: 12px;
+}
+
+.watchlist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.watchlist-table th {
+  background: #f8fafc;
+  color: var(--slate-700);
+  padding: 10px 14px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.watchlist-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--slate-100);
+  vertical-align: middle;
+}
+
+.watchlist-table tr:last-child td {
+  border-bottom: none;
+}
+
+.badge-risk {
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  font-size: 11px;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  font-size: 11px;
+}
+
+.badge-normal {
+  background: #d1fae5;
+  color: #065f46;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  font-size: 11px;
+}
+
+/* Organic Story Passport Modal */
+.passport-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.passport-card {
+  background: #fff;
+  width: 100%;
+  max-width: 460px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  border: 2px solid #a7f3d0;
+  animation: popIn 0.25s ease-out;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.passport-header {
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+  color: #fff;
+  padding: 20px;
+  text-align: center;
+  position: relative;
+}
+
+.passport-badge {
+  background: #fbbf24;
+  color: #78350f;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+.passport-body {
+  padding: 20px;
+}
+
+.passport-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--slate-200);
+  font-size: 13.5px;
+}
+
+.passport-row:last-child {
+  border-bottom: none;
+}
+
+.passport-qr {
+  text-align: center;
+  margin: 16px 0;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--slate-200);
+}
+
+.passport-close-btn {
+  width: 100%;
+  background: var(--slate-800) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-md) !important;
+  padding: 10px !important;
+  margin-top: 14px;
+}
