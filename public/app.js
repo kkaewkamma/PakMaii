@@ -175,6 +175,132 @@ function icon(name, size = 16, className = 'ui-icon') {
   return svg;
 }
 
+// Pure DOM SVG Circular Progress Gauge — 100% CSP safe
+function createCircularGauge(percent, size = 100, strokeWidth = 9, colorClass = 'gauge-green') {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const validPercent = percent !== null && Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
+  const offset = circumference * (1 - validPercent / 100);
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.setAttribute('class', `circular-gauge-svg ${colorClass}`);
+
+  const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  bgCircle.setAttribute('cx', String(size / 2));
+  bgCircle.setAttribute('cy', String(size / 2));
+  bgCircle.setAttribute('r', String(radius));
+  bgCircle.setAttribute('class', 'gauge-bg-circle');
+  bgCircle.setAttribute('stroke-width', String(strokeWidth));
+
+  const progressCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  progressCircle.setAttribute('cx', String(size / 2));
+  progressCircle.setAttribute('cy', String(size / 2));
+  progressCircle.setAttribute('r', String(radius));
+  progressCircle.setAttribute('class', 'gauge-progress-circle');
+  progressCircle.setAttribute('stroke-width', String(strokeWidth));
+  progressCircle.setAttribute('stroke-dasharray', circumference.toFixed(2));
+  progressCircle.setAttribute('stroke-dashoffset', offset.toFixed(2));
+
+  svg.append(bgCircle, progressCircle);
+  return svg;
+}
+
+// Pure DOM SVG Horizontal Distribution Bar — 100% CSP safe
+function createDistributionBar(total, normal, pending, risk) {
+  const safeTotal = total > 0 ? total : 1;
+  const normalW = Math.max(0, (normal / safeTotal) * 100);
+  const pendingW = Math.max(0, (pending / safeTotal) * 100);
+  const riskW = Math.max(0, (risk / safeTotal) * 100);
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 100 12');
+  svg.setAttribute('class', 'dist-bar-svg');
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  let curX = 0;
+  if (normalW > 0) {
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('x', curX.toFixed(2));
+    r.setAttribute('y', '0');
+    r.setAttribute('width', normalW.toFixed(2));
+    r.setAttribute('height', '12');
+    r.setAttribute('rx', '4');
+    r.setAttribute('class', 'dist-rect dist-green');
+    svg.append(r);
+    curX += normalW;
+  }
+  if (pendingW > 0) {
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('x', curX.toFixed(2));
+    r.setAttribute('y', '0');
+    r.setAttribute('width', pendingW.toFixed(2));
+    r.setAttribute('height', '12');
+    r.setAttribute('rx', '4');
+    r.setAttribute('class', 'dist-rect dist-amber');
+    svg.append(r);
+    curX += pendingW;
+  }
+  if (riskW > 0) {
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('x', curX.toFixed(2));
+    r.setAttribute('y', '0');
+    r.setAttribute('width', riskW.toFixed(2));
+    r.setAttribute('height', '12');
+    r.setAttribute('rx', '4');
+    r.setAttribute('class', 'dist-rect dist-rose');
+    svg.append(r);
+  }
+  if (total === 0) {
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('x', '0');
+    r.setAttribute('y', '0');
+    r.setAttribute('width', '100');
+    r.setAttribute('height', '12');
+    r.setAttribute('rx', '4');
+    r.setAttribute('class', 'dist-rect dist-empty');
+    svg.append(r);
+  }
+  return svg;
+}
+
+// Pure DOM Visual Milestone Roadmap Graphic — 100% CSP safe
+function createMilestoneGraphic(activeStepIndex = 1) {
+  const steps = [
+    { title: 'เตรียมแปลง', desc: 'ไถกลบ/ไม่เผาฟาง', iconName: 'leaf' },
+    { title: 'บันทึกแปลง', desc: 'บันทึกกิจกรรมต่อเนื่อง', iconName: 'calendar' },
+    { title: 'ปัจจัยอินทรีย์', desc: 'ผ่านอนุมัติ 100%', iconName: 'clipboard' },
+    { title: 'รับรอง PGS', desc: 'มาตรฐานอินทรีย์สมบูรณ์', iconName: 'shield' }
+  ];
+
+  const container = el('div', { className: 'milestone-graphic-box' },
+    el('div', { className: 'milestone-track-row' },
+      ...steps.flatMap((step, idx) => {
+        const isDone = idx < activeStepIndex;
+        const isCurrent = idx === activeStepIndex;
+        const statusClass = isDone ? 'step-done' : isCurrent ? 'step-current' : 'step-pending';
+        const node = el('div', { className: `milestone-step-node ${statusClass}` },
+          el('div', { className: 'milestone-circle' },
+            isDone ? icon('check', 14) : icon(step.iconName, 14)
+          ),
+          el('div', { className: 'milestone-text' },
+            el('b', { className: 'milestone-title' }, step.title),
+            el('span', { className: 'milestone-desc' }, step.desc)
+          )
+        );
+        if (idx < steps.length - 1) {
+          const line = el('div', { className: `milestone-connector ${idx < activeStepIndex ? 'line-done' : 'line-pending'}` });
+          return [node, line];
+        }
+        return [node];
+      })
+    )
+  );
+  return container;
+}
+
 const tabsFarmer = [
   ['home', 'ภาพรวม', 'sprout'],
   ['plots', 'แปลงปลูก', 'mapPin'],
@@ -810,6 +936,11 @@ function showStoryPassport(lot) {
         ),
         el('button', {
           type: 'button',
+          className: 'btn-sm secondary',
+          onclick: () => window.print()
+        }, icon('printer', 14), ' พิมพ์ใบรับรอง (Print)'),
+        el('button', {
+          type: 'button',
           className: 'passport-close-btn',
           onclick: () => overlay.remove()
         }, 'ปิดหน้าต่างใบรับรอง')
@@ -1347,37 +1478,94 @@ async function loadTab() {
           watchlistContent = el('div', {}, desktopTable, mobileCards);
         }
 
-        nodes = [
-          el('div', { className: 'grid' },
-            card(
-              el('div', { className: 'stat-label' }, icon('users', 14), 'สมาชิกกลุ่มเกษตรกร'),
-              el('div', { className: 'stat' }, `${totalMembers} ราย`),
-              el('small', { className: 'muted' }, totalMembers > 0 ? (isDemo ? 'วิสาหกิจชุมชนผักไหม (Demo)' : 'สมาชิกในความรับผิดชอบ') : 'รอการมอบหมายสมาชิก')
-            ),
-            card(
-              el('div', { className: 'stat-label' }, icon('mapPin', 14), 'แปลงปลูกทั้งหมด'),
-              el('div', { className: 'stat' }, `${totalPlots} แปลง`),
-              el('small', { className: 'muted' }, totalPlots > 0 ? (isDemo ? 'รวมพื้นที่ 380 ไร่' : 'แปลงในความดูแล') : 'ยังไม่มีแปลงในระบบ')
-            ),
-            card(
-              el('div', { className: 'stat-label' }, icon('clock', 14), 'คำขอปัจจัยรอตรวจ'),
-              el('div', { className: 'stat stat-amber' }, `${pendingInput} รายการ`),
-              el('small', { className: 'muted' }, 'สูตรปุ๋ย/น้ำหมักอินทรีย์')
-            ),
-            card(
-              el('div', { className: 'stat-label' }, icon('alert', 14), 'สัญญาณความเสี่ยง'),
-              el('div', { className: 'stat stat-rose' }, `${riskAlerts} จุด`),
-              el('small', { className: 'muted' }, riskAlerts > 0 ? 'ขาดบันทึก / ไม่สอดคล้อง' : 'ไม่พบจุดเสี่ยง')
-            ),
-            card(
-              el('div', { className: 'stat-label' }, icon('shield', 14), 'ความพร้อมรับรองกลุ่ม (ICS)'),
-              el('div', { className: 'stat stat-primary' }, readinessStatText),
-              el('div', { className: 'readiness-bar-box', 'aria-label': `ความพร้อม ${readinessStatText}` },
-                el('div', { className: `readiness-bar-fill ${readinessFillClass}` })
+        const normalPlotsCount = Math.max(0, totalPlots - riskAlerts - pendingInput);
+        const gaugeColorClass = groupReadiness >= 90 ? 'gauge-green' : groupReadiness >= 75 ? 'gauge-amber' : 'gauge-rose';
+
+        const icsHeroCard = el('div', { className: 'card ics-hero-graphic-card' },
+          el('div', { className: 'ics-hero-content' },
+            el('div', { className: 'gauge-panel' },
+              el('div', { className: 'gauge-wrap' },
+                createCircularGauge(groupReadiness, 100, 9, gaugeColorClass),
+                el('div', { className: 'gauge-center' },
+                  el('span', { className: 'gauge-val' }, readinessStatText),
+                  el('small', { className: 'gauge-lbl' }, groupReadiness !== null ? 'พร้อมรับรอง' : 'รอข้อมูล')
+                )
               ),
-              el('small', { className: 'muted' }, readinessSubtext)
+              el('div', { className: 'gauge-meta' },
+                el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'PGS Group Readiness' : 'เกณฑ์ควบคุมภายใน ICS'),
+                el('h3', { className: 'gauge-title' }, 'ความพร้อมรับรองมาตรฐานกลุ่ม (PGS / ICS)'),
+                el('p', { className: 'muted gauge-desc' }, readinessSubtext + ' • ตำบลผักไหม จ.ศรีสะเกษ')
+              )
+            ),
+            el('div', { className: 'dist-panel' },
+              el('div', { className: 'dist-header row between' },
+                el('b', { className: 'dist-title' }, icon('sprout', 14), ' สัดส่วนสถานะแปลงทั้งตำบล'),
+                el('small', { className: 'muted' }, `รวม ${totalPlots} แปลง (${totalMembers} สมาชิก)`)
+              ),
+              createDistributionBar(totalPlots, normalPlotsCount, pendingInput, riskAlerts),
+              el('div', { className: 'dist-legend-grid' },
+                el('div', { className: 'legend-item' },
+                  el('span', { className: 'legend-dot dot-green' }),
+                  el('span', { className: 'legend-label' }, 'ปกติ/ผ่านเกณฑ์:'),
+                  el('b', { className: 'legend-val' }, `${normalPlotsCount} แปลง`)
+                ),
+                el('div', { className: 'legend-item' },
+                  el('span', { className: 'legend-dot dot-amber' }),
+                  el('span', { className: 'legend-label' }, 'รออนุมัติปัจจัย:'),
+                  el('b', { className: 'legend-val text-amber' }, `${pendingInput} แปลง`)
+                ),
+                el('div', { className: 'legend-item' },
+                  el('span', { className: 'legend-dot dot-rose' }),
+                  el('span', { className: 'legend-label' }, 'จุดเสี่ยงเฝ้าระวัง:'),
+                  el('b', { className: 'legend-val text-rose' }, `${riskAlerts} จุด`)
+                )
+              )
             )
+          )
+        );
+
+        const kpiGrid = el('div', { className: 'grid kpi-grid' },
+          el('div', { className: 'card kpi-card' },
+            el('div', { className: 'kpi-top' },
+              el('div', { className: 'kpi-icon-badge kpi-forest' }, icon('users', 18)),
+              el('span', { className: 'kpi-tag' }, 'เกษตรกร')
+            ),
+            el('div', { className: 'kpi-num' }, `${totalMembers}`, el('small', {}, ' ราย')),
+            el('div', { className: 'kpi-desc muted' }, totalMembers > 0 ? (isDemo ? 'วิสาหกิจชุมชนผักไหม (Demo)' : 'สมาชิกในความรับผิดชอบ') : 'รอการมอบหมายสมาชิก'),
+            el('div', { className: 'kpi-bar kpi-bar-forest' })
           ),
+          el('div', { className: 'card kpi-card' },
+            el('div', { className: 'kpi-top' },
+              el('div', { className: 'kpi-icon-badge kpi-emerald' }, icon('mapPin', 18)),
+              el('span', { className: 'kpi-tag' }, 'พื้นที่แปลง')
+            ),
+            el('div', { className: 'kpi-num' }, `${totalPlots}`, el('small', {}, ' แปลง')),
+            el('div', { className: 'kpi-desc muted' }, totalPlots > 0 ? (isDemo ? 'รวมพื้นที่ 380 ไร่' : 'แปลงในความดูแล') : 'ยังไม่มีแปลงในระบบ'),
+            el('div', { className: 'kpi-bar kpi-bar-emerald' })
+          ),
+          el('div', { className: 'card kpi-card' },
+            el('div', { className: 'kpi-top' },
+              el('div', { className: 'kpi-icon-badge kpi-amber' }, icon('clock', 18)),
+              el('span', { className: 'kpi-tag tag-amber' }, 'รอพิจารณา')
+            ),
+            el('div', { className: 'kpi-num stat-amber' }, `${pendingInput}`, el('small', {}, ' รายการ')),
+            el('div', { className: 'kpi-desc muted' }, 'สูตรปุ๋ย/น้ำหมักอินทรีย์'),
+            el('div', { className: 'kpi-bar kpi-bar-amber' })
+          ),
+          el('div', { className: 'card kpi-card' },
+            el('div', { className: 'kpi-top' },
+              el('div', { className: 'kpi-icon-badge kpi-rose' }, icon('alert', 18)),
+              el('span', { className: 'kpi-tag tag-rose' }, 'ความเสี่ยง')
+            ),
+            el('div', { className: 'kpi-num stat-rose' }, `${riskAlerts}`, el('small', {}, ' จุด')),
+            el('div', { className: 'kpi-desc muted' }, riskAlerts > 0 ? 'ขาดบันทึก / ไม่สอดคล้อง' : 'ไม่พบจุดเสี่ยง'),
+            el('div', { className: 'kpi-bar kpi-bar-rose' })
+          )
+        );
+
+        nodes = [
+          icsHeroCard,
+          kpiGrid,
           el('div', { className: 'card watchlist-card' },
             el('div', { className: 'row between' },
               el('h3', {}, icon('alert', 16), ' Priority Watch-list: การเฝ้าระวังและบริหารความเสี่ยงรายแปลง'),
@@ -1437,76 +1625,92 @@ async function loadTab() {
           statusDesc = 'คำขอปุ๋ย/น้ำหมักอินทรีย์อยู่ระหว่างเจ้าหน้าที่ตรวจสอบ ห้ามนำปัจจัยไปใช้ในแปลงก่อนได้รับการอนุมัติอย่างเป็นทางการ';
         }
 
-        const statIcons = {
-          'แปลงปลูก': 'mapPin',
-          'กิจกรรม': 'calendar',
-          'คำขอรอพิจารณา': 'clock',
-          'ล็อตผลผลิต': 'package',
-          'ผลตรวจแปลง': 'shield'
-        };
-
-        const statusBannerClass = `farmer-status-card ${statusTier}`;
         const statusBadgeClass = `badge-${statusTier}`;
+        const farmerGaugeVal = daysSince === null ? 0 : Math.max(0, Math.round(((14 - Math.min(14, daysSince)) / 14) * 100));
+        const farmerGaugeColor = isOverdue ? 'gauge-rose' : isWarning ? 'gauge-amber' : 'gauge-green';
 
-        nodes = [
-          el('div', { className: statusBannerClass },
-            el('div', { className: 'farmer-status-header' },
+        const farmerHeroCard = el('div', { className: `farmer-hero-graphic-card ${statusTier}` },
+          el('div', { className: 'farmer-hero-top' },
+            el('div', { className: 'farmer-gauge-wrap' },
+              createCircularGauge(farmerGaugeVal, 96, 8, farmerGaugeColor),
+              el('div', { className: 'gauge-center' },
+                el('span', { className: `gauge-val val-${statusTier}` }, daysSince === null ? '-' : daysSince === 0 ? 'วันนี้' : `${daysSince}ว.`),
+                el('small', { className: 'gauge-lbl' }, 'บันทึกล่าสุด')
+              )
+            ),
+            el('div', { className: 'farmer-hero-info' },
               el('div', { className: 'status-badge-row' },
                 el('span', { className: `pill ${statusBadgeClass}` }, statusBadgeText),
                 myPlot?.conversion_year ? el('span', { className: 'pill' }, myPlot.conversion_year) : null,
                 myPlot?.plot_code ? el('span', { className: 'pill' }, `รหัสแปลง: ${myPlot.plot_code}`) : null
-              )
-            ),
-            el('h3', { className: 'farmer-status-title' }, statusTitle),
-            el('p', { className: 'farmer-status-desc' }, statusDesc),
-            alertAdvice ? el('div', { className: `farmer-advice-box advice-${statusTier}` },
-              icon('alert', 15),
-              el('span', {}, alertAdvice)
-            ) : null,
-            el('div', { className: 'farmer-quick-stats' },
-              el('div', { className: 'quick-stat-item' },
-                el('span', { className: 'quick-stat-sub' }, 'บันทึกล่าสุด'),
-                el('b', {}, daysSince === null ? 'ยังไม่มี' : daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`)
               ),
-              el('div', { className: 'quick-stat-item' },
-                el('span', { className: 'quick-stat-sub' }, 'เกณฑ์รอบบันทึก'),
-                el('b', {}, 'ไม่เกิน 14 วัน')
-              ),
-              el('div', { className: 'quick-stat-item' },
-                el('span', { className: 'quick-stat-sub' }, 'คำขอปัจจัย'),
-                el('b', {}, pendingCount > 0 ? `${pendingCount} รายการรอตรวจ` : 'ผ่านทุกรายการ')
-              )
-            ),
-            el('div', { className: 'row farmer-actions-row' },
-              el('button', {
-                type: 'button',
-                className: isOverdue ? 'pulse' : '',
-                onclick: async () => { tab = 'record'; renderTabs(); await loadTab(); }
-              }, icon('calendar', 14), ' บันทึกกิจกรรมแปลงด่วน'),
-              el('button', {
-                type: 'button',
-                className: 'secondary',
-                onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
-              }, icon('clipboard', 14), ' ขออนุมัติปัจจัยการผลิต'),
-              el('button', {
-                type: 'button',
-                className: 'secondary',
-                onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
-              }, icon('shield', 14), ' ผลตรวจประเมินแปลง')
+              el('h3', { className: 'farmer-status-title' }, statusTitle),
+              el('p', { className: 'farmer-status-desc' }, statusDesc)
             )
           ),
-          el('div', { className: 'grid' },
-            [['แปลงปลูก', plots.length],
-             ['กิจกรรม', activities.length],
-             ['คำขอรอพิจารณา', pendingCount],
-             ['ล็อตผลผลิต', lots.length],
-             ['ผลตรวจแปลง', revs.length]].map(([label, count]) =>
-              card(
-                el('div', { className: 'stat-label' }, icon(statIcons[label] || 'sprout', 14), label),
-                el('div', { className: 'stat' }, count)
-              )
-            )
+          alertAdvice ? el('div', { className: `farmer-advice-box advice-${statusTier}` },
+            icon('alert', 15),
+            el('span', {}, alertAdvice)
+          ) : null,
+          el('div', { className: 'row farmer-actions-row mt-12' },
+            el('button', {
+              type: 'button',
+              className: isOverdue ? 'pulse' : '',
+              onclick: async () => { tab = 'record'; renderTabs(); await loadTab(); }
+            }, icon('calendar', 14), ' บันทึกกิจกรรมแปลงด่วน'),
+            el('button', {
+              type: 'button',
+              className: 'secondary',
+              onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
+            }, icon('clipboard', 14), ' ขออนุมัติปัจจัยการผลิต'),
+            el('button', {
+              type: 'button',
+              className: 'secondary',
+              onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
+            }, icon('shield', 14), ' ผลตรวจประเมินแปลง')
           )
+        );
+
+        const currentMilestoneStep = isOverdue ? 1 : pendingCount > 0 ? 2 : revs.length > 0 ? 3 : 1;
+        const milestoneCard = el('div', { className: 'card milestone-card' },
+          el('div', { className: 'row between' },
+            el('h4', { className: 'milestone-header' }, icon('shield', 16), ' เส้นทางมาตรฐานเกษตรอินทรีย์ (PGS / ICS Milestones)'),
+            el('span', { className: 'pill' }, 'วิสาหกิจชุมชนผักไหม')
+          ),
+          el('p', { className: 'muted card-lead' }, 'แนวทางการดำเนินงาน 4 ขั้นตอน เพื่อรักษามาตรฐานความปลอดภัยและสร้างมูลค่าผลผลิตอินทรีย์ร่วมกันทั้งชุมชน'),
+          createMilestoneGraphic(currentMilestoneStep)
+        );
+
+        const farmerStatMeta = {
+          'แปลงปลูก': { icon: 'mapPin', color: 'kpi-emerald', unit: ' แปลง' },
+          'กิจกรรม': { icon: 'calendar', color: 'kpi-forest', unit: ' รายการ' },
+          'คำขอรอพิจารณา': { icon: 'clock', color: 'kpi-amber', unit: ' คำขอ' },
+          'ล็อตผลผลิต': { icon: 'package', color: 'kpi-forest', unit: ' ล็อต' },
+          'ผลตรวจแปลง': { icon: 'shield', color: 'kpi-emerald', unit: ' ครั้ง' }
+        };
+
+        const farmerKpiGrid = el('div', { className: 'grid kpi-grid' },
+          [['แปลงปลูก', plots.length],
+           ['กิจกรรม', activities.length],
+           ['คำขอรอพิจารณา', pendingCount],
+           ['ล็อตผลผลิต', lots.length],
+           ['ผลตรวจแปลง', revs.length]].map(([label, count]) => {
+            const meta = farmerStatMeta[label] || { icon: 'sprout', color: 'kpi-forest', unit: '' };
+            return el('div', { className: 'card kpi-card' },
+              el('div', { className: 'kpi-top' },
+                el('div', { className: `kpi-icon-badge ${meta.color}` }, icon(meta.icon, 16)),
+                el('span', { className: 'kpi-tag' }, label)
+              ),
+              el('div', { className: 'kpi-num' }, `${count}`, el('small', {}, meta.unit)),
+              el('div', { className: `kpi-bar ${meta.color.replace('kpi-', 'kpi-bar-')}` })
+            );
+          })
+        );
+
+        nodes = [
+          farmerHeroCard,
+          milestoneCard,
+          farmerKpiGrid
         ];
       }
 
@@ -1589,7 +1793,6 @@ async function loadTab() {
           )
         );
       }
-
       const buildPlotCard = (plot) => {
         const conversionYear = plot.conversion_year || 'Year 1';
 
