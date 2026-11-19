@@ -81,7 +81,26 @@ export function uploadEvidenceWithProgress(blob, { plotId, entityType = 'activit
 }
 
 export async function openEvidenceViewer(evidenceId) {
-  const overlay = el('div', { className: 'passport-overlay' });
+  const previousFocus = document.activeElement;
+  const overlay = el('div', {
+    className: 'passport-overlay',
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-label': `ภาพหลักฐาน #${evidenceId}`
+  });
+  const closeDialog = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown);
+    if (previousFocus && typeof previousFocus.focus === 'function') {
+      previousFocus.focus();
+    }
+  };
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') closeDialog();
+  };
+  document.addEventListener('keydown', onKeyDown);
+
+  const closeBtn = el('button', { type: 'button', className: 'passport-close-btn', onclick: closeDialog }, 'ปิดหน้าต่าง');
   const bodyHost = el('div', { className: 'passport-body' },
     el('p', { className: 'muted' }, 'กำลังโหลดภาพหลักฐานอย่างปลอดภัย...')
   );
@@ -93,12 +112,13 @@ export async function openEvidenceViewer(evidenceId) {
     ),
     bodyHost,
     el('div', { className: 'passport-actions row between mt-12' },
-      el('button', { type: 'button', className: 'passport-close-btn', onclick: () => overlay.remove() }, 'ปิดหน้าต่าง')
+      closeBtn
     )
   );
   overlay.append(cardNode);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
   document.body.append(overlay);
+  closeBtn.focus();
 
   try {
     const response = await fetch(`/api/evidence/${encodeURIComponent(String(evidenceId))}/content`, {

@@ -458,12 +458,18 @@ function currentTabs() {
   return me.role === 'admin' ? tabsAdmin : me.role === 'ics' ? (demoUser ? tabsIcsDemo : tabsIcs) : tabsFarmer;
 }
 
+function scrollToTop() {
+  const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  window.scrollTo({ top: 0, behavior: prefersReduced ? 'auto' : 'smooth' });
+}
+
 function renderTabs() {
   const items = currentTabs();
   $('#tabs').replaceChildren(...items.map(([id, label, iconName]) =>
     el('button', {
       type: 'button',
       className: tab === id ? 'active' : '',
+      'aria-current': tab === id ? 'page' : undefined,
       onclick: async () => { tab = id; renderTabs(); await loadTab(); }
     },
       icon(iconName || 'sprout', 15),
@@ -476,9 +482,13 @@ function renderTabs() {
 
 function openMoreSheet(secondaryItems) {
   $('.more-sheet-overlay')?.remove();
+  const previousFocus = document.activeElement;
   const closeSheet = () => {
     overlay.remove();
     document.removeEventListener('keydown', onKeyDown);
+    if (previousFocus && typeof previousFocus.focus === 'function') {
+      previousFocus.focus();
+    }
   };
   const onKeyDown = (e) => {
     if (e.key === 'Escape') closeSheet();
@@ -490,13 +500,14 @@ function openMoreSheet(secondaryItems) {
       el('button', {
         type: 'button',
         className: `more-sheet-item ${tab === id ? 'active' : ''}`,
+        'aria-current': tab === id ? 'page' : undefined,
         onclick: async () => {
           closeSheet();
           if (tab !== id) {
             tab = id;
             renderTabs();
             await loadTab();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            scrollToTop();
           }
         }
       },
@@ -518,6 +529,7 @@ function openMoreSheet(secondaryItems) {
     }, icon('logOut', 16), demoUser ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ')
   );
 
+  const closeBtn = el('button', { type: 'button', className: 'ghost btn-sm', onclick: closeSheet, 'aria-label': 'ปิดเมนูเพิ่มเติม' }, 'ปิด');
   const sheet = el('div', {
     className: 'more-sheet',
     role: 'dialog',
@@ -526,7 +538,7 @@ function openMoreSheet(secondaryItems) {
   },
     el('div', { className: 'more-sheet-header' },
       el('b', {}, 'เมนูเพิ่มเติม'),
-      el('button', { type: 'button', className: 'ghost btn-sm', onclick: closeSheet, 'aria-label': 'ปิดเมนูเพิ่มเติม' }, 'ปิด')
+      closeBtn
     ),
     secondaryItems.length ? navList : null,
     accountActions
@@ -537,6 +549,7 @@ function openMoreSheet(secondaryItems) {
     onclick: (e) => { if (e.target === overlay) closeSheet(); }
   }, sheet);
   document.body.append(overlay);
+  closeBtn.focus();
 }
 
 function renderMobileDock() {
@@ -580,12 +593,13 @@ function renderMobileDock() {
     return el('button', {
       type: 'button',
       className: `dock-btn ${tab === id ? 'active' : ''} ${isHighlight ? 'dock-highlight' : ''}`,
+      'aria-current': tab === id ? 'page' : undefined,
       onclick: async () => {
         if (tab !== id) {
           tab = id;
           renderTabs();
           await loadTab();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          scrollToTop();
         }
       }
     },
