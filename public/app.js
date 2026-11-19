@@ -54,8 +54,12 @@ const tabsAdmin = [
 ];
 
 
+import { setToken, setConfig, setDemoUser } from './js/core/state.js';
+
 function clearSession() {
   token = null; me = null; plots = []; lastInvitation = null; demoUser = null; tab = 'home';
+  setToken(null);
+  setDemoUser(null);
   sessionStorage.removeItem('token');
   demoSession?.logout();
 }
@@ -65,6 +69,7 @@ async function loadConfig() {
   const response = await fetch('/api/config', { cache: 'no-store' });
   if (!response.ok) throw new Error('โหลดคอนฟิกไม่สำเร็จ');
   config = await response.json();
+  setConfig(config);
   return config;
 }
 
@@ -102,9 +107,11 @@ async function api(path, method = 'GET', body) {
 
 async function acceptLogin(data) {
   demoUser = null;
+  setDemoUser(null);
   demoSession?.logout();
   sessionStorage.removeItem('admin_login');
   token = data.token;
+  setToken(token);
   sessionStorage.setItem('token', token);
   tab = data.redirectTo || 'home';
   await start();
@@ -114,6 +121,7 @@ async function acceptDemoLogin(role, code) {
   clearSession();
   sessionStorage.removeItem('logged_out');
   demoUser = demoSession.login(role, code);
+  setDemoUser(demoUser);
   loginRole = demoUser.role;
   tab = 'home';
   await start();
@@ -430,301 +438,8 @@ async function start(forceLogin = false) {
   }
 }
 
-function createVoiceInput(textarea) {
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRec) {
-    return el('div', { className: 'voice-mic-bar hide' });
-  }
-
-  const voiceBtn = el('button', {
-    type: 'button',
-    className: 'voice-btn',
-    title: 'กดเพื่อพูดภาษาไทย'
-  }, icon('mic', 14), ' บันทึกด้วยเสียง');
-
-  let recognition = null;
-  try {
-    recognition = new SpeechRec();
-    recognition.lang = 'th-TH';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => {
-      voiceBtn.classList.add('recording');
-      voiceBtn.textContent = 'กำลังรับฟังเสียง...';
-    };
-
-    recognition.onresult = (e) => {
-      const transcript = e.results[0]?.[0]?.transcript || '';
-      if (transcript) {
-        textarea.value = (textarea.value ? textarea.value + ' ' : '') + transcript;
-        notify(`แปลงเสียงสำเร็จ: "${transcript}"`);
-      }
-    };
-
-    recognition.onerror = () => {
-      voiceBtn.classList.remove('recording');
-      voiceBtn.replaceChildren(icon('mic', 14), document.createTextNode(' บันทึกด้วยเสียง'));
-      notify('อุปกรณ์นี้ยังใช้การพิมพ์ด้วยเสียงไม่ได้ กรุณาพิมพ์แทน');
-    };
-
-    recognition.onend = () => {
-      voiceBtn.classList.remove('recording');
-      voiceBtn.replaceChildren(icon('mic', 14), document.createTextNode(' บันทึกด้วยเสียง'));
-    };
-  } catch {
-    return el('div', { className: 'voice-mic-bar hide' });
-  }
-
-  voiceBtn.onclick = () => {
-    if (recognition) {
-      try {
-        recognition.start();
-      } catch {
-        notify('อุปกรณ์นี้ยังใช้การพิมพ์ด้วยเสียงไม่ได้ กรุณาพิมพ์แทน');
-      }
-    } else {
-      notify('อุปกรณ์นี้ยังใช้การพิมพ์ด้วยเสียงไม่ได้ กรุณาพิมพ์แทน');
-    }
-  };
-
-  return el('div', { className: 'voice-mic-bar' }, voiceBtn);
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.readAsDataURL(blob);
-  });
-}
-
-function compressImage(file, maxDimension = 1200, quality = 0.8) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(e.target.result);
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-async function compressImageToBlob(file, maxDimension = 1200, quality = 0.8) {
-  const dataUrl = await compressImage(file, maxDimension, quality);
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  return { blob, dataUrl, contentType: blob.type || 'image/jpeg', size: blob.size };
-}
-
-function uploadEvidenceWithProgress(blob, { plotId, entityType = 'activity', onProgress } = {}) {
-  return new Promise((resolve, reject) => {
-    if (!plotId) {
-      reject(new Error('กรุณาเลือกแปลงปลูกก่อนอัปโหลดภาพหลักฐาน'));
-      return;
-    }
-    const xhr = new XMLHttpRequest();
-    const qs = `plot_id=${encodeURIComponent(String(plotId))}&entity_type=${encodeURIComponent(String(entityType))}`;
-    xhr.open('POST', `/api/evidence?${qs}`);
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    xhr.setRequestHeader('Content-Type', blob.type || 'image/jpeg');
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && typeof onProgress === 'function') {
-        onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
-      }
-    };
-    xhr.onload = () => {
-      let data = {};
-      try { data = JSON.parse(xhr.responseText || '{}'); } catch { data = {}; }
-      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
-      else reject(new Error(data.error || `อัปโหลดภาพไม่สำเร็จ (${xhr.status})`));
-    };
-    xhr.onerror = () => reject(new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง'));
-    xhr.send(blob);
-  });
-}
-
-async function openEvidenceViewer(evidenceId) {
-  const overlay = el('div', { className: 'passport-overlay' });
-  const bodyHost = el('div', { className: 'passport-body' },
-    el('p', { className: 'muted' }, 'กำลังโหลดภาพหลักฐานอย่างปลอดภัย...')
-  );
-  const cardNode = el('div', { className: 'passport-card' },
-    el('div', { className: 'passport-header' },
-      el('span', { className: 'pill success' }, icon('shield', 12), ' หลักฐานภาพถ่ายที่อัปโหลดแล้ว'),
-      el('h3', { className: 'passport-title mt-8' }, `ภาพหลักฐาน #${evidenceId}`),
-      el('small', { className: 'passport-subtitle' }, 'เข้าถึงได้เฉพาะเจ้าของแปลง เจ้าหน้าที่ ICS ที่รับผิดชอบ และผู้ดูแลระบบ')
-    ),
-    bodyHost,
-    el('div', { className: 'passport-actions row between mt-12' },
-      el('button', { type: 'button', className: 'passport-close-btn', onclick: () => overlay.remove() }, 'ปิดหน้าต่าง')
-    )
-  );
-  overlay.append(cardNode);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.append(overlay);
-
-  try {
-    const response = await fetch(`/api/evidence/${encodeURIComponent(String(evidenceId))}/content`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      cache: 'no-store'
-    });
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'ไม่สามารถเปิดดูภาพหลักฐานได้');
-    }
-    const blob = await response.blob();
-    const dataUrl = await blobToDataUrl(blob);
-    bodyHost.replaceChildren(
-      el('img', { src: dataUrl, className: 'evidence-viewer-img', alt: `ภาพหลักฐาน #${evidenceId}` }),
-      el('small', { className: 'muted mt-8' }, 'ภาพหลักฐานที่จัดเก็บอย่างปลอดภัยในระบบ')
-    );
-  } catch (err) {
-    bodyHost.replaceChildren(
-      el('small', { className: 'field-error' }, err.message || 'ไม่สามารถโหลดภาพหลักฐานได้')
-    );
-  }
-}
-
-function createPhotoUploader(photoUrlInput, options = {}) {
-  const entityType = options.entityType || 'activity';
-  const getPlotId = typeof options.getPlotId === 'function' ? options.getPlotId : () => null;
-  const evidenceIdInput = options.evidenceIdInput || null;
-
-  const isDemoPreview = Boolean(demoUser);
-  const realUploadReady = !isDemoPreview && Boolean(config?.evidenceUploadEnabled);
-
-  if (!isDemoPreview && !realUploadReady) {
-    return el('div', { className: 'photo-preview-wrap' },
-      el('small', { className: 'muted' }, 'ระบบอัปโหลดภาพขึ้น R2 ยังไม่เปิดใช้งานในสภาพแวดล้อมนี้ (สามารถแนบลิงก์ HTTPS ด้านบนได้หากมี)')
-    );
-  }
-
-  const galleryInput = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/*', className: 'hide' });
-  const cameraInput = el('input', { type: 'file', accept: 'image/*', capture: 'environment', className: 'hide' });
-  const previewImg = el('img', { className: 'photo-preview-img hide', alt: 'ตัวอย่างหลักฐานภาพถ่าย' });
-  const statusLine = el('small', { className: 'photo-upload-status muted hide' });
-  const errorLine = el('small', { className: 'field-error hide' });
-  const clearBtn = el('button', {
-    type: 'button',
-    className: 'ghost btn-sm hide',
-    onclick: () => {
-      previewImg.classList.add('hide');
-      previewImg.removeAttribute('src');
-      statusLine.classList.add('hide');
-      errorLine.classList.add('hide');
-      clearBtn.classList.add('hide');
-      if (photoUrlInput && !photoUrlInput.value.startsWith('https://')) photoUrlInput.value = '';
-      if (evidenceIdInput) evidenceIdInput.value = '';
-      galleryInput.value = '';
-      cameraInput.value = '';
-    }
-  }, 'ลบภาพ');
-
-  const cameraBtn = el('button', {
-    type: 'button',
-    className: 'secondary btn-sm',
-    onclick: () => cameraInput.click()
-  }, icon('camera', 13), ' ถ่ายภาพด้วยกล้อง');
-
-  const galleryBtn = el('button', {
-    type: 'button',
-    className: 'secondary btn-sm',
-    onclick: () => galleryInput.click()
-  }, icon('plus', 13), ' เลือกจากคลังภาพ');
-
-  const handleSelectedFile = async (file) => {
-    if (!file) return;
-    errorLine.classList.add('hide');
-    statusLine.classList.remove('hide');
-    statusLine.textContent = 'กำลังบีบอัดภาพ...';
-
-    try {
-      const compressed = await compressImageToBlob(file, 1200, 0.8);
-      if (isDemoPreview) {
-        previewImg.src = compressed.dataUrl;
-        previewImg.classList.remove('hide');
-        clearBtn.classList.remove('hide');
-        if (photoUrlInput) photoUrlInput.value = compressed.dataUrl;
-        statusLine.textContent = 'ตัวอย่างภาพในโหมดทดลอง (เก็บเฉพาะในเครื่องนี้ ไม่ได้อัปโหลดขึ้นเซิร์ฟเวอร์)';
-        notify('โหลดภาพตัวอย่างในโหมดทดลองเรียบร้อย');
-        return;
-      }
-
-      if (compressed.size > 5 * 1024 * 1024) {
-        throw new Error('ไฟล์ภาพหลังบีบอัดยังมีขนาดเกิน 5 MB กรุณาเลือกภาพที่เล็กลง');
-      }
-
-      const plotId = getPlotId();
-      cameraBtn.disabled = true;
-      galleryBtn.disabled = true;
-      statusLine.textContent = 'กำลังอัปโหลด... 0%';
-
-      const uploaded = await uploadEvidenceWithProgress(compressed.blob, {
-        plotId,
-        entityType,
-        onProgress: (pct) => { statusLine.textContent = `กำลังอัปโหลด... ${pct}%`; },
-      });
-
-      if (evidenceIdInput) evidenceIdInput.value = String(uploaded.id);
-      previewImg.src = compressed.dataUrl;
-      previewImg.classList.remove('hide');
-      clearBtn.classList.remove('hide');
-      const sizeKb = Math.max(1, Math.round((uploaded.size_bytes || compressed.size) / 1024));
-      statusLine.textContent = `อัปโหลดขึ้นระบบแล้ว (หลักฐาน #${uploaded.id} • ${sizeKb} KB)`;
-      notify('อัปโหลดภาพหลักฐานสำเร็จ');
-    } catch (err) {
-      statusLine.classList.add('hide');
-      errorLine.textContent = err?.message || 'ไม่สามารถอัปโหลดภาพได้ กรุณาลองใหม่';
-      errorLine.classList.remove('hide');
-    } finally {
-      cameraBtn.disabled = false;
-      galleryBtn.disabled = false;
-    }
-  };
-
-  galleryInput.onchange = () => handleSelectedFile(galleryInput.files?.[0]);
-  cameraInput.onchange = () => handleSelectedFile(cameraInput.files?.[0]);
-
-  const previewWrap = el('div', { className: 'photo-preview-wrap' },
-    el('div', { className: 'photo-upload-actions' }, cameraBtn, galleryBtn, clearBtn),
-    cameraInput,
-    galleryInput,
-    previewImg,
-    statusLine,
-    errorLine,
-    el('small', { className: isDemoPreview ? 'muted demo-note' : 'muted' },
-      isDemoPreview
-        ? 'โหมดทดลอง: ตัวอย่างภาพเก็บเฉพาะในเครื่องนี้ (ไม่ได้อัปโหลดขึ้นเซิร์ฟเวอร์)'
-        : 'รองรับ JPEG/PNG/WebP ระบบจะย่อขนาดอัตโนมัติก่อนอัปโหลดขึ้นเซิร์ฟเวอร์อย่างปลอดภัย (สูงสุด 5 MB)'
-    )
-  );
-  return previewWrap;
-}
-
+import { openEvidenceViewer, createPhotoUploader } from './js/core/photo.js';
+import { buildFarmerHomeView, buildFarmerActivityWizard, buildFarmerReviewsView } from './js/views/farmer.js';
 import { showStoryPassport } from './js/views/passport.js';
 
 function sharePlotRiskToLine(w) {
@@ -1358,141 +1073,13 @@ async function loadTab() {
           )
         ];
       } else {
-        const myPlot = plots[0];
-        const sortedActs = [...activities].sort((a, b) => String(b.activity_date || '').localeCompare(String(a.activity_date || '')));
-        const latestAct = sortedActs[0];
-        let daysSince = null;
-        if (latestAct?.activity_date) {
-          const actTime = new Date(latestAct.activity_date).getTime();
-          if (!Number.isNaN(actTime)) {
-            daysSince = Math.max(0, Math.floor((Date.now() - actTime) / 86_400_000));
-          }
-        }
-
-        const isOverdue = daysSince === null || daysSince > 14;
-        const isWarning = !isOverdue && daysSince >= 7;
-        const hasPendingApp = pendingCount > 0;
-
-        let statusTier = 'normal';
-        let statusBadgeText = daysSince !== null
-          ? `บันทึกล่าสุด ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`}`
-          : 'แปลงใหม่ รอเริ่มบันทึก';
-        let statusTitle = myPlot ? `แปลง ${myPlot.name}` : 'ภาพรวมแปลงปลูก';
-        let statusDesc = daysSince !== null
-          ? `บันทึกกิจกรรมล่าสุดเมื่อ ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`} • งานถัดไป: ตรวจสอบและบันทึกกิจกรรมการดูแลแปลงรอบถัดไป`
-          : 'ยังไม่มีประวัติกิจกรรม • งานถัดไป: แตะ "บันทึกกิจกรรมแปลง" เพื่อเริ่มต้นบันทึกข้อมูล';
-        let alertAdvice = null;
-
-        if (isOverdue) {
-          statusTier = 'risk';
-          statusBadgeText = `ขาดบันทึกเกิน 14 วัน (${daysSince !== null ? `${daysSince} วันก่อน` : 'ยังไม่มีประวัติ'})`;
-          statusTitle = `แจ้งเตือน: แปลง ${myPlot?.name || ''} ขาดการบันทึกกิจกรรม`;
-          statusDesc = `บันทึกกิจกรรมล่าสุดเกิน 14 วัน • งานถัดไป: แตะ "บันทึกกิจกรรมแปลงด่วน" เพื่ออัปเดตการทำงานในแปลง`;
-          alertAdvice = 'คำแนะนำ: บันทึกกิจกรรมเพื่อรักษาความต่อเนื่องของข้อมูลและแจ้งความคืบหน้าให้เจ้าหน้าที่ ICS ทราบ';
-        } else if (isWarning) {
-          statusTier = 'warn';
-          statusBadgeText = `บันทึกล่าสุด ${daysSince} วันก่อน`;
-          statusTitle = `เตือนล่วงหน้า: แปลง ${myPlot?.name || ''} ใกล้ครบ 14 วัน`;
-          statusDesc = `บันทึกกิจกรรมล่าสุด ${daysSince} วันก่อน • งานถัดไป: บันทึกกิจกรรมการดูแลแปลงก่อนครบกำหนด 14 วัน`;
-          alertAdvice = 'คำแนะนำ: บันทึกกิจกรรมการให้น้ำ ใส่ปุ๋ย หรือตรวจแปลงเพื่ออัปเดตข้อมูล';
-        } else if (hasPendingApp) {
-          statusTier = 'warn';
-          statusBadgeText = `รอผลพิจารณาคำขอ (${pendingCount} รายการ)`;
-          statusTitle = `สถานะแปลง ${myPlot?.name || ''}: มีคำขอรอพิจารณา`;
-          statusDesc = `มีคำขอปัจจัยการผลิตรอการพิจารณาจากเจ้าหน้าที่ ICS ${pendingCount} รายการ • งานถัดไป: รอการอนุมัติก่อนนำปัจจัยไปใช้ในแปลงจริง`;
-        }
-
-        const farmerRhythmSection = plots.length === 0
-          ? empty('ยังไม่มีแปลงปลูกในระบบ', 'เพิ่มแปลงปลูกแรกของคุณ', async () => { tab = 'plots'; renderTabs(); await loadTab(); })
-          : plots.length === 1
-          ? create14DayRhythmTrack(plots[0].id, activities, { title: `ความต่อเนื่องการบันทึกแปลง ${plots[0].name} (14 วันล่าสุด)` })
-          : el('div', { className: 'farmer-rhythm-list' },
-              ...plots.map(p => create14DayRhythmTrack(p.id, activities, { title: `จังหวะบันทึกแปลง ${p.name} (14 วันล่าสุด)` }))
-            );
-
-        const farmerHeroCard = el('div', { className: `farmer-hero-graphic-card ${statusTier}` },
-          el('div', { className: 'farmer-hero-top' },
-            el('div', { className: 'farmer-hero-info' },
-              el('div', { className: 'status-badge-row' },
-                el('span', { className: 'pill' }, 'สิ่งที่ต้องทำวันนี้'),
-                statusBadge(statusTier, statusBadgeText),
-                myPlot?.conversion_year ? el('span', { className: 'pill' }, myPlot.conversion_year) : null,
-                myPlot?.plot_code ? el('span', { className: 'pill' }, `รหัสแปลง: ${myPlot.plot_code}`) : null
-              ),
-              el('h3', { className: 'farmer-status-title' }, statusTitle),
-              el('p', { className: 'farmer-status-desc' }, statusDesc)
-            )
-          ),
-          farmerRhythmSection,
-          alertAdvice ? el('div', { className: `farmer-advice-box advice-${statusTier} mt-12` },
-            icon('alert', 15),
-            el('span', {}, alertAdvice)
-          ) : null,
-          el('div', { className: 'row farmer-actions-row mt-12' },
-            el('button', {
-              type: 'button',
-              id: 'farmerPrimaryRecordBtn',
-              className: isOverdue ? 'pulse' : '',
-              onclick: async () => { tab = 'record'; renderTabs(); await loadTab(); }
-            }, icon('calendar', 16), ' บันทึกกิจกรรม')
-          )
-        );
-
-        const pgsCriteriaCard = el('div', { className: 'card pgs-criteria-card' },
-          el('div', { className: 'row between' },
-            el('h4', { className: 'milestone-header' }, icon('shield', 16), ' ข้อกำหนดมาตรฐานเกษตรอินทรีย์ PGS (วิสาหกิจชุมชนผักไหม)'),
-            el('span', { className: 'pill success' }, 'เกณฑ์รับรองกลุ่ม')
-          ),
-          el('p', { className: 'muted card-lead' }, 'แนวทางปฏิบัติ 4 ข้อสำคัญเพื่อรักษามาตรฐานอินทรีย์และเตรียมความพร้อมก่อนการตรวจประเมิน'),
-          el('div', { className: 'grid pgs-criteria-grid mt-12' },
-            el('div', { className: 'criteria-item' },
-              el('b', { className: 'criteria-title' }, icon('calendar', 14), ' 1. บันทึกแปลงต่อเนื่อง'),
-              el('p', { className: 'criteria-desc muted' }, 'บันทึกการดูแลแปลงอย่างน้อยทุก 14 วัน เพื่อให้ตรวจสอบย้อนกลับได้')
-            ),
-            el('div', { className: 'criteria-item' },
-              el('b', { className: 'criteria-title' }, icon('clipboard', 14), ' 2. ขออนุมัติปัจจัยการผลิต'),
-              el('p', { className: 'criteria-desc muted' }, 'ยื่นขออนุมัติปุ๋ยอินทรีย์และชีวภัณฑ์กับเจ้าหน้าที่ ICS ก่อนใช้ในแปลงจริง')
-            ),
-            el('div', { className: 'criteria-item' },
-              el('b', { className: 'criteria-title' }, icon('mapPin', 14), ' 3. แนวกันชนปลอดภัย'),
-              el('p', { className: 'criteria-desc muted' }, 'ดูแลแนวกันชนรอบแปลงเพื่อป้องกันสารเคมีจากภายนอกพัดพาเข้ามา')
-            ),
-            el('div', { className: 'criteria-item' },
-              el('b', { className: 'criteria-title' }, icon('shield', 14), ' 4. ตรวจประเมินแปลง'),
-              el('p', { className: 'criteria-desc muted' }, 'พร้อมรับการตรวจประเมินแปลงประจำฤดูกาลโดยคณะกรรมการกลุ่ม PGS')
-            )
-          )
-        );
-
-        const farmerStatMeta = {
-          'แปลงปลูก': { icon: 'mapPin', color: 'kpi-emerald', unit: ' แปลง' },
-          'กิจกรรม': { icon: 'calendar', color: 'kpi-forest', unit: ' รายการ' },
-          'คำขอรอพิจารณา': { icon: 'clock', color: 'kpi-amber', unit: ' คำขอ' },
-          'ล็อตผลผลิต': { icon: 'package', color: 'kpi-forest', unit: ' ล็อต' }
-        };
-
-        const farmerKpiGrid = el('div', { className: 'grid kpi-grid' },
-          [['แปลงปลูก', plots.length],
-           ['กิจกรรม', activities.length],
-           ['คำขอรอพิจารณา', pendingCount],
-           ['ล็อตผลผลิต', lots.length]].map(([label, count]) => {
-            const meta = farmerStatMeta[label] || { icon: 'sprout', color: 'kpi-forest', unit: '' };
-            return el('div', { className: 'card kpi-card' },
-              el('div', { className: 'kpi-top' },
-                el('div', { className: `kpi-icon-badge ${meta.color}` }, icon(meta.icon, 16)),
-                el('span', { className: 'kpi-tag' }, label)
-              ),
-              el('div', { className: 'kpi-num' }, `${count}`, el('small', {}, meta.unit)),
-              el('div', { className: `kpi-bar ${meta.color.replace('kpi-', 'kpi-bar-')}` })
-            );
-          })
-        );
-
-        nodes = [
-          farmerHeroCard,
-          pgsCriteriaCard,
-          farmerKpiGrid
-        ];
+        nodes = buildFarmerHomeView({
+          plots,
+          activities,
+          lots,
+          pendingCount,
+          navigateTab: async (targetTab) => { tab = targetTab; renderTabs(); await loadTab(); }
+        });
       }
 
       if (demoUser) {
@@ -1701,195 +1288,12 @@ async function loadTab() {
     } else if (tab === 'record') {
       const rows = await api('/activities');
       if (me.role === 'farmer') {
-        if (plots.length) {
-          const todayIso = formatLocalIsoDate(new Date());
-          const plotSel = plotSelect();
-          const kindSel = selectField('kind', 'ประเภทกิจกรรม', ['ปลูก', 'ให้น้ำ', 'ใส่ปุ๋ย', 'กำจัดวัชพืช', 'ป้องกันกำจัดศัตรูพืช', 'เก็บเกี่ยว', 'อื่นๆ'].map(value => ({ value, label: value })));
-          const dateField = inputField('activity_date', 'วันที่ทำกิจกรรม', 'date', true, todayIso);
-          const inputUsedField = el('input', { name: 'input_used', type: 'text', maxlength: 120, placeholder: 'เช่น ปุ๋ยหมักอินทรีย์, แหนแดง, น้ำส้มควันไม้ (ถ้ามี)' });
-          const amountField = el('input', { name: 'amount_qty', type: 'text', maxlength: 60, placeholder: 'เช่น 20 กก., 5 ลิตร (ถ้ามี)' });
-          const detailsArea = el('textarea', { name: 'details', required: true, placeholder: 'ระบุการปฏิบัติงาน สภาพแปลง หรือสิ่งที่สังเกตเห็น' });
-          const detailsError = el('small', { className: 'field-error hide' }, 'กรุณาระบุรายละเอียดกิจกรรมอย่างน้อยสั้น ๆ เพื่อให้ตรวจสอบย้อนกลับได้');
-          const photoInput = el('input', { name: 'photo_url', type: 'url', placeholder: 'https://...' });
-          const evidenceIdInput = el('input', { name: 'evidence_id', type: 'hidden', value: '' });
-
-          const quickPresets = [
-            { kindTag: 'ปลูก', label: 'ปลูกข้าวหอมมะลิ 105', kind: 'ปลูก', inputUsed: 'เมล็ดพันธุ์ข้าวหอมมะลิ 105 อินทรีย์', details: 'ปลูกข้าวหอมมะลิ 105 อินทรีย์ ตามมาตรฐานกลุ่มวิสาหกิจชุมชนผักไหม' },
-            { kindTag: 'ให้น้ำ', label: 'สูบน้ำเข้าแปลงนา', kind: 'ให้น้ำ', inputUsed: '', details: 'สูบน้ำเข้าแปลงนาอินทรีย์ ตรวจคันนาและแนวกันชนรอบแปลงเรียบร้อย' },
-            { kindTag: 'ใส่ปุ๋ย', label: 'ปล่อยแหนแดงบำรุงดิน', kind: 'ใส่ปุ๋ย', inputUsed: 'แหนแดงสด', details: 'ปล่อยแหนแดงในแปลงนาเพื่อบำรุงดินตามธรรมชาติ' },
-            { kindTag: 'ใส่ปุ๋ย', label: 'พ่นน้ำหมักชีวภาพ', kind: 'ใส่ปุ๋ย', inputUsed: 'น้ำหมักชีวภาพสูตรกลุ่ม', details: 'ฉีดพ่นปุ๋ยหมักอินทรีย์และจุลินทรีย์หน่อกล้วยตามสูตรที่ได้รับอนุมัติจาก ICS' },
-            { kindTag: 'ถอนหญ้า', label: 'ดายหญ้ารอบแปลง', kind: 'กำจัดวัชพืช', inputUsed: '', details: 'กำจัดวัชพืชด้วยแรงงานคนและตัดหญ้าแนวกันชนรอบแปลง ไม่ใช้สารเคมี' },
-            { kindTag: 'ป้องกันแมลง', label: 'พ่นน้ำส้มควันไม้', kind: 'ป้องกันกำจัดศัตรูพืช', inputUsed: 'น้ำส้มควันไม้', details: 'ฉีดพ่นน้ำส้มควันไม้เจือจางเพื่อไล่แมลงและเพลี้ย' },
-            { kindTag: 'บำรุงดิน', label: 'ไถกลบตอซังไม่เผาฟาง', kind: 'อื่นๆ', inputUsed: 'ปอเทืองบำรุงดิน', details: 'ไถกลบตอซังข้าวและหว่านปอเทืองบำรุงดิน ไม่เผาฟาง' },
-            { kindTag: 'เก็บเกี่ยว', label: 'เก็บเกี่ยวผลผลิต', kind: 'เก็บเกี่ยว', inputUsed: '', details: 'เก็บเกี่ยวผลผลิตอินทรีย์ ทำความสะอาดเครื่องมือก่อนเก็บเกี่ยว' }
-          ];
-
-          const chipsGrid = el('div', { className: 'quick-chips-grid' });
-          quickPresets.forEach(preset => {
-            const btn = el('button', {
-              type: 'button',
-              className: 'chip-btn',
-              onclick: () => {
-                const kindSelect = kindSel.querySelector('select[name="kind"]');
-                if (kindSelect) kindSelect.value = preset.kind;
-                inputUsedField.value = preset.inputUsed;
-                detailsArea.value = preset.details;
-                detailsError.classList.add('hide');
-                chipsGrid.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                notify(`เลือกกิจกรรม: "${preset.label}"`);
-              }
-            },
-              el('span', { className: 'chip-tag' }, preset.kindTag),
-              el('span', { className: 'chip-text' }, preset.label)
-            );
-            chipsGrid.append(btn);
-          });
-
-          let wizardStep = 1;
-          const stepTabs = [
-            el('div', { className: 'wizard-step-pill active' }, '1. แปลงและประเภท'),
-            el('div', { className: 'wizard-step-pill' }, '2. รายละเอียดและปริมาณ'),
-            el('div', { className: 'wizard-step-pill' }, '3. ทบทวนแล้วบันทึก')
-          ];
-          const reviewBox = el('div', { className: 'wizard-review-box' });
-          const submitBtn = el('button', { type: 'submit', id: 'recordSubmitBtn' }, icon('checkCircle', 16), ' บันทึกกิจกรรม');
-
-          const step1Panel = el('div', { className: 'wizard-panel' },
-            plotSel,
-            el('small', { className: 'muted helper-label' }, 'เลือกงานที่ใช้บ่อยจากปุ่มลัด หรือเลือกประเภทด้านล่าง:'),
-            chipsGrid,
-            kindSel,
-            dateField,
-            el('div', { className: 'row mt-12' },
-              el('button', {
-                type: 'button',
-                id: 'wizardNext1Btn',
-                onclick: () => setWizardStep(2)
-              }, 'ถัดไป: ระบุรายละเอียด')
-            )
-          );
-
-          const step2Panel = el('div', { className: 'wizard-panel hide' },
-            el('label', {}, 'ปัจจัยที่ใช้ (ถ้ามี)', inputUsedField),
-            el('label', {}, 'ปริมาณและหน่วย (ถ้ามี)', amountField),
-            el('label', {},
-              'รายละเอียดกิจกรรม',
-              detailsArea,
-              detailsError,
-              createVoiceInput(detailsArea)
-            ),
-            el('label', {},
-              'ภาพหลักฐาน / ลิงก์รูปภาพ (ถ้ามี)',
-              photoInput,
-              evidenceIdInput,
-              createPhotoUploader(photoInput, {
-                entityType: 'activity',
-                getPlotId: () => plotSel.querySelector('select[name="plot_id"]')?.value,
-                evidenceIdInput,
-              })
-            ),
-            el('div', { className: 'row between mt-12' },
-              el('button', { type: 'button', className: 'secondary', onclick: () => setWizardStep(1) }, 'ย้อนกลับ'),
-              el('button', {
-                type: 'button',
-                id: 'wizardNext2Btn',
-                onclick: () => {
-                  if (!detailsArea.value.trim()) {
-                    detailsError.classList.remove('hide');
-                    detailsArea.focus();
-                    return;
-                  }
-                  detailsError.classList.add('hide');
-                  setWizardStep(3);
-                }
-              }, 'ถัดไป: ทบทวนข้อมูล')
-            )
-          );
-
-          const step3Panel = el('div', { className: 'wizard-panel hide' },
-            reviewBox,
-            el('div', { className: 'row between mt-12' },
-              el('button', { type: 'button', className: 'secondary', onclick: () => setWizardStep(2) }, 'แก้ไขข้อมูล'),
-              submitBtn
-            )
-          );
-
-          const renderReviewBox = () => {
-            const plotSelectEl = plotSel.querySelector('select[name="plot_id"]');
-            const kindSelectEl = kindSel.querySelector('select[name="kind"]');
-            const dateInputEl = dateField.querySelector('input[name="activity_date"]');
-            const plotLabel = plotSelectEl?.selectedOptions?.[0]?.textContent || '-';
-            const inputText = [inputUsedField.value.trim(), amountField.value.trim()].filter(Boolean).join(' • ');
-            reviewBox.replaceChildren(
-              el('div', { className: 'passport-row' }, el('b', {}, 'แปลงปลูก:'), el('span', {}, plotLabel)),
-              el('div', { className: 'passport-row' }, el('b', {}, 'ประเภทกิจกรรม:'), el('span', {}, kindSelectEl?.value || '-')),
-              el('div', { className: 'passport-row' }, el('b', {}, 'วันที่ทำกิจกรรม:'), el('span', {}, dateInputEl?.value || '-')),
-              inputText ? el('div', { className: 'passport-row' }, el('b', {}, 'ปัจจัยและปริมาณ:'), el('span', {}, inputText)) : null,
-              el('div', { className: 'passport-row' }, el('b', {}, 'รายละเอียด:'), el('span', {}, detailsArea.value.trim() || '-')),
-              evidenceIdInput.value
-                ? el('div', { className: 'passport-row' }, el('b', {}, 'ภาพหลักฐาน:'), el('span', { className: 'pill success' }, `อัปโหลดแล้ว (#${evidenceIdInput.value})`))
-                : (photoInput.value.startsWith('data:')
-                    ? el('div', { className: 'passport-row' }, el('b', {}, 'ภาพตัวอย่าง (Demo):'), el('span', { className: 'pill warn' }, 'เก็บในเครื่องนี้'))
-                    : null)
-            );
-          };
-
-          const setWizardStep = (nextStep) => {
-            wizardStep = nextStep;
-            stepTabs.forEach((pill, idx) => {
-              pill.classList.toggle('active', idx + 1 === wizardStep);
-              pill.classList.toggle('done', idx + 1 < wizardStep);
-            });
-            step1Panel.classList.toggle('hide', wizardStep !== 1);
-            step2Panel.classList.toggle('hide', wizardStep !== 2);
-            step3Panel.classList.toggle('hide', wizardStep !== 3);
-            if (wizardStep === 3) renderReviewBox();
-          };
-
-          const recordForm = el('form', { id: 'recordForm', className: 'card' },
-            el('h3', {}, icon('calendar', 16), ' บันทึกกิจกรรมแปลง'),
-            el('div', { className: 'wizard-steps' }, ...stepTabs),
-            step1Panel,
-            step2Panel,
-            step3Panel
-          );
-
-          recordForm.addEventListener('submit', async event => {
-            event.preventDefault();
-            if (submitBtn.disabled) return;
-            const formData = new FormData(recordForm);
-            const rawDetails = String(formData.get('details') || '').trim();
-            const used = String(formData.get('input_used') || '').trim();
-            const qty = String(formData.get('amount_qty') || '').trim();
-            const prefix = [used ? `ปัจจัย: ${used}` : '', qty ? `ปริมาณ: ${qty}` : ''].filter(Boolean).join(' | ');
-            const finalDetails = prefix ? `${prefix} — ${rawDetails}` : rawDetails;
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'กำลังบันทึก...';
-            try {
-              await api('/activities', 'POST', {
-                plot_id: formData.get('plot_id'),
-                kind: formData.get('kind'),
-                activity_date: formData.get('activity_date'),
-                details: finalDetails,
-                photo_url: formData.get('photo_url') || '',
-                evidence_id: formData.get('evidence_id') || ''
-              });
-              notify('บันทึกกิจกรรมสำเร็จ');
-              await loadTab();
-            } catch (error) {
-              if (!error.handled) notify(error.message);
-            } finally {
-              submitBtn.disabled = false;
-              submitBtn.replaceChildren(icon('checkCircle', 16), document.createTextNode(' บันทึกกิจกรรม'));
-            }
-          });
-
-          nodes.push(recordForm);
-        } else {
-          nodes.push(empty('กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถบันทึกกิจกรรมได้', 'ไปหน้าแปลงปลูก', async () => { tab = 'plots'; renderTabs(); await loadTab(); }));
-        }
+        nodes.push(buildFarmerActivityWizard({
+          plots,
+          plotSelect,
+          reloadTab: () => loadTab(),
+          navigateTab: async (targetTab) => { tab = targetTab; renderTabs(); await loadTab(); }
+        }));
       }
       nodes.push(el('div', { className: 'notice' },
         el('b', {}, icon('calendar', 15), me.role === 'farmer' ? ' ประวัติการทำกิจกรรมในแปลง' : ' รายการกิจกรรมของเกษตรกรในความดูแล'),
@@ -2244,15 +1648,9 @@ async function loadTab() {
       }
     } else if (tab === 'reviews') {
       if (me.role === 'farmer') {
-        nodes = [
-          el('div', { className: 'notice' },
-            el('b', {}, icon('shield', 15), ' ประวัติผลการตรวจประเมินแปลง'),
-            el('p', { className: 'muted' }, 'ผลตรวจจะแสดงที่นี่เมื่อระบบเปิดให้เกษตรกรดูได้ โดยปัจจุบันเจ้าหน้าที่ ICS เป็นผู้บันทึกผลการตรวจประเมินภายในกลุ่ม')
-          ),
-          empty('ผลตรวจจะแสดงที่นี่เมื่อระบบเปิดให้เกษตรกรดูได้ หากมีข้อสงสัยเกี่ยวกับผลการตรวจแปลง กรุณาติดต่อเจ้าหน้าที่ ICS ผู้รับผิดชอบของคุณ')
-        ];
+        nodes = await buildFarmerReviewsView();
       } else {
-        nodes = await buildIcsReviewsView();
+        nodes = await buildIcsReviewsView({ plots, plotSelect });
       }
     } else if (tab === 'risks') {
       nodes = await buildIcsRisksView();
@@ -2269,5 +1667,21 @@ async function loadTab() {
     }
   }
 }
+
+window.__pakMaiiLoadTab = () => loadTab();
+window.__pakMaiiNavigateTab = async (targetTab) => {
+  tab = targetTab;
+  renderTabs();
+  await loadTab();
+};
+window.__pakMaiiGetPlots = () => plots;
+window.__pakMaiiStart = (forceLogin) => start(forceLogin);
+window.__pakMaiiShowLogin = (dev) => showLogin(dev);
+window.__pakMaiiShowState = (title, msg, label, act) => showState(title, msg, label, act);
+window.__pakMaiiShowRegistration = (idToken) => showRegistration(idToken);
+window.__pakMaiiOnSessionExpired = () => {
+  clearSession();
+  showState('เซสชันหมดอายุ', 'กรุณาเข้าสู่ระบบผ่าน LINE อีกครั้ง', 'เข้าสู่ระบบใหม่', () => start(true));
+};
 
 start();
