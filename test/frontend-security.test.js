@@ -184,3 +184,23 @@ test('Phase 3 farmer experience: today action hero, 3-step activity wizard, and 
   assert.doesNotMatch(script, /Daily Farm Log/);
   assert.doesNotMatch(script, /Input Approval/);
 });
+
+test('Phase 4 ICS experience: real /risks dashboard feed, recent activities, filters, and split-view approvals', () => {
+  // ICS home fetches /risks and renders risks + recent activities feeds
+  assert.match(script, /api\(['"]\/risks['"]\)\.catch\(\(\) => \[\]\)/);
+  assert.match(script, /icsRisksSummaryCard/);
+  assert.match(script, /icsRecentActivitiesCard/);
+  assert.match(script, /ics-home-lower-grid/);
+
+  // Filter bars on watchlist, approvals, and reviews
+  assert.match(script, /ics-filter-bar/);
+  assert.match(script, /filter-chips-row/);
+
+  // Split-view approval review with plot activity context
+  assert.match(script, /ics-split-layout/);
+  assert.match(script, /split-list-pane/);
+  assert.match(script, /split-detail-pane/);
+  assert.match(script, /split-plot-context/);
+  assert.match(css, /\.ics-split-layout\s*\{/);
+  assert.match(css, /\.ics-home-lower-grid\s*\{/);
+});

@@ -1358,7 +1358,9 @@ async function loadTab() {
         api('/approvals'),
         api('/lots')
       ]);
-      const revs = me.role === 'ics' ? await api('/reviews').catch(() => []) : [];
+      const [revs, risks] = me.role === 'ics'
+        ? await Promise.all([api('/reviews').catch(() => []), api('/risks').catch(() => [])])
+        : [[], []];
       const pendingCount = approvals.filter(item => item.status === 'pending').length;
 
       if (me.role === 'ics') {
@@ -1510,38 +1512,55 @@ async function loadTab() {
         if (!watchRows.length) {
           watchlistContent = empty('ไม่พบแปลงที่มีความเสี่ยงในระบบ สมาชิกทุกคนบันทึกข้อมูลและปฏิบัติตามมาตรฐาน');
         } else {
-          // 1. Desktop Table View (visible on > 640px)
-          const desktopTable = el('div', { className: 'watchlist-table-wrap desktop-only' },
-            el('table', { className: 'watchlist-table' },
-              el('thead', {},
-                el('tr', {},
-                  el('th', {}, 'รหัสแปลง'),
-                  el('th', {}, 'เกษตรกรผู้ดูแล'),
-                  el('th', {}, 'พืช & ระยะปรับเปลี่ยน'),
-                  el('th', {}, 'จังหวะ 14 วัน'),
-                  el('th', {}, 'สถานะความเสี่ยง'),
-                  el('th', {}, 'การดำเนินการ')
-                )
-              ),
-              el('tbody', {},
-                ...watchRows.map(w => {
-                  return el('tr', {},
+          let watchSeverityFilter = 'all';
+          let watchQuery = '';
+          const watchResultsHost = el('div', {});
+
+          const renderWatchRows = () => {
+            const q = watchQuery.trim().toLowerCase();
+            const filtered = watchRows.filter(w => {
+              const matchSeverity = watchSeverityFilter === 'all' || w.severity === watchSeverityFilter;
+              const matchQuery = !q ||
+                String(w.code || '').toLowerCase().includes(q) ||
+                String(w.farmer || '').toLowerCase().includes(q) ||
+                String(w.crop || '').toLowerCase().includes(q);
+              return matchSeverity && matchQuery;
+            });
+
+            if (!filtered.length) {
+              watchResultsHost.replaceChildren(empty('ไม่พบแปลงที่ตรงกับตัวกรอง'));
+              return;
+            }
+
+            // 1. Desktop Table View (visible on > 640px)
+            const desktopTable = el('div', { className: 'watchlist-table-wrap desktop-only' },
+              el('table', { className: 'watchlist-table' },
+                el('thead', {},
+                  el('tr', {},
+                    el('th', {}, 'รหัสแปลง'),
+                    el('th', {}, 'เกษตรกรผู้ดูแล'),
+                    el('th', {}, 'พืช & ระยะปรับเปลี่ยน'),
+                    el('th', {}, 'จังหวะ 14 วัน'),
+                    el('th', {}, 'สถานะความเสี่ยง'),
+                    el('th', {}, 'การดำเนินการ')
+                  )
+                ),
+                el('tbody', {},
+                  ...filtered.map(w => el('tr', {},
                     el('td', {}, el('b', { className: 'plot-code-tag' }, w.code)),
                     el('td', {}, w.farmer),
                     el('td', {}, `${w.crop}${w.conversion ? ` (${w.conversion})` : ''}`),
                     el('td', { className: 'rhythm-col' }, create14DayRhythmTrack(w.plot_id, activities, { compact: true })),
                     el('td', {}, statusBadge(w.severity, w.status)),
                     el('td', {}, buildWatchlistActionButtons(w))
-                  );
-                })
+                  ))
+                )
               )
-            )
-          );
+            );
 
-          // 2. Mobile Card View (visible on <= 640px, NO horizontal scrolling!)
-          const mobileCards = el('div', { className: 'watchlist-cards mobile-only' },
-            ...watchRows.map(w => {
-              return el('div', { className: `watchlist-card-item severity-${w.severity}` },
+            // 2. Mobile Card View (visible on <= 640px, NO horizontal scrolling!)
+            const mobileCards = el('div', { className: 'watchlist-cards mobile-only' },
+              ...filtered.map(w => el('div', { className: `watchlist-card-item severity-${w.severity}` },
                 el('div', { className: 'watchlist-card-top' },
                   el('b', { className: 'plot-code-tag' }, w.code),
                   statusBadge(w.severity, w.status)
@@ -1562,11 +1581,45 @@ async function loadTab() {
                 el('div', { className: 'watchlist-card-actions' },
                   buildWatchlistActionButtons(w)
                 )
-              );
-            })
+              ))
+            );
+
+            watchResultsHost.replaceChildren(desktopTable, mobileCards);
+          };
+
+          const filterBtns = [
+            ['all', 'ทั้งหมด'],
+            ['risk', 'เสี่ยง/ขาดบันทึก'],
+            ['warning', 'รอพิจารณา'],
+            ['normal', 'ปกติ']
+          ].map(([key, label]) => {
+            const btn = el('button', {
+              type: 'button',
+              className: `chip ${key === 'all' ? 'active' : ''}`,
+              onclick: () => {
+                watchSeverityFilter = key;
+                filterBar.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderWatchRows();
+              }
+            }, label);
+            return btn;
+          });
+
+          const filterBar = el('div', { className: 'ics-filter-bar' },
+            el('div', { className: 'search-filter-box' },
+              icon('search', 15),
+              el('input', {
+                type: 'search',
+                placeholder: 'ค้นหารหัสแปลง, เกษตรกร, หรือพืช...',
+                oninput: (e) => { watchQuery = e.target.value; renderWatchRows(); }
+              })
+            ),
+            el('div', { className: 'filter-chips-row' }, ...filterBtns)
           );
 
-          watchlistContent = el('div', {}, desktopTable, mobileCards);
+          renderWatchRows();
+          watchlistContent = el('div', {}, filterBar, watchResultsHost);
         }
 
         const normalPlotsCount = Math.max(0, totalPlots - riskAlerts - pendingInput);
@@ -1660,9 +1713,59 @@ async function loadTab() {
           )
         );
 
+        const icsRisksSummaryCard = el('div', { className: 'card ics-summary-list-card' },
+          el('div', { className: 'row between' },
+            el('h4', {}, icon('alert', 15), ` งานค้างและความเสี่ยงจริง (${risks.length})`),
+            el('button', {
+              type: 'button',
+              className: 'ghost btn-sm',
+              onclick: async () => { tab = 'risks'; renderTabs(); await loadTab(); }
+            }, 'ดูทั้งหมด')
+          ),
+          ...(risks.length
+            ? risks.slice(0, 5).map(r => el('div', { className: 'summary-feed-item' },
+                el('div', { className: 'row between' },
+                  el('b', {}, r.plot_name || '-'),
+                  statusBadge(r.type === 'pending' ? 'warn' : 'risk', r.type === 'pending' ? 'คำขอค้างตรวจ' : 'ขาดบันทึก >14 วัน')
+                ),
+                el('small', { className: 'muted' }, r.type === 'pending'
+                  ? `ปัจจัย: ${r.input_name || '-'}${r.farmer_name ? ` • ${r.farmer_name}` : ''}`
+                  : `ไม่พบบันทึกกิจกรรมเกิน 14 วัน${r.farmer_name ? ` • ${r.farmer_name}` : ''}`)
+              ))
+            : [el('p', { className: 'muted' }, 'ไม่พบงานค้างหรือจุดเสี่ยงจากระบบ /risks')])
+        );
+
+        const recentActivitiesList = [...activities]
+          .sort((a, b) => String(b.activity_date || '').localeCompare(String(a.activity_date || '')))
+          .slice(0, 5);
+
+        const icsRecentActivitiesCard = el('div', { className: 'card ics-summary-list-card' },
+          el('div', { className: 'row between' },
+            el('h4', {}, icon('calendar', 15), ` กิจกรรมล่าสุดของสมาชิก (${activities.length})`),
+            el('button', {
+              type: 'button',
+              className: 'ghost btn-sm',
+              onclick: async () => { tab = 'record'; renderTabs(); await loadTab(); }
+            }, 'ดูทั้งหมด')
+          ),
+          ...(recentActivitiesList.length
+            ? recentActivitiesList.map(act => el('div', { className: 'summary-feed-item' },
+                el('div', { className: 'row between' },
+                  el('b', {}, `${act.kind || 'กิจกรรม'} • ${act.plot_name || '-'}`),
+                  el('small', { className: 'muted' }, act.activity_date || '-')
+                ),
+                el('small', { className: 'muted' }, `${act.farmer ? `${act.farmer}: ` : ''}${String(act.details || '').slice(0, 90)}`)
+              ))
+            : [el('p', { className: 'muted' }, 'ยังไม่มีกิจกรรมล่าสุดในระบบ')])
+        );
+
         nodes = [
           icsHeroCard,
           kpiGrid,
+          el('div', { className: 'ics-home-lower-grid' },
+            icsRisksSummaryCard,
+            icsRecentActivitiesCard
+          ),
           el('div', { className: 'card watchlist-card' },
             el('div', { className: 'row between' },
               el('h3', {}, icon('alert', 16), ' รายการแปลงที่ต้องติดตาม'),
@@ -2287,67 +2390,86 @@ async function loadTab() {
 
       if (!rows.length) nodes.push(empty('ยังไม่มีคำขออนุมัติปัจจัยการผลิต'));
 
-      for (const item of rows) {
-        const isPending = item.status === 'pending';
-        const isApproved = item.status === 'approved';
-        const pillClass = isPending ? 'pill warn' : isApproved ? 'pill success' : 'pill danger';
-        const statusIcon = isPending ? icon('clock', 12) : isApproved ? icon('checkCircle', 12) : icon('xCircle', 12);
-        const statusLabel = isPending ? 'รอพิจารณา' : isApproved ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ';
+      if (me.role === 'ics' && rows.length) {
+        const plotActivities = await api('/activities').catch(() => []);
+        let statusFilter = 'all';
+        let queryFilter = '';
+        let selectedId = (rows.find(r => r.status === 'pending') || rows[0])?.id;
 
-        const box = card(
-          el('div', { className: 'row between' },
-            el('b', {}, item.input_name),
-            el('span', { className: pillClass }, statusIcon, statusLabel)
-          ),
-          el('p', { className: 'muted' }, `แปลง: ${item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
-          el('p', {}, item.details),
-          el('small', { className: 'muted' }, `ยื่นคำขอเมื่อ ${dated(item.created_at)}`)
-        );
+        const listPane = el('div', { className: 'split-list-pane' });
+        const detailPane = el('div', { className: 'split-detail-pane' });
 
-        if (item.comment) {
-          box.append(el('div', { className: 'comment-box' },
-            el('b', {}, icon('message', 13), ' ความเห็นของเจ้าหน้าที่ ICS: '),
-            el('span', {}, item.comment),
-            item.reviewed_at ? el('small', { className: 'muted block-meta' }, `พิจารณาเมื่อ ${dated(item.reviewed_at)}`) : null
-          ));
-        }
+        const getFilteredApprovals = () => {
+          const q = queryFilter.trim().toLowerCase();
+          return rows.filter(r => {
+            const matchStatus = statusFilter === 'all' || r.status === statusFilter;
+            const matchQ = !q ||
+              String(r.input_name || '').toLowerCase().includes(q) ||
+              String(r.plot_name || '').toLowerCase().includes(q) ||
+              String(r.farmer || '').toLowerCase().includes(q);
+            return matchStatus && matchQ;
+          });
+        };
 
-        // ICS inline decision UI
-        if (me.role === 'ics' && isPending) {
-          let decisionForm = null;
-          const openDecideBtn = el('button', {
-            type: 'button',
-            className: 'btn-sm'
-          }, icon('clipboard', 13), ' พิจารณาคำขอ');
-          const actionRow = el('div', { className: 'row mt-10' }, openDecideBtn);
-          box.append(actionRow);
+        const renderDetail = (item) => {
+          if (!item) {
+            detailPane.replaceChildren(empty('เลือกคำขอจากรายการด้านซ้ายเพื่อตรวจสอบรายละเอียดและกิจกรรมของแปลง'));
+            return;
+          }
+          const isPending = item.status === 'pending';
+          const isApproved = item.status === 'approved';
+          const statusTier = isPending ? 'warn' : isApproved ? 'normal' : 'risk';
+          const statusLabel = isPending ? 'รอพิจารณา' : isApproved ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ';
+          const actsForPlot = plotActivities
+            .filter(a => a.plot_id === item.plot_id)
+            .sort((a, b) => String(b.activity_date || '').localeCompare(String(a.activity_date || '')))
+            .slice(0, 5);
 
-          openDecideBtn.onclick = () => {
-            if (decisionForm) { decisionForm.remove(); decisionForm = null; actionRow.classList.remove('hide'); return; }
-            actionRow.classList.add('hide');
+          const detailCard = card(
+            el('div', { className: 'row between' },
+              el('h3', {}, item.input_name),
+              statusBadge(statusTier, statusLabel)
+            ),
+            el('p', { className: 'muted' }, `แปลง: ${item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
+            el('p', {}, item.details),
+            el('small', { className: 'muted' }, `ยื่นคำขอเมื่อ ${dated(item.created_at)}`),
+            item.comment ? el('div', { className: 'comment-box mt-12' },
+              el('b', {}, icon('message', 13), ' ความเห็นของเจ้าหน้าที่ ICS: '),
+              el('span', {}, item.comment),
+              item.reviewed_at ? el('small', { className: 'muted block-meta' }, `พิจารณาเมื่อ ${dated(item.reviewed_at)}`) : null
+            ) : null,
+            el('div', { className: 'split-plot-context mt-12' },
+              el('h4', {}, icon('calendar', 14), ' กิจกรรมล่าสุดของแปลงนี้'),
+              create14DayRhythmTrack(item.plot_id, plotActivities, { title: `จังหวะบันทึกแปลง ${item.plot_name || ''}`.trim() }),
+              actsForPlot.length
+                ? el('div', { className: 'split-activity-list mt-10' },
+                    ...actsForPlot.map(act => el('div', { className: 'summary-feed-item' },
+                      el('div', { className: 'row between' },
+                        el('b', {}, act.kind || 'กิจกรรม'),
+                        el('small', { className: 'muted' }, act.activity_date || '-')
+                      ),
+                      el('small', { className: 'muted' }, act.details || '-')
+                    ))
+                  )
+                : el('small', { className: 'muted' }, 'ยังไม่มีบันทึกกิจกรรมในแปลงนี้')
+            )
+          );
 
+          if (isPending) {
             let selectedStatus = 'approved';
             const approveBtn = el('button', { type: 'button', className: 'btn-sm' }, icon('check', 13), ' อนุมัติ');
             const rejectBtn = el('button', { type: 'button', className: 'secondary btn-sm' }, icon('x', 13), ' ไม่อนุมัติ');
-
             approveBtn.onclick = () => { selectedStatus = 'approved'; approveBtn.className = 'btn-sm'; rejectBtn.className = 'secondary btn-sm'; };
             rejectBtn.onclick = () => { selectedStatus = 'rejected'; rejectBtn.className = 'btn-sm danger-btn'; approveBtn.className = 'secondary btn-sm'; };
 
             const commentArea = el('textarea', { placeholder: 'ระบุความเห็น ข้อแนะนำ หรือเหตุผลประกอบ (จำเป็นกรณีไม่อนุมัติ)' });
             const confirmBtn = el('button', { type: 'submit', className: 'btn-sm' }, 'บันทึกผลการพิจารณา');
-            const cancelBtn = el('button', {
-              type: 'button',
-              className: 'secondary btn-sm',
-              onclick: () => { decisionForm.remove(); decisionForm = null; actionRow.classList.remove('hide'); }
-            }, 'ยกเลิก');
-
-            decisionForm = el('form', { className: 'decision-box' },
-              el('h4', {}, 'ผลการพิจารณาคำขอปัจจัยการผลิต'),
+            const decisionForm = el('form', { className: 'decision-box' },
+              el('h4', {}, 'ตัดสินคำขอปัจจัยการผลิต'),
               el('div', { className: 'row mb-10' }, approveBtn, rejectBtn),
               el('label', {}, 'ความเห็น / ข้อเสนอแนะของเจ้าหน้าที่ ICS:', commentArea),
-              el('div', { className: 'row' }, confirmBtn, cancelBtn)
+              el('div', { className: 'row' }, confirmBtn)
             );
-
             decisionForm.addEventListener('submit', async e => {
               e.preventDefault();
               const commentText = commentArea.value.trim();
@@ -2374,12 +2496,107 @@ async function loadTab() {
                 confirmBtn.disabled = false;
               }
             });
+            detailCard.append(decisionForm);
+          }
 
-            box.append(decisionForm);
-          };
+          detailPane.replaceChildren(detailCard);
+        };
+
+        const renderSplit = () => {
+          const filtered = getFilteredApprovals();
+          if (!filtered.some(r => r.id === selectedId)) {
+            selectedId = filtered[0]?.id ?? null;
+          }
+          if (!filtered.length) {
+            listPane.replaceChildren(empty('ไม่พบคำขอที่ตรงกับตัวกรอง'));
+            detailPane.replaceChildren();
+            return;
+          }
+          listPane.replaceChildren(...filtered.map(item => {
+            const isPending = item.status === 'pending';
+            const isApproved = item.status === 'approved';
+            const statusTier = isPending ? 'warn' : isApproved ? 'normal' : 'risk';
+            const statusLabel = isPending ? 'รอพิจารณา' : isApproved ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ';
+            return el('button', {
+              type: 'button',
+              className: `split-list-item ${item.id === selectedId ? 'active' : ''}`,
+              onclick: () => {
+                selectedId = item.id;
+                renderSplit();
+              }
+            },
+              el('div', { className: 'row between' },
+                el('b', {}, item.input_name),
+                statusBadge(statusTier, statusLabel)
+              ),
+              el('small', { className: 'muted' }, `${item.plot_name}${item.farmer ? ` • ${item.farmer}` : ''}`),
+              el('small', { className: 'muted' }, dated(item.created_at))
+            );
+          }));
+          renderDetail(filtered.find(r => r.id === selectedId) || null);
+        };
+
+        const filterBtns = [
+          ['all', 'ทั้งหมด'],
+          ['pending', 'รอพิจารณา'],
+          ['approved', 'อนุมัติแล้ว'],
+          ['rejected', 'ไม่อนุมัติ']
+        ].map(([key, label]) => {
+          const btn = el('button', {
+            type: 'button',
+            className: `chip ${key === 'all' ? 'active' : ''}`,
+            onclick: () => {
+              statusFilter = key;
+              approvalFilterBar.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              renderSplit();
+            }
+          }, label);
+          return btn;
+        });
+
+        const approvalFilterBar = el('div', { className: 'ics-filter-bar' },
+          el('div', { className: 'search-filter-box' },
+            icon('search', 15),
+            el('input', {
+              type: 'search',
+              placeholder: 'ค้นหาชื่อปัจจัย, แปลง, หรือเกษตรกร...',
+              oninput: (e) => { queryFilter = e.target.value; renderSplit(); }
+            })
+          ),
+          el('div', { className: 'filter-chips-row' }, ...filterBtns)
+        );
+
+        renderSplit();
+        nodes.push(approvalFilterBar, el('div', { className: 'ics-split-layout' }, listPane, detailPane));
+      } else {
+        for (const item of rows) {
+          const isPending = item.status === 'pending';
+          const isApproved = item.status === 'approved';
+          const pillClass = isPending ? 'pill warn' : isApproved ? 'pill success' : 'pill danger';
+          const statusIcon = isPending ? icon('clock', 12) : isApproved ? icon('checkCircle', 12) : icon('xCircle', 12);
+          const statusLabel = isPending ? 'รอพิจารณา' : isApproved ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ';
+
+          const box = card(
+            el('div', { className: 'row between' },
+              el('b', {}, item.input_name),
+              el('span', { className: pillClass }, statusIcon, statusLabel)
+            ),
+            el('p', { className: 'muted' }, `แปลง: ${item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
+            el('p', {}, item.details),
+            el('small', { className: 'muted' }, `ยื่นคำขอเมื่อ ${dated(item.created_at)}`)
+          );
+
+          if (item.comment) {
+            box.append(el('div', { className: 'comment-box' },
+              el('b', {}, icon('message', 13), ' ความเห็นของเจ้าหน้าที่ ICS: '),
+              el('span', {}, item.comment),
+              item.reviewed_at ? el('small', { className: 'muted block-meta' }, `พิจารณาเมื่อ ${dated(item.reviewed_at)}`) : null
+            ));
+          }
+
+          nodes.push(box);
         }
-
-        nodes.push(box);
       }
     } else if (tab === 'lots') {
       const rows = await api('/lots');
@@ -2509,22 +2726,73 @@ async function loadTab() {
 
         if (!rows.length) {
           nodes.push(empty('ยังไม่มีบันทึกผลตรวจแปลง'));
-        }
+        } else {
+          let resultFilter = 'all';
+          let reviewQuery = '';
+          const reviewsHost = el('div', { className: 'cards-list' });
+          const renderReviewsList = () => {
+            const q = reviewQuery.trim().toLowerCase();
+            const filtered = rows.filter(item => {
+              const matchResult = resultFilter === 'all' || item.result === resultFilter;
+              const matchQ = !q ||
+                String(item.plot_name || '').toLowerCase().includes(q) ||
+                String(item.farmer_name || '').toLowerCase().includes(q) ||
+                String(item.note || '').toLowerCase().includes(q);
+              return matchResult && matchQ;
+            });
+            if (!filtered.length) {
+              reviewsHost.replaceChildren(empty('ไม่พบผลตรวจที่ตรงกับตัวกรอง'));
+              return;
+            }
+            reviewsHost.replaceChildren(...filtered.map(item => {
+              const isPass = item.result === 'ผ่าน';
+              const pillClass = isPass ? 'pill success' : 'pill warn';
+              const resultIcon = isPass ? icon('checkCircle', 12) : icon('alert', 12);
+              return card(
+                el('div', { className: 'row between' },
+                  el('b', {}, item.plot_name),
+                  el('span', { className: pillClass }, resultIcon, item.result)
+                ),
+                item.farmer_name ? el('p', { className: 'muted' }, `เกษตรกร: ${item.farmer_name}`) : null,
+                el('p', { className: 'pre-line-text' }, item.note),
+                el('small', { className: 'muted' }, `ผู้ตรวจ: ${item.reviewer_name || 'เจ้าหน้าที่ ICS'} • ${dated(item.created_at)}`)
+              );
+            }));
+          };
 
-        for (const item of rows) {
-          const isPass = item.result === 'ผ่าน';
-          const pillClass = isPass ? 'pill success' : 'pill warn';
-          const resultIcon = isPass ? icon('checkCircle', 12) : icon('alert', 12);
-          const box = card(
-            el('div', { className: 'row between' },
-              el('b', {}, item.plot_name),
-              el('span', { className: pillClass }, resultIcon, item.result)
+          const reviewFilterBtns = [
+            ['all', 'ทั้งหมด'],
+            ['ผ่าน', 'ผ่าน'],
+            ['ต้องแก้ไข', 'ต้องแก้ไข'],
+            ['ติดตามเพิ่มเติม', 'ติดตามเพิ่มเติม']
+          ].map(([key, label]) => {
+            const btn = el('button', {
+              type: 'button',
+              className: `chip ${key === 'all' ? 'active' : ''}`,
+              onclick: () => {
+                resultFilter = key;
+                reviewFilterBar.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderReviewsList();
+              }
+            }, label);
+            return btn;
+          });
+
+          const reviewFilterBar = el('div', { className: 'ics-filter-bar' },
+            el('div', { className: 'search-filter-box' },
+              icon('search', 15),
+              el('input', {
+                type: 'search',
+                placeholder: 'ค้นหาชื่อแปลง, เกษตรกร, หรือบันทึกผลตรวจ...',
+                oninput: (e) => { reviewQuery = e.target.value; renderReviewsList(); }
+              })
             ),
-            item.farmer_name ? el('p', { className: 'muted' }, `เกษตรกร: ${item.farmer_name}`) : null,
-            el('p', { className: 'pre-line-text' }, item.note),
-            el('small', { className: 'muted' }, `ผู้ตรวจ: ${item.reviewer_name || 'เจ้าหน้าที่ ICS'} • ${dated(item.created_at)}`)
+            el('div', { className: 'filter-chips-row' }, ...reviewFilterBtns)
           );
-          nodes.push(box);
+
+          renderReviewsList();
+          nodes.push(reviewFilterBar, reviewsHost);
         }
       }
     } else if (tab === 'risks') {

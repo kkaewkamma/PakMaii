@@ -2801,6 +2801,126 @@ body.is-login .hero {
   }
 }
 
+/* Phase 4: ICS Dashboard Feeds, Filters & Split Approval Review */
+.ics-home-lower-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 768px) {
+  .ics-home-lower-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ics-summary-list-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.summary-feed-item {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--sage-50);
+  border: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ics-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ics-filter-bar .search-filter-box {
+  flex: 1 1 240px;
+  margin-bottom: 0;
+}
+
+.filter-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip.active {
+  background: var(--green-700);
+  color: var(--white);
+  border-color: var(--green-900);
+}
+
+.ics-split-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .ics-split-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.split-list-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.split-list-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  text-align: left;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  min-height: 44px;
+  height: auto;
+  box-shadow: none;
+}
+
+.split-list-item:hover {
+  background: var(--sage-50);
+  border-color: var(--green-700);
+  color: var(--ink);
+}
+
+.split-list-item.active {
+  background: var(--sage-50);
+  border-color: var(--green-700);
+  border-left: 4px solid var(--green-700);
+}
+
+.split-detail-pane {
+  min-width: 0;
+}
+
+.split-plot-context {
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+}
+
+.split-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ==========================================================================
    Print / PDF Export Styles (Official Audit & Traceability Certificate)
    ========================================================================== */
