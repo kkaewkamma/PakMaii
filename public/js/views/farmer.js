@@ -145,7 +145,12 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
         id: 'farmerPrimaryRecordBtn',
         className: isOverdue ? 'pulse' : '',
         onclick: () => navigateTab('record')
-      }, icon('calendar', 16), ' บันทึกกิจกรรม')
+      }, icon('calendar', 16), ' บันทึกกิจกรรม'),
+      el('button', {
+        type: 'button',
+        className: 'secondary',
+        onclick: () => navigateTab('approval')
+      }, icon('clipboard', 16), ' ขออนุมัติปัจจัย')
     )
   );
 
@@ -267,6 +272,10 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
   const submitBtn = el('button', { type: 'submit', id: 'recordSubmitBtn' }, icon('checkCircle', 16), ' บันทึกกิจกรรม');
 
   const step1Panel = el('div', { className: 'wizard-panel' },
+    el('div', { className: 'senior-step-guide' },
+      icon('info', 15),
+      el('span', {}, 'ขั้นตอนที่ 1 จาก 3: เลือกแปลงปลูก แล้วแตะปุ่มลัดด้านล่างเพื่อเลือกงานที่ทำวันนี้ได้ทันทีโดยไม่ต้องพิมพ์เอง')
+    ),
     plotSel,
     el('small', { className: 'muted helper-label' }, 'เลือกงานที่ใช้บ่อยจากปุ่มลัด หรือเลือกประเภทด้านล่าง:'),
     chipsGrid,
@@ -282,6 +291,10 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
   );
 
   const step2Panel = el('div', { className: 'wizard-panel hide' },
+    el('div', { className: 'senior-step-guide' },
+      icon('info', 15),
+      el('span', {}, 'ขั้นตอนที่ 2 จาก 3: ตรวจสอบหรือพิมพ์รายละเอียดเพิ่มเติม (สามารถกดปุ่ม "บันทึกด้วยเสียง" เพื่อพูดแทนการพิมพ์) และถ่ายรูปแปลงหากมี')
+    ),
     el('label', {}, 'ปัจจัยที่ใช้ (ถ้ามี)', inputUsedField),
     el('label', {}, 'ปริมาณและหน่วย (ถ้ามี)', amountField),
     el('label', {},
@@ -319,6 +332,10 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
   );
 
   const step3Panel = el('div', { className: 'wizard-panel hide' },
+    el('div', { className: 'senior-step-guide' },
+      icon('checkCircle', 15),
+      el('span', {}, 'ขั้นตอนสุดท้าย (3 จาก 3): ตรวจสอบข้อมูลในกรอบด้านล่าง หากถูกต้องแล้วให้กดปุ่มสีเขียว "บันทึกกิจกรรม"')
+    ),
     reviewBox,
     el('div', { className: 'row between mt-12' },
       el('button', { type: 'button', className: 'secondary', onclick: () => setWizardStep(2) }, 'แก้ไขข้อมูล'),

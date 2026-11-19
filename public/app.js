@@ -247,6 +247,7 @@ function showLogin(development) {
 
   const quickPersonas = el('div', { className: 'quick-persona-box' },
     el('div', { className: 'quick-persona-title' }, 'ทดลองใช้งานด่วนตามบทบาท'),
+    el('p', { className: 'muted quick-persona-sub' }, 'แตะที่ปุ่มรายชื่อด้านล่าง 1 ครั้ง เพื่อเข้าทดลองใช้งานได้ทันทีโดยไม่ต้องพิมพ์รหัส'),
     el('div', { className: 'quick-persona-grid' },
       el('button', {
         type: 'button',
@@ -458,6 +459,33 @@ function currentTabs() {
   return me.role === 'admin' ? tabsAdmin : me.role === 'ics' ? (demoUser ? tabsIcsDemo : tabsIcs) : tabsFarmer;
 }
 
+function applyFontScale(isLarge) {
+  document.documentElement.classList.toggle('large-text', isLarge);
+  const btn = $('#fontScaleToggle');
+  if (btn) {
+    btn.setAttribute('aria-pressed', isLarge ? 'true' : 'false');
+    btn.textContent = isLarge ? 'ก ขนาดปกติ' : 'ก+ ตัวอักษรใหญ่';
+    btn.classList.toggle('active', isLarge);
+  }
+}
+
+function toggleLargeText() {
+  const next = !document.documentElement.classList.contains('large-text');
+  sessionStorage.setItem('pakmaii_large_text', next ? '1' : '0');
+  applyFontScale(next);
+  notify(next ? 'เปิดโหมดตัวอักษรใหญ่พิเศษ (อ่านง่ายสำหรับผู้สูงอายุ)' : 'กลับสู่ขนาดตัวอักษรปกติ');
+  return next;
+}
+
+function initFontScaleToggle() {
+  const saved = sessionStorage.getItem('pakmaii_large_text') === '1';
+  applyFontScale(saved);
+  const btn = $('#fontScaleToggle');
+  if (btn) {
+    btn.onclick = () => toggleLargeText();
+  }
+}
+
 function scrollToTop() {
   const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
   window.scrollTo({ top: 0, behavior: prefersReduced ? 'auto' : 'smooth' });
@@ -517,11 +545,22 @@ function openMoreSheet(secondaryItems) {
     )
   );
 
+  const isLargeNow = document.documentElement.classList.contains('large-text');
+  const fontToggleSheetBtn = el('button', {
+    type: 'button',
+    className: 'secondary',
+    onclick: () => {
+      const next = toggleLargeText();
+      fontToggleSheetBtn.textContent = next ? 'ก กลับสู่ตัวอักษรขนาดปกติ' : 'ก+ ขยายตัวอักษรใหญ่พิเศษ (ผู้สูงอายุ)';
+    }
+  }, isLargeNow ? 'ก กลับสู่ตัวอักษรขนาดปกติ' : 'ก+ ขยายตัวอักษรใหญ่พิเศษ (ผู้สูงอายุ)');
+
   const accountActions = el('div', { className: 'more-sheet-footer' },
     el('div', { className: 'more-sheet-account' },
       el('b', {}, me?.name || '-'),
       el('small', { className: 'muted' }, `${roleLabels[me?.role] || me?.role} • ${me?.agency_code || '-'}`)
     ),
+    fontToggleSheetBtn,
     el('button', {
       type: 'button',
       className: 'secondary',
@@ -1698,4 +1737,5 @@ window.__pakMaiiOnSessionExpired = () => {
   showState('เซสชันหมดอายุ', 'กรุณาเข้าสู่ระบบผ่าน LINE อีกครั้ง', 'เข้าสู่ระบบใหม่', () => start(true));
 };
 
+initFontScaleToggle();
 start();
