@@ -113,6 +113,43 @@ export class D1Repository {
     return this.findPlot(id);
   }
 
+  findActivity(id) {
+    return this.first('SELECT * FROM activities WHERE id=?', id);
+  }
+
+  findReview(id) {
+    return this.first('SELECT * FROM reviews WHERE id=?', id);
+  }
+
+  findPhotoEvidence(id) {
+    return this.first('SELECT * FROM photo_evidence WHERE id=?', id);
+  }
+
+  async createPhotoEvidence({ ownerUserId, uploadedBy, plotId, entityType, entityId = null, objectKey, contentType, sizeBytes, sha256Hex, storageBackend = 'r2' }) {
+    const results = await this.batch([
+      this.statement(
+        `INSERT INTO photo_evidence(owner_user_id,uploaded_by,plot_id,entity_type,entity_id,object_key,content_type,size_bytes,sha256_hex,storage_backend)
+         VALUES(?,?,?,?,?,?,?,?,?,?)`,
+        ownerUserId, uploadedBy, plotId, entityType, entityId, objectKey, contentType, sizeBytes, sha256Hex, storageBackend
+      ),
+      this.statement(
+        `INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json)
+         VALUES(?,'evidence.uploaded','evidence',CAST(last_insert_rowid() AS TEXT),?)`,
+        uploadedBy, JSON.stringify({ plotId, entityType, entityId, contentType, sizeBytes })
+      ),
+    ]);
+    return { id: results[0].meta.last_row_id };
+  }
+
+  async attachPhotoEvidence(evidenceId, uploaderId, plotId, entityType, entityId) {
+    await this.guardedBatch([
+      this.statement(
+        'UPDATE photo_evidence SET entity_id=? WHERE id=? AND uploaded_by=? AND plot_id=? AND entity_type=? AND entity_id IS NULL',
+        entityId, evidenceId, uploaderId, plotId, entityType
+      ),
+    ], 400, 'ไม่สามารถผูกภาพหลักฐานนี้ได้ (ไม่พบ ถูกใช้งานแล้ว หรือไม่มีสิทธิ์)');
+  }
+
   async createActivity(plotId, userId, kind, details, activityDate, photoUrl) {
     const result = await this.run('INSERT INTO activities(plot_id,user_id,kind,details,activity_date,photo_url) VALUES(?,?,?,?,?,?)', plotId, userId, kind, details, activityDate, photoUrl);
     return result.meta.last_row_id;
@@ -298,11 +335,22 @@ export class D1Repository {
     return this.all('SELECT * FROM plots WHERE owner_id=? ORDER BY id DESC', user.id);
   }
 
-  listActivities(user) {
-    const base = 'SELECT a.*,p.name plot_name,u.name farmer FROM activities a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=a.user_id';
-    if (user.role === 'admin') return this.all(`${base} ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`);
-    if (user.role === 'ics') return this.all(`${base} JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`, user.id);
-    return this.all(`${base} WHERE p.owner_id=? ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`, user.id);
+  async listActivities(user) {
+    const withEvidence = `SELECT a.*,p.name plot_name,u.name farmer,
+      (SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='activity' AND pe.entity_id=a.id ORDER BY pe.id DESC LIMIT 1) evidence_id
+      FROM activities a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=a.user_id`;
+    const legacyBase = 'SELECT a.*,p.name plot_name,u.name farmer FROM activities a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=a.user_id';
+    const runQuery = base => {
+      if (user.role === 'admin') return this.all(`${base} ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`);
+      if (user.role === 'ics') return this.all(`${base} JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`, user.id);
+      return this.all(`${base} WHERE p.owner_id=? ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`, user.id);
+    };
+    try {
+      return await runQuery(withEvidence);
+    } catch (err) {
+      if (/no such table: photo_evidence/i.test(String(err?.message))) return runQuery(legacyBase);
+      throw err;
+    }
   }
 
   listApprovals(user) {
@@ -328,8 +376,18 @@ export class D1Repository {
     return [...pending, ...inactive];
   }
 
-  listReviews(userId) {
-    return this.all(`SELECT r.*,p.name plot_name FROM reviews r JOIN plots p ON p.id=r.plot_id
-      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC`, userId);
+  async listReviews(userId) {
+    const withEvidence = `SELECT r.*,p.name plot_name,
+      (SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id
+      FROM reviews r JOIN plots p ON p.id=r.plot_id
+      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC`;
+    const legacy = `SELECT r.*,p.name plot_name FROM reviews r JOIN plots p ON p.id=r.plot_id
+      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC`;
+    try {
+      return await this.all(withEvidence, userId);
+    } catch (err) {
+      if (/no such table: photo_evidence/i.test(String(err?.message))) return this.all(legacy, userId);
+      throw err;
+    }
   }
 }

@@ -4,47 +4,48 @@
 
 ---
 
-## 1. ภาพรวมสถานะโครงการปัจจุบัน (Current Status: READY FOR HANDOVER)
+## 1. ภาพรวมสถานะโครงการปัจจุบัน (Current Status: PHASE 1-2 SPRINT UPDATED)
 
-- **ความพร้อมของระบบ:** พร้อมสำหรับการนำเสนอ Demo และส่งต่อให้ทีมพัฒนาต่อยอด
-- **Automated Tests:** ผ่าน 80/80 รายการ (100% Pass) ครอบคลุมความปลอดภัย, สิทธิ์ผู้ใช้ และ Workflow
-- **Public Demo Environment:** Deploy ใช้งานได้จริงบน Cloudflare Workers:
-  `https://ready-to-grow-demo.readytogrow-app.workers.dev`
+- **ความพร้อมของระบบ:** อัปเดต Phase 1 (End-to-End Workflow Reliability) และ Phase 2 (Real Photo Evidence Storage Abstraction & R2-Ready Layer) แล้ว; ต้องสร้าง/ผูก Cloudflare R2 Bucket (`EVIDENCE_BUCKET`) เพิ่มเมื่อขึ้น Staging/Production
+- **Automated Tests:**
+  - ชุดทดสอบ Worker / Miniflare D1 / Frontend Security / Demo / Staging: ผ่าน **56/56 รายการ (100% Pass)**
+  - `npm test` เต็มชุดบนเครื่องที่ใช้ Node.js v26.13.0: ติด `better-sqlite3` ขาด native binary (`better_sqlite3.node`) ในไฟล์เทสต์ฝั่ง SQLite (`api.test.js`, `migration.test.js`, `invitation.test.js`, `d1-local-migration.test.js`, `production-dev-login.test.js`, `worker-contract.test.js`) — ต้องรันด้วย Node.js 20/22 LTS เพื่อตรวจ SQLite suite ครบทั้งหมด
+- **Public Demo Environment:** Deploy แยกต่างหากบน Cloudflare Workers:
+  `https://ready-to-grow-demo.readytogrow-app.workers.dev` (แยกจากระบบจริงทั้งหมด)
 
 ---
 
 ## 2. สิ่งที่พัฒนาเสร็จสมบูรณ์แล้ว (Completed Features)
 
 ### ก. ระบบแกนกลางและฐานข้อมูล (Core & Database)
-- [x] โครงสร้างฐานข้อมูลเชิงสัมพันธ์สมบูรณ์ รองรับ Foreign Keys, Triggers, และ Audit Logs
+- [x] โครงสร้างฐานข้อมูลเชิงสัมพันธ์สมบูรณ์ รองรับ Foreign Keys, Triggers, และ Audit Logs (`approval.reviewed`, `review.created`, `evidence.uploaded`)
 - [x] ระบบ Dual-Runtime รองรับทั้ง Express + SQLite (Local) และ Cloudflare Workers + D1 (Edge)
-- [x] สคริปต์ Database Migrations ทั้งหมด 5 ลำดับขั้น (0001 - 0005)
+- [x] D1 Migrations: `0001` – `0007` (เพิ่ม `0007_photo_evidence.sql` สำหรับ metadata ภาพหลักฐาน) และ SQLite Migrations `001` – `003`
+- [x] Backend E2E Integration Test (`test/worker-e2e-workflow.test.js`) และ Photo Evidence Test (`test/worker-photo-evidence.test.js`) บน Miniflare D1
 
 ### ข. ระบบความปลอดภัยและสิทธิ์ผู้ใช้ (Security & RBAC)
 - [x] แยกบทบาทชัดเจนระหว่าง Farmer, ICS, และ Admin
-- [x] ป้องกันการเข้าถึงข้อมูลข้ามเกษตรกร (Farmer 1 ไม่เห็นข้อมูล Farmer 2)
-- [x] ป้องกัน ICS เข้าถึงข้อมูลเกษตรกรนอกสายงาน (ICS 1 ไม่สามารถอนุมัติคำขอของ Farmer สายงาน ICS 2)
+- [x] ป้องกันการเข้าถึงข้อมูลข้ามเกษตรกร (Farmer 1 ไม่เห็นข้อมูลและภาพหลักฐานของ Farmer 2)
+- [x] ป้องกัน ICS เข้าถึงข้อมูลเกษตรกรนอกสายงาน (ICS 1 ไม่สามารถอนุมัติคำขอหรือเปิดภาพหลักฐานของ Farmer สายงาน ICS 2)
 - [x] Public Demo ทำงานเป็น Client-Side Sandbox ตัดสิทธิ์การเข้าถึง Admin API เด็ดขาด
-- [x] มี Security Headers และ CSP ที่เข้มงวด ป้องกัน XSS และ Injection
+- [x] มี Security Headers และ CSP ที่เข้มงวด ป้องกัน XSS และ Injection (ตรวจสอบ magic bytes ภาพ JPEG/PNG/WebP ก่อนจัดเก็บ และเปิดดูผ่าน Authenticated Endpoint)
 
-### ค. ประสบการณ์ผู้ใช้ (UX & Mobile/LIFF Optimization)
-- [x] หน้า Login แบบ Demo-First สลับ Role สะดวก พร้อม Auto-fill รหัสตัวอย่าง
-- [x] แทนที่ `window.prompt()` ด้วย Inline Decision Box ไม่ค้างบน LINE Browser
-- [x] เพิ่มแท็บ "ผลตรวจแปลง" สำหรับ Farmer เพื่อให้เกษตรกรทราบผลการตรวจรับรอง
-- [x] เพิ่มแบบฟอร์ม "แก้ไขข้อมูลแปลง" ได้โดยตรงบนการ์ดแปลง
-- [x] เพิ่มระบบป้องกัน Double-Submit ในทุกฟอร์ม
-- [x] เพิ่ม Dialog ยืนยันก่อนรีเซ็ตข้อมูล Demo ป้องกันการกดพลาด
+### ค. ประสบการณ์ผู้ใช้และภาพหลักฐาน (UX, Mobile/LIFF & Evidence)
+- [x] แถบจังหวะบันทึก 14 วัน (`create14DayRhythmTrack`), Sidebar/Bottom 4+เพิ่มเติม, 3-Step Activity Wizard, Split-View Approval, Admin Overview & RBAC Matrix
+- [x] ระบบอัปโหลดภาพหลักฐานแบบ R2-ready (`worker/storage.js`) และ Local private storage (`lib/evidence-storage.js`) รองรับกล้อง + คลังภาพ ย่อขนาดฝั่ง client แสดงความคืบหน้า และแยกป้ายตัวอย่างในโหมด Demo ชัดเจน
 
 ---
 
 ## 3. ปัญหาที่ยังพบและข้อจำกัดปัจจุบัน (Known Limitations)
 
-1. **การจัดเก็บข้อมูลในโหมด Demo (Standalone Client Storage):**
-   - ข้อมูลของโหมด Demo อาศัย `localStorage` ของบราวเซอร์ ทำให้ไม่สามารถทดสอบระหว่าง 2 เครื่องแบบเรียลไทม์ได้ (เช่น เกษตรกรกดส่งจากเครื่อง A แล้วเจ้าหน้าที่เปิดเครื่อง B ดูทันที ยังทำไม่ได้ในโหมด Demo)
-2. **การอัปโหลดไฟล์ภาพจริง:**
-   - ฟังก์ชันถ่ายภาพกิจกรรมในปัจจุบันยังเป็นการบันทึก Image URL จำลอง ยังไม่ได้เชื่อมต่อ Cloudflare R2 Bucket สำหรับจัดเก็บไฟล์รูปภาพจริง
-3. **การแจ้งเตือนอัตโนมัติ (Push Notifications):**
-   - ยังไม่มีการส่ง Flex Message เข้า LINE ส่วนตัวของเกษตรกรเมื่อ ICS กดอนุมัติคำขอ (ปัจจุบันผู้ใช้ต้องเปิดดูผ่านแท็บในแอป)
+1. **Cloudflare R2 Bucket สำหรับ Staging/Production:**
+   - ชั้นแอปพลิเคชัน (`POST /api/evidence`, `GET /api/evidence/:id`, `GET /api/evidence/:id/content`) และ Migration `0007` พร้อมแล้ว แต่ยังไม่ได้สร้าง R2 Bucket จริงและเพิ่ม `r2_buckets` binding (`EVIDENCE_BUCKET`) ลงใน `wrangler.jsonc` / `wrangler.staging.jsonc` (หากยังไม่ผูก binding API จะ fail-closed คืน `503 EVIDENCE_STORAGE_UNAVAILABLE`)
+2. **การจัดเก็บข้อมูลในโหมด Demo (Standalone Client Storage):**
+   - โหมด Demo ยังเก็บข้อมูลและภาพตัวอย่างเฉพาะในเบราว์เซอร์ (`localStorage`) ตามหลักการแยก Sandbox ออกจากระบบจริง
+3. **การแจ้งเตือน LINE Messaging API, Real Public QR Traceability และ ICS Audit Assistant:**
+   - ยังอยู่ใน Phase 3–7 ถัดไป
+4. **CSP `font-src` สำหรับฟอนต์ Self-hosted:**
+   - `public/_headers` และ `server.js` ยังไม่มี `font-src 'self' data:` จึงต้องขออนุมัติก่อนแก้ Header ความปลอดภัยเพื่อให้ `IBM Plex Sans Thai` โหลดจาก `/fonts/` ได้จริง
 
 ---
 

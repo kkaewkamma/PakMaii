@@ -1,5 +1,12 @@
 import { D1Repository } from './repository/d1.js';
 import { agencyCodeDigests, verifyAdminPassword } from './auth.js';
+import {
+  MAX_EVIDENCE_BYTES,
+  detectImageContentType,
+  extensionForContentType,
+  buildEvidenceObjectKey,
+  createEvidenceStorage,
+} from './storage.js';
 
 class HttpError extends Error {
   constructor(status, message, code) {
@@ -22,9 +29,14 @@ function json(value, status = 200, extraHeaders = {}) {
 }
 
 async function sha256Hex(value) {
-  const bytes = new TextEncoder().encode(value);
+  const bytes = value instanceof Uint8Array ? value : new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function randomHexBytes(length = 16) {
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 const text = (value, field, max = 500) => {
@@ -127,13 +139,34 @@ async function ownPlot(repository, user, rawId) {
   throw new HttpError(403, 'ไม่มีสิทธิ์เข้าถึงแปลง');
 }
 
+async function authorizeEvidenceAccess(repository, user, evidence) {
+  if (user.role === 'admin') return;
+  if (user.role === 'farmer' && evidence.owner_user_id === user.id) return;
+  if (user.role === 'ics' && await repository.hasActiveAssignment(user.id, evidence.owner_user_id)) return;
+  throw new HttpError(403, 'ไม่มีสิทธิ์เข้าถึงภาพหลักฐานนี้');
+}
+
+async function validatePendingEvidenceForEntity(repository, user, rawEvidenceId, plotId, entityType) {
+  if (rawEvidenceId === undefined || rawEvidenceId === null || String(rawEvidenceId).trim() === '') return null;
+  const evidenceId = positiveId(rawEvidenceId, 'รหัสภาพหลักฐาน');
+  const evidence = await repository.findPhotoEvidence(evidenceId);
+  if (!evidence) throw new HttpError(404, 'ไม่พบภาพหลักฐานที่ระบุ');
+  if (evidence.uploaded_by !== user.id || evidence.plot_id !== plotId || evidence.entity_type !== entityType) {
+    throw new HttpError(403, 'ไม่มีสิทธิ์ใช้ภาพหลักฐานนี้กับรายการดังกล่าว');
+  }
+  if (evidence.entity_id !== null) {
+    throw new HttpError(400, 'ภาพหลักฐานนี้ถูกใช้งานกับรายการอื่นแล้ว');
+  }
+  return evidenceId;
+}
+
 export async function handleApi(request, env) {
   const url = new URL(request.url);
   const { pathname } = url;
 
   if (request.method === 'GET' && pathname === '/api/health') return json({ ok: true, service: 'ready-to-grow' });
   if (request.method === 'GET' && pathname === '/api/config') {
-    return json({ liffId: env.LIFF_ID || '', development: false });
+    return json({ liffId: env.LIFF_ID || '', development: false, evidenceUploadEnabled: Boolean(env.EVIDENCE_BUCKET) });
   }
 
   const repository = new D1Repository(env.DB);
@@ -225,12 +258,14 @@ export async function handleApi(request, env) {
   ]);
   const plotPatch = request.method === 'PATCH' ? pathname.match(/^\/api\/plots\/([^/]+)$/) : null;
   const approvalPatch = request.method === 'PATCH' ? pathname.match(/^\/api\/approvals\/([^/]+)$/) : null;
+  const evidenceContentMatch = request.method === 'GET' ? pathname.match(/^\/api\/evidence\/([^/]+)\/content$/) : null;
+  const evidenceMetaMatch = request.method === 'GET' && !evidenceContentMatch ? pathname.match(/^\/api\/evidence\/([^/]+)$/) : null;
   const userStatusPatch = request.method === 'PATCH' ? pathname.match(/^\/api\/admin\/users\/([^/]+)\/status$/) : null;
   const assignmentEndPatch = request.method === 'PATCH' ? pathname.match(/^\/api\/admin\/assignments\/([^/]+)\/end$/) : null;
   const inviteRevokePatch = request.method === 'PATCH' ? pathname.match(/^\/api\/admin\/invites\/([^/]+)\/revoke$/) : null;
-  const postRoutes = new Set(['/api/logout','/api/plots','/api/activities','/api/approvals','/api/lots','/api/reviews','/api/admin/users','/api/admin/assignments','/api/admin/invites']);
+  const postRoutes = new Set(['/api/logout','/api/plots','/api/activities','/api/approvals','/api/lots','/api/reviews','/api/evidence','/api/admin/users','/api/admin/assignments','/api/admin/invites']);
   const known = (request.method === 'GET' && readOnlyRoutes.has(pathname)) ||
-    (request.method === 'POST' && postRoutes.has(pathname)) || plotPatch || approvalPatch || userStatusPatch || assignmentEndPatch || inviteRevokePatch;
+    (request.method === 'POST' && postRoutes.has(pathname)) || plotPatch || approvalPatch || evidenceContentMatch || evidenceMetaMatch || userStatusPatch || assignmentEndPatch || inviteRevokePatch;
   if (!known) return json({ error: 'ไม่พบ API' }, 404);
 
   const authentication = await authenticate(request, repository);
@@ -269,8 +304,117 @@ export async function handleApi(request, env) {
     if (denied) return denied;
     const body = await requestBody(request);
     const plot = await ownPlot(repository, user, body.plot_id);
+    const evidenceId = await validatePendingEvidenceForEntity(repository, user, body.evidence_id, plot.id, 'activity');
     const id = await repository.createActivity(plot.id, user.id, text(body.kind, 'กิจกรรม', 100), text(body.details, 'รายละเอียด', 2000), isoDate(body.activity_date, 'วันที่ทำกิจกรรม'), photoUrl(body.photo_url));
-    return json({ id }, 201);
+    if (evidenceId !== null) await repository.attachPhotoEvidence(evidenceId, user.id, plot.id, 'activity', id);
+    return json({ id, ...(evidenceId !== null ? { evidence_id: evidenceId } : {}) }, 201);
+  }
+  if (request.method === 'POST' && pathname === '/api/evidence') {
+    const plotId = positiveId(url.searchParams.get('plot_id'), 'รหัสแปลง');
+    const entityType = url.searchParams.get('entity_type') || 'activity';
+    if (!['activity', 'review'].includes(entityType)) throw new HttpError(400, 'ประเภทหลักฐานไม่ถูกต้อง');
+    if (entityType === 'activity') {
+      const denied = requireRole(user, 'farmer', 'เฉพาะเกษตรกร');
+      if (denied) return denied;
+    } else {
+      const denied = requireRole(user, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
+      if (denied) return denied;
+    }
+    const plot = await ownPlot(repository, user, plotId);
+    const rawEntityId = url.searchParams.get('entity_id');
+    const entityId = rawEntityId !== null && rawEntityId !== '' ? positiveId(rawEntityId, 'รหัสรายการ') : null;
+    if (entityId !== null) {
+      const targetRecord = entityType === 'activity'
+        ? await repository.findActivity(entityId)
+        : await repository.findReview(entityId);
+      if (!targetRecord) throw new HttpError(404, 'ไม่พบรายการอ้างอิง');
+      if (targetRecord.plot_id !== plot.id) throw new HttpError(403, 'ไม่มีสิทธิ์แนบภาพหลักฐานข้ามแปลง');
+    }
+    const storage = createEvidenceStorage(env);
+    if (!storage.configured) {
+      throw new HttpError(503, 'ระบบจัดเก็บภาพหลักฐานยังไม่ได้เชื่อมต่อ Cloudflare R2', 'EVIDENCE_STORAGE_UNAVAILABLE');
+    }
+    const headerLength = Number(request.headers.get('content-length') || 0);
+    if (headerLength > MAX_EVIDENCE_BYTES) throw new HttpError(413, 'ไฟล์ภาพมีขนาดใหญ่เกิน 5 MB');
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    if (!bytes.byteLength) throw new HttpError(400, 'ไม่พบข้อมูลไฟล์ภาพ');
+    if (bytes.byteLength > MAX_EVIDENCE_BYTES) throw new HttpError(413, 'ไฟล์ภาพมีขนาดใหญ่เกิน 5 MB');
+    const detectedType = detectImageContentType(bytes);
+    if (!detectedType) throw new HttpError(415, 'รองรับเฉพาะไฟล์ภาพ JPEG, PNG หรือ WebP เท่านั้น');
+
+    const fileHash = await sha256Hex(bytes);
+    const objectKey = buildEvidenceObjectKey(entityType, plot.id, detectedType, randomHexBytes(16));
+    await storage.put(objectKey, bytes, detectedType, {
+      plotId: String(plot.id),
+      entityType,
+      uploadedBy: String(user.id),
+    });
+    let created;
+    try {
+      created = await repository.createPhotoEvidence({
+        ownerUserId: plot.owner_id,
+        uploadedBy: user.id,
+        plotId: plot.id,
+        entityType,
+        entityId,
+        objectKey,
+        contentType: detectedType,
+        sizeBytes: bytes.byteLength,
+        sha256Hex: fileHash,
+        storageBackend: storage.backend,
+      });
+    } catch (err) {
+      await storage.delete(objectKey).catch(() => {});
+      throw err;
+    }
+    return json({
+      id: created.id,
+      plot_id: plot.id,
+      entity_type: entityType,
+      entity_id: entityId,
+      content_type: detectedType,
+      size_bytes: bytes.byteLength,
+      sha256_hex: fileHash,
+      storage_backend: storage.backend,
+      content_url: `/api/evidence/${created.id}/content`,
+    }, 201, { 'Cache-Control': 'no-store' });
+  }
+  if (evidenceContentMatch) {
+    const id = positiveId(evidenceContentMatch[1], 'รหัสภาพหลักฐาน');
+    const evidence = await repository.findPhotoEvidence(id);
+    if (!evidence) throw new HttpError(404, 'ไม่พบภาพหลักฐาน');
+    await authorizeEvidenceAccess(repository, user, evidence);
+    const obj = await createEvidenceStorage(env).get(evidence.object_key);
+    if (!obj) throw new HttpError(404, 'ไม่พบไฟล์ภาพหลักฐานในคลังจัดเก็บ');
+    return new Response(obj.body, {
+      status: 200,
+      headers: {
+        'Content-Type': evidence.content_type,
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+        'Content-Disposition': `inline; filename="evidence-${evidence.id}.${extensionForContentType(evidence.content_type)}"`,
+        'Cache-Control': 'private, no-store',
+        'Referrer-Policy': 'no-referrer',
+      },
+    });
+  }
+  if (evidenceMetaMatch) {
+    const id = positiveId(evidenceMetaMatch[1], 'รหัสภาพหลักฐาน');
+    const evidence = await repository.findPhotoEvidence(id);
+    if (!evidence) throw new HttpError(404, 'ไม่พบภาพหลักฐาน');
+    await authorizeEvidenceAccess(repository, user, evidence);
+    return json({
+      id: evidence.id,
+      plot_id: evidence.plot_id,
+      entity_type: evidence.entity_type,
+      entity_id: evidence.entity_id,
+      content_type: evidence.content_type,
+      size_bytes: evidence.size_bytes,
+      sha256_hex: evidence.sha256_hex,
+      storage_backend: evidence.storage_backend,
+      created_at: evidence.created_at,
+      content_url: `/api/evidence/${evidence.id}/content`,
+    }, 200, { 'Cache-Control': 'private, no-store' });
   }
   if (request.method === 'POST' && pathname === '/api/approvals') {
     const denied = requireRole(user, 'farmer', 'เฉพาะเกษตรกร');
@@ -310,8 +454,10 @@ export async function handleApi(request, env) {
     if (denied) return denied;
     const body = await requestBody(request);
     const plot = await ownPlot(repository, user, body.plot_id);
+    const evidenceId = await validatePendingEvidenceForEntity(repository, user, body.evidence_id, plot.id, 'review');
     const id = await repository.createReview(plot.id, user.id, text(body.result, 'ผลตรวจ', 100), text(body.note, 'บันทึกผลตรวจ', 2000));
-    return json({ id }, 201);
+    if (evidenceId !== null) await repository.attachPhotoEvidence(evidenceId, user.id, plot.id, 'review', id);
+    return json({ id, ...(evidenceId !== null ? { evidence_id: evidenceId } : {}) }, 201);
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/users') {

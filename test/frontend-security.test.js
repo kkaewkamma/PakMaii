@@ -15,6 +15,7 @@ test('frontend has external assets only and CSP allows no inline script or style
   assert.doesNotMatch(headers, /unsafe-inline|unsafe-eval/i);
   assert.match(headers, /default-src 'none'/);
   assert.match(headers, /script-src 'self' https:\/\/static\.line-scdn\.net/);
+  assert.match(headers, /font-src 'self' data:/);
   assert.match(headers, /base-uri 'none'/);
   assert.match(headers, /object-src 'none'/);
 });
@@ -220,4 +221,16 @@ test('Phase 5 admin overview, RBAC matrix, public traceability proposal, and pri
   // Print styles handle desktop sidebar grid and rhythm cells
   assert.match(css, /@media print\s*\{[\s\S]*body:not\(\.is-login\)\s*main\.wrap/);
   assert.match(css, /@media print\s*\{[\s\S]*\.rhythm-cell\.active/);
+});
+
+test('Phase 2 photo evidence: camera/gallery inputs, authenticated upload & viewer, Demo distinction', () => {
+  assert.match(script, /capture:\s*['"]environment['"]/);
+  assert.match(script, /evidenceUploadEnabled/);
+  assert.match(script, /uploadEvidenceWithProgress/);
+  assert.match(script, /openEvidenceViewer/);
+  assert.match(script, /blobToDataUrl/);
+  const viewerSlice = script.slice(script.indexOf('async function openEvidenceViewer'), script.indexOf('function createPhotoUploader'));
+  assert.doesNotMatch(viewerSlice, /createObjectURL/);
+  assert.match(script, /ตัวอย่างภาพในโหมดทดลอง \(เก็บเฉพาะในเครื่องนี้ ไม่ได้อัปโหลดขึ้นเซิร์ฟเวอร์\)/);
+  assert.match(script, /ดูภาพหลักฐานที่อัปโหลด/);
 });
