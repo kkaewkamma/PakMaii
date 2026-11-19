@@ -84,7 +84,7 @@
     const crops = ['ข้าวหอมมะลิ 105', 'ถั่วเหลืองอินทรีย์แฟร์เทรด', 'ปอเทือง (Sunn Hemp)', 'ข้าวหอมมะลิอินทรีย์', 'ถั่วเหลืองสลับข้าว'];
     const cropTypes = ['Jasmine Rice', 'Fairtrade Organic Soybean', 'Sunn Hemp', 'Jasmine Rice', 'Fairtrade Organic Soybean'];
     const plotCodes = ['A-03', 'B-01', 'C-12', 'D-05', 'A-04'];
-    const conversionYears = ['Year 1', 'Year 2', 'Year 1', 'Certified EU Organic', 'Year 3'];
+    const conversionYears = ['ระยะปรับเปลี่ยนปีที่ 1', 'ระยะปรับเปลี่ยนปีที่ 2', 'ระยะปรับเปลี่ยนปีที่ 1', 'ผ่านการรับรอง PGS', 'ระยะปรับเปลี่ยนปีที่ 3'];
     const waterStatuses = ['Low - Groundwater Bank / Solar Pump needed', 'Normal', 'Low - Groundwater Bank / Solar Pump needed', 'Normal', 'Normal'];
 
     const store = {

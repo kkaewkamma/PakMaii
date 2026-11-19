@@ -66,3 +66,22 @@ test('ensureLiff guards liff.init() exactly once and all LIFF call sites use ens
   // loadConfig validates liffId or development before returning cached config
   assert.match(script, /config\?\.liffId \|\| config\?\.development/);
 });
+
+test('Phase 0 data integrity: app.js contains no fake fallbacks, hardcoded metrics, or canned certifications', () => {
+  // Voice input must not have simulated voice fallback or canned samples
+  assert.doesNotMatch(script, /simulateVoiceFallback/);
+  assert.doesNotMatch(script, /ฉีดพ่นน้ำหมักสะเดาไล่แมลง/);
+
+  // ICS Dashboard must not have hardcoded fallback literals or canned watchlist array
+  assert.doesNotMatch(script, /\?\?\s*65\b/);
+  assert.doesNotMatch(script, /\?\?\s*120\b/);
+  assert.doesNotMatch(script, /\?\?\s*12\b/);
+  assert.doesNotMatch(script, /\?\?\s*86\b/);
+  assert.doesNotMatch(script, /Certified EU Organic/);
+
+  // Story Passport must not contain canned certification or fake codes
+  assert.doesNotMatch(script, /ผ่านการตรวจประเมิน PGS & ICS ครบถ้วน/);
+  assert.doesNotMatch(script, /ปลอดสารเคมีสังเคราะห์ 100%/);
+  assert.doesNotMatch(script, /'L-12'/);
+  assert.doesNotMatch(script, /แปลง A-03, A-04/);
+});

@@ -748,62 +748,60 @@ async function start(forceLogin = false) {
 }
 
 function createVoiceInput(textarea) {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    return el('div', { className: 'voice-mic-bar hide' });
+  }
+
   const voiceBtn = el('button', {
     type: 'button',
     className: 'voice-btn',
-    title: 'กดเพื่อพูดภาษาไทย แปลงเป็นข้อความอัตโนมัติ'
-  }, icon('mic', 14), ' บันทึกด้วยเสียง (Speech-to-Text)');
+    title: 'กดเพื่อพูดภาษาไทย'
+  }, icon('mic', 14), ' บันทึกด้วยเสียง');
 
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
+  try {
+    recognition = new SpeechRec();
+    recognition.lang = 'th-TH';
+    recognition.continuous = false;
+    recognition.interimResults = false;
 
-  function simulateVoiceFallback() {
-    const samples = [
-      'ฉีดพ่นน้ำหมักสะเดาไล่แมลง แปลงข้าวหอมมะลิช่วงเช้า 20 ลิตร ตามสูตรที่ได้รับอนุมัติ',
-      'ตรวจสภาพความชื้นดินและระดับน้ำในแปลงข้าวหอมมะลิ ปริมาณน้ำปกติ',
-      'ปล่อยแหนแดงบำรุงดินตรึงไนโตรเจน 5 กิโลกรัมทั่วแปลง',
-      'ไถกลบปอเทืองอายุ 90 วัน เพื่อเตรียมแปลงปลูกถั่วเหลืองอินทรีย์รอบถัดไป'
-    ];
-    const picked = samples[Math.floor(Math.random() * samples.length)];
-    textarea.value = (textarea.value ? textarea.value + ' ' : '') + picked;
-    notify(`บันทึกข้อความจากเสียง: "${picked}"`);
-  }
+    recognition.onstart = () => {
+      voiceBtn.classList.add('recording');
+      voiceBtn.textContent = 'กำลังรับฟังเสียง...';
+    };
 
-  if (SpeechRec) {
-    try {
-      recognition = new SpeechRec();
-      recognition.lang = 'th-TH';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      recognition.onstart = () => {
-        voiceBtn.classList.add('recording');
-        voiceBtn.textContent = 'กำลังรับฟังเสียง...';
-      };
-
-      recognition.onresult = (e) => {
-        const transcript = e.results[0][0].transcript;
+    recognition.onresult = (e) => {
+      const transcript = e.results[0]?.[0]?.transcript || '';
+      if (transcript) {
         textarea.value = (textarea.value ? textarea.value + ' ' : '') + transcript;
         notify(`แปลงเสียงสำเร็จ: "${transcript}"`);
-      };
+      }
+    };
 
-      recognition.onerror = () => {
-        simulateVoiceFallback();
-      };
+    recognition.onerror = () => {
+      voiceBtn.classList.remove('recording');
+      voiceBtn.replaceChildren(icon('mic', 14), document.createTextNode(' บันทึกด้วยเสียง'));
+      notify('อุปกรณ์นี้ยังใช้การพิมพ์ด้วยเสียงไม่ได้ กรุณาพิมพ์แทน');
+    };
 
-      recognition.onend = () => {
-        voiceBtn.classList.remove('recording');
-        voiceBtn.replaceChildren(icon('mic', 14), document.createTextNode(' บันทึกด้วยเสียง (Speech-to-Text)'));
-      };
-    } catch {}
+    recognition.onend = () => {
+      voiceBtn.classList.remove('recording');
+      voiceBtn.replaceChildren(icon('mic', 14), document.createTextNode(' บันทึกด้วยเสียง'));
+    };
+  } catch {
+    return el('div', { className: 'voice-mic-bar hide' });
   }
 
   voiceBtn.onclick = () => {
     if (recognition) {
-      try { recognition.start(); }
-      catch { simulateVoiceFallback(); }
+      try {
+        recognition.start();
+      } catch {
+        notify('อุปกรณ์นี้ยังใช้การพิมพ์ด้วยเสียงไม่ได้ กรุณาพิมพ์แทน');
+      }
     } else {
-      simulateVoiceFallback();
+      notify('อุปกรณ์นี้ยังใช้การพิมพ์ด้วยเสียงไม่ได้ กรุณาพิมพ์แทน');
     }
   };
 
@@ -844,6 +842,9 @@ function compressImage(file, maxDimension = 1200, quality = 0.8) {
 }
 
 function createPhotoUploader(photoUrlInput) {
+  if (!demoUser) {
+    return el('div', { className: 'photo-preview-wrap hide' });
+  }
   const fileInput = el('input', { type: 'file', accept: 'image/*', className: 'hide' });
   const previewImg = el('img', { className: 'photo-preview-img hide', alt: 'ตัวอย่างหลักฐานภาพถ่าย' });
   const previewWrap = el('div', { className: 'photo-preview-wrap' });
@@ -862,7 +863,7 @@ function createPhotoUploader(photoUrlInput) {
       previewImg.src = compressedDataUrl;
       previewImg.classList.remove('hide');
       if (photoUrlInput) photoUrlInput.value = compressedDataUrl;
-      notify('ปรับขนาดและโหลดรูปภาพหลักฐานเรียบร้อย');
+      notify('โหลดรูปภาพหลักฐานในเครื่องเรียบร้อย');
     } catch {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -876,7 +877,12 @@ function createPhotoUploader(photoUrlInput) {
     }
   };
 
-  previewWrap.append(uploadBtn, fileInput, previewImg);
+  previewWrap.append(
+    uploadBtn,
+    fileInput,
+    previewImg,
+    el('small', { className: 'muted demo-note' }, 'รูปภาพจะจัดเก็บเฉพาะในเครื่องนี้ (โหมดทดลอง)')
+  );
   return previewWrap;
 }
 
@@ -884,66 +890,50 @@ function showStoryPassport(lot) {
   const overlay = el('div', { className: 'passport-overlay' });
   const card = el('div', { className: 'passport-card' },
     el('div', { className: 'passport-header' },
-      el('span', { className: 'passport-badge' }, 'ใบรับรองการตรวจสอบย้อนกลับ (Traceability Certificate)'),
-      el('h3', { className: 'passport-title' }, 'ล็อตผลผลิต ' + (lot.code || lot.lot_code || 'L-12')),
+      el('span', { className: 'passport-badge' }, 'ข้อมูลล็อตผลผลิต (Lot Traceability)'),
+      el('h3', { className: 'passport-title' }, 'ล็อตผลผลิต ' + (lot.code || '-')),
       el('small', { className: 'passport-subtitle' }, 'วิสาหกิจชุมชนเกษตรอินทรีย์ตำบลผักไหม จ.ศรีสะเกษ')
     ),
     el('div', { className: 'passport-body' },
       el('div', { className: 'passport-row' },
         el('b', {}, 'ชนิดผลผลิต:'),
-        el('span', {}, lot.crop || 'ข้าวหอมมะลิ 105 & ถั่วเหลืองอินทรีย์')
+        el('span', {}, lot.crop || '-')
       ),
       el('div', { className: 'passport-row' },
         el('b', {}, 'แปลงต้นทาง:'),
-        el('span', {}, lot.linked_plots || 'แปลง A-03, A-04 (ผ่านการตรวจรับรอง ICS)')
+        el('span', {}, lot.plot_name || '-')
       ),
       el('div', { className: 'passport-row' },
-        el('b', {}, 'ปริมาณสุทธิ:'),
-        el('span', {}, lot.total_bags_or_kg || `${lot.quantity} กก.`)
+        el('b', {}, 'ปริมาณ:'),
+        el('span', {}, typeof lot.quantity === 'number' ? `${lot.quantity} กก.` : (lot.quantity || '-'))
+      ),
+      lot.harvest_date ? el('div', { className: 'passport-row' },
+        el('b', {}, 'วันที่เก็บเกี่ยว:'),
+        el('span', {}, dated(lot.harvest_date))
+      ) : null,
+      lot.farmer ? el('div', { className: 'passport-row' },
+        el('b', {}, 'เกษตรกรผู้ผลิต:'),
+        el('span', {}, lot.farmer)
+      ) : null,
+      el('div', { className: 'passport-row' },
+        el('b', {}, 'ผลการตรวจประเมิน:'),
+        el('span', { className: 'muted' }, 'ยังไม่มีผลตรวจที่เชื่อมกับล็อตนี้')
       ),
       el('div', { className: 'passport-row' },
-        el('b', {}, 'การควบคุมปัจจัยการผลิต:'),
-        el('span', {}, 'ได้รับอนุมัติสูตรอินทรีย์ 100% ปลอดสารเคมีสังเคราะห์')
+        el('b', {}, 'วันที่บันทึกล็อต:'),
+        el('span', {}, dated(lot.created_at))
       ),
-      el('div', { className: 'passport-row' },
-        el('b', {}, 'การรับรองมาตรฐาน:'),
-        el('span', { className: 'badge-normal' }, 'ผ่านการตรวจประเมิน PGS & ICS ครบถ้วน')
-      ),
-      el('div', { className: 'passport-qr' },
-        el('div', { className: 'passport-qr-icon' }, icon('shield', 28)),
-        el('b', {}, 'การยืนยันความถูกต้องผ่านระบบกลุ่ม (Chain of Custody)'),
-        el('p', { className: 'muted passport-qr-desc' }, lot.story_highlights || 'ผลผลิตอินทรีย์ผ่านการรับรองระบบควบคุมภายใน (Internal Control System: ICS) วิสาหกิจชุมชนตำบลผักไหม จ.ศรีสะเกษ')
-      ),
-      el('div', { className: 'passport-actions row between' },
-        el('div', { className: 'row' },
-          el('button', {
-            type: 'button',
-            className: 'btn-sm secondary',
-            onclick: () => window.print()
-          }, icon('printer', 14), ' พิมพ์ใบรับรอง (Print)'),
-          el('button', {
-            type: 'button',
-            className: 'btn-sm secondary',
-            onclick: () => {
-              const text = `[ใบรับรองตรวจสอบย้อนกลับเกษตรอินทรีย์ ผักไหม]\n` +
-                `ล็อตผลผลิต: ${lot.code || lot.lot_code || 'L-12'}\n` +
-                `ผลผลิต: ${lot.crop || 'ข้าวหอมมะลิ 105'}\n` +
-                `ปริมาณ: ${lot.total_bags_or_kg || `${lot.quantity} กก.`}\n` +
-                `มาตรฐาน: รับรองระบบควบคุมภายใน PGS & ICS วิสาหกิจชุมชนตำบลผักไหม จ.ศรีสะเกษ`;
-              window.open(`https://line.me/R/msg/text/?${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-            }
-          }, icon('message', 14), ' แชร์เข้า LINE')
-        ),
+      el('div', { className: 'passport-actions row between mt-12' },
         el('button', {
           type: 'button',
           className: 'btn-sm secondary',
           onclick: () => window.print()
-        }, icon('printer', 14), ' พิมพ์ใบรับรอง (Print)'),
+        }, icon('printer', 14), ' พิมพ์ข้อมูลล็อต'),
         el('button', {
           type: 'button',
           className: 'passport-close-btn',
           onclick: () => overlay.remove()
-        }, 'ปิดหน้าต่างใบรับรอง')
+        }, 'ปิดหน้าต่าง')
       )
     )
   );
@@ -1242,12 +1232,12 @@ async function loadTab() {
     else if (tab === 'users') nodes = await loadUsers();
     else if (tab === 'assignments') nodes = await loadAssignments();
     else if (tab === 'home') {
-      const [activities, approvals, lots, revs] = await Promise.all([
+      const [activities, approvals, lots] = await Promise.all([
         api('/activities'),
         api('/approvals'),
-        api('/lots'),
-        api('/reviews').catch(() => [])
+        api('/lots')
       ]);
+      const revs = me.role === 'ics' ? await api('/reviews').catch(() => []) : [];
       const pendingCount = approvals.filter(item => item.status === 'pending').length;
 
       if (me.role === 'ics') {
@@ -1264,17 +1254,12 @@ async function loadTab() {
             api('/metrics').catch(() => null),
             api('/watchlist').catch(() => [])
           ]);
-          totalMembers = metrics?.totalMembers ?? 65;
-          totalPlots = metrics?.totalPlots ?? 120;
-          pendingInput = metrics?.pendingInputRequests ?? (pendingCount || 8);
-          riskAlerts = metrics?.riskAlerts ?? 12;
-          groupReadiness = metrics?.groupReadiness ?? 86;
-          watchRows = (watchlist && watchlist.length) ? watchlist : [
-            { code: 'A-03', farmer: 'Demo Farmer 01', crop: 'ข้าวหอมมะลิ 105', conversion: 'Year 1', status: 'ขาดการบันทึกกิจกรรม 14 วัน', severity: 'risk', action: 'ติดตามด่วน', targetTab: 'record' },
-            { code: 'B-01', farmer: 'Demo Farmer 02', crop: 'ถั่วเหลืองอินทรีย์แฟร์เทรด', conversion: 'Year 2', status: 'มีคำขอปัจจัยการผลิตรออนุมัติ', severity: 'warning', action: 'พิจารณาคำขอ', targetTab: 'approval' },
-            { code: 'C-12', farmer: 'Demo Farmer 03', crop: 'ปอเทือง (Sunn Hemp)', conversion: 'Year 1', status: 'ประวัติไม่สอดคล้อง', severity: 'risk', action: 'นัดตรวจแปลง', targetTab: 'reviews' },
-            { code: 'D-05', farmer: 'Demo Farmer 04', crop: 'ข้าวหอมมะลิอินทรีย์', conversion: 'Certified EU Organic', status: 'ปกติ (ผ่านเกณฑ์อินทรีย์)', severity: 'normal', action: 'ดูใบรับรอง', targetTab: 'lots' }
-          ];
+          totalMembers = metrics?.totalMembers ?? 0;
+          totalPlots = metrics?.totalPlots ?? 0;
+          pendingInput = metrics?.pendingInputRequests ?? pendingCount;
+          riskAlerts = metrics?.riskAlerts ?? 0;
+          groupReadiness = metrics?.groupReadiness ?? null;
+          watchRows = Array.isArray(watchlist) ? watchlist : [];
         } else {
           // REAL PRODUCTION DATA: Calculated strictly from real API responses
           const since14 = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
@@ -1295,7 +1280,7 @@ async function loadTab() {
                 code: p.plot_code || p.name || `P-${p.id}`,
                 farmer: farmerDisplayName,
                 crop: p.crop || '-',
-                conversion: p.conversion_year || 'Year 1',
+                conversion: p.conversion_year || '',
                 status: 'ขาดการบันทึกกิจกรรมเกิน 14 วัน',
                 severity: 'risk',
                 action: 'ติดตามด่วน',
@@ -1307,7 +1292,7 @@ async function loadTab() {
                 code: p.plot_code || p.name || `P-${p.id}`,
                 farmer: farmerDisplayName,
                 crop: p.crop || '-',
-                conversion: p.conversion_year || 'Year 1',
+                conversion: p.conversion_year || '',
                 status: 'มีคำขอปัจจัยการผลิตรออนุมัติ',
                 severity: 'warning',
                 action: 'พิจารณาคำขอ',
@@ -1346,24 +1331,8 @@ async function loadTab() {
               el('button', {
                 type: 'button',
                 className: 'btn-sm',
-                onclick: async () => {
-                  try {
-                    await api(`/approvals/${w.pendingApprovalId}`, 'PATCH', {
-                      status: 'approved',
-                      comment: 'อนุมัติสูตรปุ๋ยหมักอินทรีย์ตามเกณฑ์มาตรฐาน PGS & ICS'
-                    });
-                    notify(`อนุมัติคำขอปัจจัยแปลง ${w.code} เรียบร้อย`);
-                    await loadTab();
-                  } catch (err) {
-                    if (!err.handled) notify(err.message);
-                  }
-                }
-              }, icon('check', 13), ' อนุมัติทันที'),
-              el('button', {
-                type: 'button',
-                className: 'secondary btn-sm',
                 onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
-              }, 'ตรวจสอบ')
+              }, icon('clipboard', 13), ' พิจารณาคำขอ')
             );
           } else if (w.targetTab === 'reviews' || w.action === 'นัดตรวจแปลง' || w.action === 'บันทึกตรวจ') {
             actionRow.append(
@@ -1376,7 +1345,7 @@ async function loadTab() {
                 type: 'button',
                 className: 'btn-sm secondary',
                 onclick: () => sharePlotRiskToLine(w)
-              }, icon('message', 13), ' แจ้งเตือน LINE')
+              }, icon('message', 13), ' แชร์ข้อความทาง LINE')
             );
           } else if (w.code === 'A-03' && w.severity === 'risk' && demoUser) {
             actionRow.append(
@@ -1389,7 +1358,7 @@ async function loadTab() {
                 type: 'button',
                 className: 'btn-sm secondary',
                 onclick: () => sharePlotRiskToLine(w)
-              }, icon('message', 13), ' แจ้งเตือน LINE')
+              }, icon('message', 13), ' แชร์ข้อความทาง LINE')
             );
           } else if (w.severity === 'risk') {
             actionRow.append(
@@ -1402,7 +1371,7 @@ async function loadTab() {
                 type: 'button',
                 className: 'btn-sm secondary',
                 onclick: () => sharePlotRiskToLine(w)
-              }, icon('message', 13), ' แจ้งเตือน LINE')
+              }, icon('message', 13), ' แชร์ข้อความทาง LINE')
             );
           } else {
             actionRow.append(
@@ -1439,7 +1408,7 @@ async function loadTab() {
                   return el('tr', {},
                     el('td', {}, el('b', { className: 'plot-code-tag' }, w.code)),
                     el('td', {}, w.farmer),
-                    el('td', {}, `${w.crop} (${w.conversion})`),
+                    el('td', {}, `${w.crop}${w.conversion ? ` (${w.conversion})` : ''}`),
                     el('td', {}, el('span', { className: badgeClass }, badgePrefix + w.status)),
                     el('td', {}, buildWatchlistActionButtons(w))
                   );
@@ -1465,7 +1434,7 @@ async function loadTab() {
                   ),
                   el('div', { className: 'watchlist-meta-item' },
                     icon('leaf', 14),
-                    el('span', {}, `${w.crop} • ${w.conversion}`)
+                    el('span', {}, `${w.crop}${w.conversion ? ` • ${w.conversion}` : ''}`)
                   )
                 ),
                 el('div', { className: 'watchlist-card-actions' },
@@ -1575,7 +1544,7 @@ async function loadTab() {
                   className: 'btn-sm secondary desktop-only',
                   onclick: () => window.print()
                 }, icon('printer', 14), ' พิมพ์รายงานตรวจกลุ่ม'),
-                el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'Demo Simulation' : 'ข้อมูลจริงจากระบบ')
+                el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'ข้อมูลตัวอย่าง (Demo)' : 'ข้อมูลจริงจากระบบ')
               )
             ),
             el('p', { className: 'muted card-lead' }, 'ระบบคัดกรองแปลงที่ต้องการการดูแลเร่งด่วน (ขาดการบันทึกเกิน 14 วัน / รออนุมัติปัจจัยการผลิต / ประวัติไม่สอดคล้อง) เพื่อให้เจ้าหน้าที่ ICS ติดตามได้ทันที'),
@@ -1599,30 +1568,32 @@ async function loadTab() {
         const hasPendingApp = pendingCount > 0;
 
         let statusTier = 'normal';
-        let statusBadgeText = '● แปลงปลอดภัยตามเกณฑ์มาตรฐาน PGS (อินทรีย์สมบูรณ์)';
-        let statusTitle = `สถานะแปลง ${myPlot?.plot_code || ''}: สอดคล้องตามมาตรฐานเกษตรอินทรีย์ครบถ้วน`;
+        let statusBadgeText = daysSince !== null
+          ? `● บันทึกล่าสุด ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`}`
+          : '● แปลงใหม่ รอเริ่มบันทึก';
+        let statusTitle = myPlot ? `แปลง ${myPlot.name}` : 'ภาพรวมแปลงปลูก';
         let statusDesc = daysSince !== null
-          ? `บันทึกกิจกรรมล่าสุดเมื่อ ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันที่แล้ว`} — บันทึกข้อมูลต่อเนื่องสม่ำเสมอ อยู่ในเกณฑ์ความปลอดภัยสูงของระบบควบคุมภายใน (ICS)`
-          : 'แปลงเริ่มต้น กรุณาบันทึกกิจกรรมการดูแลแปลงครั้งแรกเพื่อเริ่มต้นประวัติมาตรฐานอินทรีย์';
+          ? `บันทึกกิจกรรมล่าสุดเมื่อ ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`} • งานถัดไป: ตรวจสอบและบันทึกกิจกรรมการดูแลแปลงรอบถัดไป`
+          : 'ยังไม่มีประวัติกิจกรรม • งานถัดไป: แตะ "บันทึกกิจกรรมแปลง" เพื่อเริ่มต้นบันทึกข้อมูล';
         let alertAdvice = null;
 
         if (isOverdue) {
           statusTier = 'risk';
-          statusBadgeText = '● เสี่ยงหลุดเกณฑ์กลุ่ม (ขาดบันทึกเกิน 14 วัน)';
-          statusTitle = `แจ้งเตือนเร่งด่วน: แปลง ${myPlot?.plot_code || ''} ขาดการบันทึกกิจกรรมเกิน 14 วัน`;
-          statusDesc = `บันทึกล่าสุดเมื่อ ${daysSince !== null ? `${daysSince} วันที่แล้ว` : 'ยังไม่มีประวัติ'} ซึ่งเกินเกณฑ์ข้อกำหนด 14 วันของกลุ่มวิสาหกิจชุมชนผักไหม`;
-          alertAdvice = 'คำแนะนำ: แตะปุ่ม "บันทึกกิจกรรมแปลงด่วน" ด้านล่างทันที เพื่อป้องกันไม่ให้เจ้าหน้าที่ ICS ปรับลดสถานะความพร้อมของแปลงหรือสั่งกักกันผลผลิต';
+          statusBadgeText = `● ขาดบันทึกเกิน 14 วัน (${daysSince !== null ? `${daysSince} วันก่อน` : 'ยังไม่มีประวัติ'})`;
+          statusTitle = `แจ้งเตือน: แปลง ${myPlot?.name || ''} ขาดการบันทึกกิจกรรม`;
+          statusDesc = `บันทึกกิจกรรมล่าสุดเกิน 14 วัน • งานถัดไป: แตะ "บันทึกกิจกรรมแปลงด่วน" เพื่ออัปเดตการทำงานในแปลง`;
+          alertAdvice = 'คำแนะนำ: บันทึกกิจกรรมเพื่อรักษาความต่อเนื่องของข้อมูลและแจ้งความคืบหน้าให้เจ้าหน้าที่ ICS ทราบ';
         } else if (isWarning) {
           statusTier = 'warn';
-          statusBadgeText = `● ควรบันทึกกิจกรรมเพิ่ม (ผ่านมา ${daysSince} วัน)`;
-          statusTitle = `เตือนล่วงหน้า: แปลง ${myPlot?.plot_code || ''} ใกล้ครบกำหนดรอบบันทึก 14 วัน`;
-          statusDesc = `บันทึกกิจกรรมล่าสุดเมื่อ ${daysSince} วันที่แล้ว ขอแนะนำให้อัปเดตข้อมูลการดูแลแปลงเพื่อรักษาความต่อเนื่องของข้อมูล`;
-          alertAdvice = 'คำแนะนำ: แตะเลือกกิจกรรม เช่น ให้น้ำ ตรวจแปลง หรือกำจัดวัชพืช เพื่อบันทึกข้อมูลก่อนครบ 14 วัน';
+          statusBadgeText = `● บันทึกล่าสุด ${daysSince} วันก่อน`;
+          statusTitle = `เตือนล่วงหน้า: แปลง ${myPlot?.name || ''} ใกล้ครบ 14 วัน`;
+          statusDesc = `บันทึกกิจกรรมล่าสุด ${daysSince} วันก่อน • งานถัดไป: บันทึกกิจกรรมการดูแลแปลงก่อนครบกำหนด 14 วัน`;
+          alertAdvice = 'คำแนะนำ: บันทึกกิจกรรมการให้น้ำ ใส่ปุ๋ย หรือตรวจแปลงเพื่ออัปเดตข้อมูล';
         } else if (hasPendingApp) {
           statusTier = 'warn';
-          statusBadgeText = `● มีคำขอปัจจัยรอตรวจ ${pendingCount} รายการ`;
-          statusTitle = `สถานะแปลง ${myPlot?.plot_code || ''}: มีคำขอปัจจัยการผลิตรอการพิจารณาจาก ICS`;
-          statusDesc = 'คำขอปุ๋ย/น้ำหมักอินทรีย์อยู่ระหว่างเจ้าหน้าที่ตรวจสอบ ห้ามนำปัจจัยไปใช้ในแปลงก่อนได้รับการอนุมัติอย่างเป็นทางการ';
+          statusBadgeText = `● รอผลพิจารณาคำขอ (${pendingCount} รายการ)`;
+          statusTitle = `สถานะแปลง ${myPlot?.name || ''}: มีคำขอรอพิจารณา`;
+          statusDesc = `มีคำขอปัจจัยการผลิตรอการพิจารณาจากเจ้าหน้าที่ ICS ${pendingCount} รายการ • งานถัดไป: รอการอนุมัติก่อนนำปัจจัยไปใช้ในแปลงจริง`;
         }
 
         const statusBadgeClass = `badge-${statusTier}`;
@@ -1671,7 +1642,7 @@ async function loadTab() {
           )
         );
 
-        const currentMilestoneStep = isOverdue ? 1 : pendingCount > 0 ? 2 : revs.length > 0 ? 3 : 1;
+        const currentMilestoneStep = isOverdue ? 1 : pendingCount > 0 ? 2 : 1;
         const milestoneCard = el('div', { className: 'card milestone-card' },
           el('div', { className: 'row between' },
             el('h4', { className: 'milestone-header' }, icon('shield', 16), ' เส้นทางมาตรฐานเกษตรอินทรีย์ (PGS / ICS Milestones)'),
@@ -1685,16 +1656,14 @@ async function loadTab() {
           'แปลงปลูก': { icon: 'mapPin', color: 'kpi-emerald', unit: ' แปลง' },
           'กิจกรรม': { icon: 'calendar', color: 'kpi-forest', unit: ' รายการ' },
           'คำขอรอพิจารณา': { icon: 'clock', color: 'kpi-amber', unit: ' คำขอ' },
-          'ล็อตผลผลิต': { icon: 'package', color: 'kpi-forest', unit: ' ล็อต' },
-          'ผลตรวจแปลง': { icon: 'shield', color: 'kpi-emerald', unit: ' ครั้ง' }
+          'ล็อตผลผลิต': { icon: 'package', color: 'kpi-forest', unit: ' ล็อต' }
         };
 
         const farmerKpiGrid = el('div', { className: 'grid kpi-grid' },
           [['แปลงปลูก', plots.length],
            ['กิจกรรม', activities.length],
            ['คำขอรอพิจารณา', pendingCount],
-           ['ล็อตผลผลิต', lots.length],
-           ['ผลตรวจแปลง', revs.length]].map(([label, count]) => {
+           ['ล็อตผลผลิต', lots.length]].map(([label, count]) => {
             const meta = farmerStatMeta[label] || { icon: 'sprout', color: 'kpi-forest', unit: '' };
             return el('div', { className: 'card kpi-card' },
               el('div', { className: 'kpi-top' },
@@ -2024,7 +1993,7 @@ async function loadTab() {
             {
               label: 'สูตรน้ำหมักสะเดาไล่แมลง (ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน)',
               name: 'น้ำหมักสมุนไพรไล่แมลง (ทำเอง)',
-              details: 'สูตร: ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน ใช้ป้องกันหนอนเจาะฝักและเพลี้ยไฟ ปลอดสารเคมีสังเคราะห์ 100%'
+              details: 'สูตร: ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน ใช้ป้องกันหนอนเจาะฝักและเพลี้ยไฟ ตามเกณฑ์มาตรฐานเกษตรอินทรีย์ PGS'
             },
             {
               label: 'สูตรปุ๋ยหมักอินทรีย์บำรุงดิน (มูลวัวนมอินทรีย์ + แกลบดำ + จุลินทรีย์หน่อกล้วย)',
@@ -2099,25 +2068,11 @@ async function loadTab() {
         // ICS inline decision UI
         if (me.role === 'ics' && isPending) {
           let decisionForm = null;
-          const quickApproveBtn = el('button', {
+          const openDecideBtn = el('button', {
             type: 'button',
-            className: 'btn-sm',
-            onclick: async () => {
-              try {
-                await api(`/approvals/${item.id}`, 'PATCH', {
-                  status: 'approved',
-                  comment: 'ผ่านเกณฑ์มาตรฐานเกษตรอินทรีย์ PGS อนุญาตให้ใช้ในแปลงได้'
-                });
-                notify(`อนุมัติ "${item.input_name}" เรียบร้อย`);
-                await loadTab();
-              } catch (err) {
-                if (!err.handled) notify(err.message);
-              }
-            }
-          }, icon('check', 13), ' อนุมัติทันที');
-
-          const openDecideBtn = el('button', { type: 'button', className: 'secondary btn-sm' }, icon('clipboard', 13), ' ระบุความเห็น / ไม่อนุมัติ');
-          const actionRow = el('div', { className: 'row mt-10' }, quickApproveBtn, openDecideBtn);
+            className: 'btn-sm'
+          }, icon('clipboard', 13), ' พิจารณาคำขอ');
+          const actionRow = el('div', { className: 'row mt-10' }, openDecideBtn);
           box.append(actionRow);
 
           openDecideBtn.onclick = () => {
@@ -2131,7 +2086,7 @@ async function loadTab() {
             approveBtn.onclick = () => { selectedStatus = 'approved'; approveBtn.className = 'btn-sm'; rejectBtn.className = 'secondary btn-sm'; };
             rejectBtn.onclick = () => { selectedStatus = 'rejected'; rejectBtn.className = 'btn-sm danger-btn'; approveBtn.className = 'secondary btn-sm'; };
 
-            const commentArea = el('textarea', { placeholder: 'ระบุความเห็น ข้อแนะนำ หรือเหตุผลประกอบ เช่น อนุญาตให้ใช้สูตรใบสะเดาหมัก 7 วัน อัตรา 50 ซีซี ต่อน้ำ 20 ลิตร' });
+            const commentArea = el('textarea', { placeholder: 'ระบุความเห็น ข้อแนะนำ หรือเหตุผลประกอบ (จำเป็นกรณีไม่อนุมัติ)' });
             const confirmBtn = el('button', { type: 'submit', className: 'btn-sm' }, 'บันทึกผลการพิจารณา');
             const cancelBtn = el('button', {
               type: 'button',
@@ -2148,11 +2103,22 @@ async function loadTab() {
 
             decisionForm.addEventListener('submit', async e => {
               e.preventDefault();
+              const commentText = commentArea.value.trim();
+              if (selectedStatus === 'rejected' && !commentText) {
+                notify('กรุณาระบุเหตุผลกรณีไม่อนุมัติคำขอ');
+                commentArea.focus();
+                return;
+              }
+              const confirmMsg = selectedStatus === 'approved'
+                ? `ยืนยันการอนุมัติคำขอ "${item.input_name}" หรือไม่?`
+                : `ยืนยันการไม่อนุมัติคำขอ "${item.input_name}" หรือไม่?`;
+              if (!window.confirm(confirmMsg)) return;
+
               confirmBtn.disabled = true;
               try {
                 await api(`/approvals/${item.id}`, 'PATCH', {
                   status: selectedStatus,
-                  comment: commentArea.value.trim() || undefined,
+                  comment: commentText || undefined,
                 });
                 notify(`บันทึกผลการพิจารณาเป็น "${selectedStatus === 'approved' ? 'อนุมัติ' : 'ไม่อนุมัติ'}" เรียบร้อย`);
                 await loadTab();
@@ -2214,8 +2180,16 @@ async function loadTab() {
         nodes.push(box);
       }
     } else if (tab === 'reviews') {
-      const rows = await api('/reviews');
-      if (me.role === 'ics') {
+      if (me.role === 'farmer') {
+        nodes = [
+          el('div', { className: 'notice' },
+            el('b', {}, icon('shield', 15), ' ประวัติผลการตรวจประเมินแปลง'),
+            el('p', { className: 'muted' }, 'ผลตรวจจะแสดงที่นี่เมื่อระบบเปิดให้เกษตรกรดูได้ โดยปัจจุบันเจ้าหน้าที่ ICS เป็นผู้บันทึกผลการตรวจประเมินตามเกณฑ์มาตรฐานกลุ่ม')
+          ),
+          empty('ผลตรวจจะแสดงที่นี่เมื่อระบบเปิดให้เกษตรกรดูได้ หากมีข้อสงสัยเกี่ยวกับผลการตรวจแปลง กรุณาติดต่อเจ้าหน้าที่ ICS ผู้รับผิดชอบของคุณ')
+        ];
+      } else {
+        const rows = await api('/reviews');
         if (plots.length) {
           const noteArea = el('textarea', { name: 'note', required: true, placeholder: 'บันทึกรายละเอียดการตรวจแปลง ข้อสังเกต หรือข้อกำหนดให้เกษตรกรปรับปรุง' });
           const checklistItems = [
@@ -2254,54 +2228,54 @@ async function loadTab() {
         } else {
           nodes.push(el('div', { className: 'notice' }, 'ไม่พบแปลงปลูกที่สามารถตรวจได้'));
         }
-      }
 
-      nodes.push(el('div', { className: 'notice' },
-        el('b', {}, icon('shield', 15), me.role === 'farmer' ? ' ประวัติผลการตรวจประเมินแปลงจากเจ้าหน้าที่ ICS' : ' ประวัติการตรวจประเมินแปลงทั้งหมด'),
-        el('p', { className: 'muted' }, me.role === 'farmer' ? 'รายงานผลการตรวจรับรองแปลงอินทรีย์โดยเจ้าหน้าที่ ICS ประจำกลุ่มของคุณ' : `บันทึกแล้วทั้งหมด ${rows.length} ครั้ง`)
-      ));
+        nodes.push(el('div', { className: 'notice' },
+          el('b', {}, icon('shield', 15), ' ประวัติการตรวจประเมินแปลงทั้งหมด'),
+          el('p', { className: 'muted' }, `บันทึกแล้วทั้งหมด ${rows.length} ครั้ง`)
+        ));
 
-      if (me.role !== 'farmer' && rows.length) {
-        nodes.push(
-          el('div', { className: 'row between search-actions-row' },
-            el('small', { className: 'muted' }, 'ข้อมูลประวัติการตรวจรับรองตามเกณฑ์มาตรฐาน PGS/ICS'),
-            el('button', {
-              type: 'button',
-              className: 'btn-sm secondary',
-              onclick: () => {
-                const headers = ['ลำดับ', 'ชื่อแปลง', 'ผลตรวจ', 'บันทึกและข้อเสนอแนะ', 'วันที่ตรวจ'];
-                const dataRows = rows.map(r => [
-                  r.id,
-                  r.plot_name || '-',
-                  r.result || '-',
-                  r.note || '-',
-                  dated(r.created_at)
-                ]);
-                exportCsv(`pakmaii-inspections-${new Date().toISOString().slice(0, 10)}.csv`, headers, dataRows);
-              }
-            }, icon('fileText', 13), ' ส่งออกผลตรวจ (CSV/Excel)')
-          )
-        );
-      }
+        if (rows.length) {
+          nodes.push(
+            el('div', { className: 'row between search-actions-row' },
+              el('small', { className: 'muted' }, 'ข้อมูลประวัติการตรวจรับรองตามเกณฑ์มาตรฐาน PGS/ICS'),
+              el('button', {
+                type: 'button',
+                className: 'btn-sm secondary',
+                onclick: () => {
+                  const headers = ['ลำดับ', 'ชื่อแปลง', 'ผลตรวจ', 'บันทึกและข้อเสนอแนะ', 'วันที่ตรวจ'];
+                  const dataRows = rows.map(r => [
+                    r.id,
+                    r.plot_name || '-',
+                    r.result || '-',
+                    r.note || '-',
+                    dated(r.created_at)
+                  ]);
+                  exportCsv(`pakmaii-inspections-${new Date().toISOString().slice(0, 10)}.csv`, headers, dataRows);
+                }
+              }, icon('fileText', 13), ' ส่งออกผลตรวจ (CSV/Excel)')
+            )
+          );
+        }
 
-      if (!rows.length) {
-        nodes.push(empty(me.role === 'farmer' ? 'ยังไม่มีประวัติการตรวจประเมินแปลงจากเจ้าหน้าที่ ICS' : 'ยังไม่มีบันทึกผลตรวจแปลง'));
-      }
+        if (!rows.length) {
+          nodes.push(empty('ยังไม่มีบันทึกผลตรวจแปลง'));
+        }
 
-      for (const item of rows) {
-        const isPass = item.result === 'ผ่าน';
-        const pillClass = isPass ? 'pill success' : 'pill warn';
-        const resultIcon = isPass ? icon('checkCircle', 12) : icon('alert', 12);
-        const box = card(
-          el('div', { className: 'row between' },
-            el('b', {}, item.plot_name),
-            el('span', { className: pillClass }, resultIcon, item.result)
-          ),
-          item.farmer_name ? el('p', { className: 'muted' }, `เกษตรกร: ${item.farmer_name}`) : null,
-          el('p', { className: 'pre-line-text' }, item.note),
-          el('small', { className: 'muted' }, `ผู้ตรวจ: ${item.reviewer_name || 'เจ้าหน้าที่ ICS'} • ${dated(item.created_at)}`)
-        );
-        nodes.push(box);
+        for (const item of rows) {
+          const isPass = item.result === 'ผ่าน';
+          const pillClass = isPass ? 'pill success' : 'pill warn';
+          const resultIcon = isPass ? icon('checkCircle', 12) : icon('alert', 12);
+          const box = card(
+            el('div', { className: 'row between' },
+              el('b', {}, item.plot_name),
+              el('span', { className: pillClass }, resultIcon, item.result)
+            ),
+            item.farmer_name ? el('p', { className: 'muted' }, `เกษตรกร: ${item.farmer_name}`) : null,
+            el('p', { className: 'pre-line-text' }, item.note),
+            el('small', { className: 'muted' }, `ผู้ตรวจ: ${item.reviewer_name || 'เจ้าหน้าที่ ICS'} • ${dated(item.created_at)}`)
+          );
+          nodes.push(box);
+        }
       }
     } else if (tab === 'risks') {
       const rows = await api('/risks');
