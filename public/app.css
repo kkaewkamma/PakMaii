@@ -2,6 +2,26 @@
    PakMaii — Internal Control System (ICS) & Organic Compliance Platform
    Ready to Grow Design System: "สมุดบันทึกแปลงที่ตรวจสอบได้"
    Natural Forest Green, Warm Ivory, Surface White & Elegant Minimalism
+
+   TABLE OF CONTENTS:
+   01. Typography & Font Declarations (IBM Plex Sans Thai 400, 500, 600)
+   02. Design Tokens (:root CSS Custom Properties)
+   03. Base CSS & Element Defaults (tabular-nums, touch target minimums)
+   04. Enterprise App Header (Navbar)
+   05. Main Layout & Hero Workspace Bar
+   06. Navigation Tabs (Desktop Sidebar & Mobile Segmented Control)
+   07. Cards, Grid & KPI Metrics
+   08. 14-Day Rhythm Track ("สมุดบันทึกแปลงที่ตรวจสอบได้")
+   09. Watch-list & Tabular Layout
+   10. Buttons & Interactive Controls (44px Minimum Accessible Touch Target)
+   11. Forms & Inputs (44px Height & High Contrast)
+   12. Traceability Certificate / Passport Modal & Public QR Proposal
+   13. Login Experience (Demo-First & Enterprise Auth Form)
+   14. Skeleton Loading State
+   15. Responsive Visibility Helpers (Desktop vs Mobile)
+   16. Mobile Dock Navigation & Touch Accessibility (4+More Pattern)
+   17. ICS Audit Assistant (Checklists, CAPA & Audit Log)
+   18. Print / PDF Export Styles (Official Audit & Traceability Certificate)
    ========================================================================== */
 
 /* Self-hosted OFL IBM Plex Sans Thai (Weights 400, 500, 600) */

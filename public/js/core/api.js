@@ -1,6 +1,6 @@
 'use strict';
 
-import { token, config, demoUser, setConfig, demoBackend, $ } from './state.js';
+import { token, config, demoUser, setConfig, demoBackend, demoSession, $ } from './state.js';
 import { el, notify } from './dom.js';
 
 export async function loadConfig() {
@@ -14,7 +14,8 @@ export async function loadConfig() {
 
 export async function api(path, method = 'GET', body) {
   // Demo mode: answered locally, never sent to the backend (no token, no Admin API).
-  if (demoUser) return demoBackend.request(demoUser, path, method, body ?? {});
+  const activeDemo = demoUser || (demoSession && !token ? demoSession.restore() : null);
+  if (activeDemo) return demoBackend.request(activeDemo, path, method, body ?? {});
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;

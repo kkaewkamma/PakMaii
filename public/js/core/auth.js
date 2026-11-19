@@ -21,7 +21,6 @@ export function clearSession() {
   setPlots([]);
   setLastInvitation(null);
   setDemoUser(null);
-  demoUser = null;
   setTab('home');
   sessionStorage.removeItem('token');
   demoSession?.logout();
@@ -40,7 +39,6 @@ export async function ensureLiff() {
 
 export async function acceptLogin(data) {
   setDemoUser(null);
-  demoUser = null;
   demoSession?.logout();
   sessionStorage.removeItem('admin_login');
   setToken(data.token);
@@ -56,7 +54,6 @@ export async function acceptDemoLogin(role, code) {
   sessionStorage.removeItem('logged_out');
   const user = demoSession.login(role, code);
   setDemoUser(user);
-  demoUser = user;
   setLoginRole(user.role);
   setTab('home');
   if (typeof window.__pakMaiiStart === 'function') {

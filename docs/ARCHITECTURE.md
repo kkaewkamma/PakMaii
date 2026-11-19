@@ -8,15 +8,20 @@
 
 ```mermaid
 flowchart LR
-  subgraph Client["Frontend (Vanilla JS / CSS / LIFF)"]
+  subgraph Client["Frontend (Vanilla JS ES Modules / CSS / LIFF)"]
     HTML["public/index.html (2.7 KB)"]
-    APP["public/app.js (200.8 KB monolith)"]
-    CSS["public/app.css (70.0 KB)"]
-    DEMO["public/demo.js (55.3 KB sandbox)"]
+    APP["public/app.js (Main Orchestrator)"]
+    CORE["public/js/core/ (icons, dom, state, api, auth, photo, rhythm)"]
+    VIEWS["public/js/views/ (admin, ics, passport)"]
+    CSS["public/app.css (18 Structured Sections)"]
+    DEMO["public/demo.js (Client Sandbox)"]
     HDR["public/_headers (Strict CSP)"]
     HTML --> APP
     HTML --> CSS
     HTML --> DEMO
+    APP --> CORE
+    APP --> VIEWS
+    VIEWS --> CORE
   end
 
   subgraph Shared["Runtime-Agnostic Shared Modules"]
@@ -103,11 +108,10 @@ flowchart LR
 
 ## 4. แผน Incremental Refactoring Roadmap
 
-| Step | เป้าหมาย | สถานะ | ขอบเขตและข้อควรระวัง |
+| Step | เป้าหมาย | สถานะ | ขอบเขตและผลการดำเนินการ |
 |---|---|---|---|
-| **Step 1** | **Extract Shared Validation & Audit Domain (`shared/validation.js`, `shared/audit-domain.js`)** | **เสร็จแล้ว** | แยก validation, `HttpError`, constants และ risk/audit formatters ออกจาก `worker/index.js`, `worker/repository/d1.js`, `server.js`; เพิ่ม `test/shared-contract.test.js` และตรวจ `wrangler deploy --dry-run` |
-| **Step 2** | Split Frontend Core (`public/js/core/{dom,icons,api,auth}.js`) + preserve `frontend-security.test.js` | แผนถัดไป | เปลี่ยน `<script defer src="/app.js">` เป็น `<script type="module" src="/js/main.js">`, อัปเดต `public/_headers` (ยังคง `'self'`), อัปเดต `frontend-security.test.js` ให้ตรวจทุกไฟล์ใน `public/js/` |
-| **Step 3** | Split Frontend Views by Role (`public/js/farmer/*`, `ics/*`, `admin/*`, `shared/*`) | รอดำเนินการ | ย้าย Farmer Wizard, ICS Split-View/Audit Assistant, Admin Overview, Lot Passport เข้าเป็นโมดูลย่อย |
-| **Step 4** | Modularize `public/app.css` into ordered `@import` partials (`tokens`, `layout`, `components`, `roles`, `print`) | รอดำเนินการ | แยก section ชัดเจน, ยืนยัน CSP `style-src 'self'` โหลด stylesheet ย่อยได้ทั้งหมด และคงกฎ 0 `linear-gradient` + `tabular-nums` |
-| **Step 5** | Decompose `server.js` into Express `routes/` and SQLite `repositories/` parity | รอดำเนินการ | ย้าย route handlers และ queries ใน `server.js` ให้โครงสร้างตรงกับ `worker/repository/d1.js` |
-| **Step 6** | Expand Dual-Runtime Contract Tests & Playwright E2E Suite | รอดำเนินการ | รัน `test/worker-contract.test.js` บน Node 20/22 LTS ควบคู่ Worker + Playwright E2E (Demo mode + Local Express + LIFF viewport emulation) |
+| **Step 1** | **Extract Shared Validation & Audit Domain (`shared/validation.js`, `shared/audit-domain.js`)** | **เสร็จแล้ว (PR #9)** | แยก validation, `HttpError`, constants และ risk/audit formatters ออกจาก `worker/index.js`, `worker/repository/d1.js`, `server.js`; เพิ่ม `test/shared-contract.test.js` ตรวจ contract parity |
+| **Step 2** | **Split Frontend Core Modules (`public/js/core/{icons,dom,state,api,auth,photo,rhythm}.js`)** | **เสร็จแล้ว (PR #10)** | แยก DOM helpers, icon SVG builder, state bindings, LIFF auth memoization, photo compression/upload, 14-day rhythm track; อัปเดต `index.html` เป็น ES module `<script type="module" src="/app.js"></script>`; อัปเดต security test ครอบคลุม zero DOM injection sinks |
+| **Step 3** | **Split Frontend Views by Domain (`public/js/views/{admin,ics,passport}.js`)** | **เสร็จแล้ว (PR #11)** | ย้าย Admin Overview/RBAC/Audit Logs, ICS Split-View Reviews/Risks Dashboard, และ Story Passport/Traceability Modal เข้าเป็น domain view modules ทำให้ `app.js` ลดขนาดลงมากกว่า 1,400 บรรทัด |
+| **Step 4** | **Modularize & Structure `public/app.css` with Comprehensive Table of Contents** | **เสร็จแล้ว** | จัดระเบียบ stylesheet 3,200 บรรทัดออกเป็น 18 ส่วนชัดเจน (Tokens, Base, Navbar, Layout, Tabs, Cards, Rhythm Track, Inputs, Buttons, Passports, Login, Skeleton, Dock, Audit Assistant, Print) รักษา design tokens และ 0 `linear-gradient` |
+| **Step 5 & 6** | **Introduce Playwright Browser E2E Tests & Dual-Runtime Parity** | **เสร็จแล้ว** | เพิ่ม `@playwright/test` พร้อม mock test static server (`scripts/test-static-server.js`) รองรับ `Desktop` (1280x720) และ `Mobile-LIFF` (390x844 iPhone 13 with touch/safe-area emulation); ครอบคลุม Farmer 3-Step Wizard, ICS Risks Dashboard, และ Mobile Dock 4+More pattern (ผ่าน 6/6 tests) |
