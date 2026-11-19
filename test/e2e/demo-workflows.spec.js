@@ -16,9 +16,14 @@ test.describe('PakMaii Critical Workflows (Demo-First & LIFF Compatibility)', ()
     await page.goto('/');
     await expect(page).toHaveTitle(/Ready to Grow/);
 
-    // 2. Verify Demo Login Form is visible
+    // 2. Verify Demo Login Form & Senior Large-Text Toggle are visible
     const loginForm = page.locator('#demoLoginForm');
     await expect(loginForm).toBeVisible();
+    const fontScaleToggle = page.locator('#fontScaleToggle');
+    await expect(fontScaleToggle).toBeVisible();
+    await fontScaleToggle.click();
+    await expect(page.locator('html')).toHaveClass(/large-text/);
+    await expect(fontScaleToggle).toHaveAttribute('aria-pressed', 'true');
 
     // 3. Fill F-STG-001 and submit demo login
     await page.fill('#demoCode', 'F-STG-001');
