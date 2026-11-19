@@ -2973,6 +2973,102 @@ body.is-login .hero {
 }
 
 /* ==========================================================================
+   Phase 3: ICS Audit Assistant (Checklists, CAPA & Audit Log)
+   ========================================================================== */
+.audit-disclaimer {
+  border-left: 4px solid var(--amber-700);
+}
+
+.audit-checklist-panel {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--sage-50);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+}
+
+.audit-checklist-item {
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+}
+
+.audit-checklist-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.audit-checklist-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 639px) {
+  .audit-checklist-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+.audit-capa-box {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+}
+
+.audit-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.audit-inline-toggle input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.capa-card {
+  border-left: 4px solid var(--amber-700);
+}
+
+.capa-card.capa-overdue {
+  border-left-color: var(--red-700);
+}
+
+.capa-card.capa-resolved {
+  border-left-color: var(--ok-700);
+}
+
+.capa-update-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border);
+}
+
+.audit-subform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.pill-list-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ==========================================================================
    Print / PDF Export Styles (Official Audit & Traceability Certificate)
    ========================================================================== */
 @media print {

@@ -234,3 +234,14 @@ test('Phase 2 photo evidence: camera/gallery inputs, authenticated upload & view
   assert.match(script, /ตัวอย่างภาพในโหมดทดลอง \(เก็บเฉพาะในเครื่องนี้ ไม่ได้อัปโหลดขึ้นเซิร์ฟเวอร์\)/);
   assert.match(script, /ดูภาพหลักฐานที่อัปโหลด/);
 });
+
+test('Phase 3 ICS Audit Assistant: separates PGS/EU_ORGANIC/FAIRTRADE, non-certification disclaimer, CAPA & audit logs', () => {
+  for (const std of ['PGS', 'EU_ORGANIC', 'FAIRTRADE']) {
+    assert.ok(script.includes(std), `Must reference separate standard ${std}`);
+  }
+  assert.match(script, /ไม่ใช่การรับรองมาตรฐานเกษตรอินทรีย์อย่างเป็นทางการ/);
+  assert.match(script, /รอการยืนยันเกณฑ์/);
+  assert.match(script, /\/corrective-actions/);
+  assert.match(script, /\/checklists/);
+  assert.match(script, /\/audit-logs/);
+});

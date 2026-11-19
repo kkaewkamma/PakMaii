@@ -177,12 +177,52 @@ export class D1Repository {
     return result.meta.last_row_id;
   }
 
-  async createReview(plotId, reviewerId, resultText, note) {
-    const results = await this.batch([
-      this.statement('INSERT INTO reviews(plot_id,reviewer_id,result,note) VALUES(?,?,?,?)', plotId, reviewerId, resultText, note),
-      this.statement("INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json) VALUES(?,'review.created','review',CAST(last_insert_rowid() AS TEXT),?)", reviewerId, JSON.stringify({ plotId, result: resultText })),
-    ]);
-    return results[0].meta.last_row_id;
+  findActiveIcsUser(id) {
+    return this.first("SELECT id,name,role,status FROM users WHERE id=? AND role='ics' AND status='active'", id);
+  }
+
+  async createReview(plotId, reviewerId, resultText, note, { standardCode = null, checklistId = null, checklistResults = null, findings = [] } = {}) {
+    const reviewRes = await this.run(
+      'INSERT INTO reviews(plot_id,reviewer_id,result,note) VALUES(?,?,?,?)',
+      plotId, reviewerId, resultText, note
+    );
+    const reviewId = reviewRes.meta.last_row_id;
+
+    const followUp = [];
+    if (standardCode || checklistId || (Array.isArray(checklistResults) && checklistResults.length)) {
+      followUp.push(this.statement(
+        'INSERT INTO review_assessments(review_id,standard_code,checklist_id,checklist_results_json) VALUES(?,?,?,?)',
+        reviewId,
+        standardCode || 'PGS',
+        checklistId ?? null,
+        JSON.stringify(Array.isArray(checklistResults) ? checklistResults : [])
+      ));
+    }
+    followUp.push(this.statement(
+      "INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json) VALUES(?,'review.created','review',?,?)",
+      reviewerId,
+      String(reviewId),
+      JSON.stringify({ plotId, result: resultText, ...(standardCode ? { standardCode } : {}), ...(findings.length ? { findingsCount: findings.length } : {}) })
+    ));
+    await this.batch(followUp);
+
+    const correctiveActionIds = [];
+    for (const item of findings) {
+      const actionRes = await this.createCorrectiveAction({
+        plotId,
+        reviewId,
+        standardCode: item.standardCode || standardCode || 'PGS',
+        severity: item.severity || 'medium',
+        finding: item.finding,
+        actionRequired: item.actionRequired,
+        responsibleUserId: item.responsibleUserId ?? reviewerId,
+        dueDate: item.dueDate,
+        createdBy: reviewerId,
+      });
+      correctiveActionIds.push(actionRes.id);
+    }
+
+    return { id: reviewId, correctiveActionIds };
   }
 
   async createAdminManagedUser(actorId, name, role, credential) {
@@ -367,25 +407,302 @@ export class D1Repository {
     return this.all('SELECT l.*,p.name plot_name FROM lots l JOIN plots p ON p.id=l.plot_id WHERE p.owner_id=? ORDER BY l.id DESC', user.id);
   }
 
+  parseJsonSafe(raw, fallback) {
+    if (!raw || typeof raw !== 'string') return fallback;
+    try { return JSON.parse(raw); } catch { return fallback; }
+  }
+
+  formatChecklist(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      standard_code: row.standard_code,
+      title: row.title,
+      description: row.description || '',
+      items: this.parseJsonSafe(row.items_json, []),
+      validation_status: row.validation_status,
+      is_active: Boolean(row.is_active),
+      created_by: row.created_by ?? null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  }
+
+  async listChecklists({ standardCode = null, includeInactive = false } = {}) {
+    const clauses = [];
+    const params = [];
+    if (standardCode) { clauses.push('standard_code=?'); params.push(standardCode); }
+    if (!includeInactive) clauses.push('is_active=1');
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const rows = await this.all(`SELECT * FROM inspection_checklists ${where} ORDER BY standard_code, id`, ...params);
+    return rows.map(row => this.formatChecklist(row));
+  }
+
+  async findChecklist(id) {
+    const row = await this.first('SELECT * FROM inspection_checklists WHERE id=?', id);
+    return this.formatChecklist(row);
+  }
+
+  async createChecklist({ actorId, standardCode, title, description = '', items, validationStatus = 'draft_unvalidated' }) {
+    const res = await this.run(
+      'INSERT INTO inspection_checklists(standard_code,title,description,items_json,validation_status,created_by) VALUES(?,?,?,?,?,?)',
+      standardCode, title, description, JSON.stringify(items), validationStatus, actorId
+    );
+    const id = res.meta.last_row_id;
+    await this.run(
+      "INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json) VALUES(?,'checklist.created','inspection_checklist',?,?)",
+      actorId, String(id), JSON.stringify({ standardCode, validationStatus, itemCount: items.length })
+    );
+    return this.findChecklist(id);
+  }
+
+  async updateChecklist(id, actorId, updates) {
+    const sets = [];
+    const params = [];
+    if (Object.hasOwn(updates, 'title')) { sets.push('title=?'); params.push(updates.title); }
+    if (Object.hasOwn(updates, 'description')) { sets.push('description=?'); params.push(updates.description); }
+    if (Object.hasOwn(updates, 'items')) { sets.push('items_json=?'); params.push(JSON.stringify(updates.items)); }
+    if (Object.hasOwn(updates, 'is_active')) { sets.push('is_active=?'); params.push(updates.is_active ? 1 : 0); }
+    if (Object.hasOwn(updates, 'validation_status')) { sets.push('validation_status=?'); params.push(updates.validation_status); }
+    sets.push('updated_at=CURRENT_TIMESTAMP');
+    await this.batch([
+      this.statement(`UPDATE inspection_checklists SET ${sets.join(',')} WHERE id=?`, ...params, id),
+      this.statement(
+        "INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json) VALUES(?,'checklist.updated','inspection_checklist',?,?)",
+        actorId, String(id), JSON.stringify({ fields: Object.keys(updates) })
+      ),
+    ]);
+    return this.findChecklist(id);
+  }
+
+  findCorrectiveAction(id) {
+    return this.first('SELECT * FROM corrective_actions WHERE id=?', id);
+  }
+
+  async findCorrectiveActionDetail(id) {
+    const row = await this.first(`SELECT ca.*,p.name plot_name,u.name farmer_name,ru.name responsible_name,
+      r.result review_result,
+      CASE WHEN ca.status!='resolved' AND ca.due_date<date('now') THEN 1 ELSE 0 END is_overdue
+      FROM corrective_actions ca
+      JOIN plots p ON p.id=ca.plot_id
+      JOIN users u ON u.id=p.owner_id
+      JOIN users ru ON ru.id=ca.responsible_user_id
+      LEFT JOIN reviews r ON r.id=ca.review_id
+      WHERE ca.id=?`, id);
+    return row ? { ...row, is_overdue: Boolean(row.is_overdue) } : null;
+  }
+
+  async listCorrectiveActions(user, { status = null, plotId = null, standardCode = null } = {}) {
+    const clauses = [];
+    const params = [];
+    let assignmentJoin = '';
+    if (user.role === 'ics') {
+      assignmentJoin = 'JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL';
+      params.push(user.id);
+    }
+    if (status) { clauses.push('ca.status=?'); params.push(status); }
+    if (plotId) { clauses.push('ca.plot_id=?'); params.push(plotId); }
+    if (standardCode) { clauses.push('ca.standard_code=?'); params.push(standardCode); }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const rows = await this.all(`SELECT ca.*,p.name plot_name,u.name farmer_name,ru.name responsible_name,
+      r.result review_result,
+      CASE WHEN ca.status!='resolved' AND ca.due_date<date('now') THEN 1 ELSE 0 END is_overdue
+      FROM corrective_actions ca
+      JOIN plots p ON p.id=ca.plot_id
+      JOIN users u ON u.id=p.owner_id
+      JOIN users ru ON ru.id=ca.responsible_user_id
+      LEFT JOIN reviews r ON r.id=ca.review_id
+      ${assignmentJoin}
+      ${where}
+      ORDER BY CASE ca.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END, ca.due_date ASC, ca.id DESC`, ...params);
+    return rows.map(row => ({ ...row, is_overdue: Boolean(row.is_overdue) }));
+  }
+
+  async createCorrectiveAction({ plotId, reviewId = null, standardCode = 'PGS', severity = 'medium', finding, actionRequired, responsibleUserId, dueDate, createdBy }) {
+    const results = await this.batch([
+      this.statement(
+        `INSERT INTO corrective_actions(plot_id,review_id,standard_code,severity,finding,action_required,responsible_user_id,due_date,created_by)
+         VALUES(?,?,?,?,?,?,?,?,?)`,
+        plotId, reviewId, standardCode, severity, finding, actionRequired, responsibleUserId, dueDate, createdBy
+      ),
+      this.statement(
+        "INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json) VALUES(?,'corrective_action.created','corrective_action',CAST(last_insert_rowid() AS TEXT),?)",
+        createdBy, JSON.stringify({ plotId, reviewId, standardCode, severity, dueDate, responsibleUserId })
+      ),
+    ]);
+    return this.findCorrectiveActionDetail(results[0].meta.last_row_id);
+  }
+
+  async updateCorrectiveAction(id, actorId, existing, updates) {
+    const sets = [];
+    const params = [];
+    if (Object.hasOwn(updates, 'status')) {
+      sets.push('status=?');
+      params.push(updates.status);
+      if (updates.status === 'resolved') sets.push('resolved_at=CURRENT_TIMESTAMP');
+      else sets.push('resolved_at=NULL');
+    }
+    if (Object.hasOwn(updates, 'resolution_note')) { sets.push('resolution_note=?'); params.push(updates.resolution_note); }
+    if (Object.hasOwn(updates, 'due_date')) { sets.push('due_date=?'); params.push(updates.due_date); }
+    if (Object.hasOwn(updates, 'severity')) { sets.push('severity=?'); params.push(updates.severity); }
+    if (Object.hasOwn(updates, 'responsible_user_id')) { sets.push('responsible_user_id=?'); params.push(updates.responsible_user_id); }
+    if (Object.hasOwn(updates, 'finding')) { sets.push('finding=?'); params.push(updates.finding); }
+    if (Object.hasOwn(updates, 'action_required')) { sets.push('action_required=?'); params.push(updates.action_required); }
+    sets.push('updated_at=CURRENT_TIMESTAMP');
+    const nextStatus = updates.status ?? existing.status;
+    await this.batch([
+      this.statement(`UPDATE corrective_actions SET ${sets.join(',')} WHERE id=?`, ...params, id),
+      this.statement(
+        "INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json) VALUES(?,'corrective_action.updated','corrective_action',?,?)",
+        actorId, String(id), JSON.stringify({ plotId: existing.plot_id, fromStatus: existing.status, toStatus: nextStatus })
+      ),
+    ]);
+    return this.findCorrectiveActionDetail(id);
+  }
+
+  async listAuditLogs(user) {
+    const rows = user.role === 'admin'
+      ? await this.all(`SELECT l.id,l.actor_user_id,u.name actor_name,l.event_type,l.target_type,l.target_id,l.metadata_json,l.created_at
+          FROM audit_logs l LEFT JOIN users u ON u.id=l.actor_user_id ORDER BY l.id DESC LIMIT 100`)
+      : await this.all(`SELECT l.id,l.actor_user_id,u.name actor_name,l.event_type,l.target_type,l.target_id,l.metadata_json,l.created_at
+          FROM audit_logs l LEFT JOIN users u ON u.id=l.actor_user_id
+          WHERE l.actor_user_id=?
+            AND l.event_type IN ('review.created','approval.reviewed','corrective_action.created','corrective_action.updated','checklist.created','checklist.updated','evidence.uploaded')
+          ORDER BY l.id DESC LIMIT 100`, user.id);
+    return rows.map(row => ({
+      id: row.id,
+      actor_user_id: row.actor_user_id,
+      actor_name: row.actor_name || null,
+      event_type: row.event_type,
+      target_type: row.target_type,
+      target_id: row.target_id,
+      metadata: this.parseJsonSafe(row.metadata_json, {}),
+      created_at: row.created_at,
+    }));
+  }
+
   async listRisks(userId) {
-    const pending = await this.all(`SELECT a.id,a.input_name,p.name plot_name,'pending' type FROM approvals a JOIN plots p ON p.id=a.plot_id
-      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL WHERE a.status='pending'`, userId);
-    const inactive = await this.all(`SELECT p.id,p.name plot_name,'inactive' type FROM plots p
+    const pendingRows = await this.all(`SELECT a.id,a.plot_id,a.input_name,p.name plot_name,u.name farmer_name
+      FROM approvals a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=p.owner_id
+      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+      WHERE a.status='pending'`, userId);
+    const pending = pendingRows.map(row => ({
+      ...row,
+      type: 'pending',
+      severity: 'medium',
+      title: 'คำขอใช้ปัจจัยการผลิตรอพิจารณา',
+      explanation: `คำขอ "${row.input_name}" รอเจ้าหน้าที่ ICS พิจารณาก่อนนำไปใช้ในแปลง`,
+      recommended_tab: 'approval',
+    }));
+
+    const inactiveRows = await this.all(`SELECT p.id,p.id plot_id,p.name plot_name,u.name farmer_name
+      FROM plots p JOIN users u ON u.id=p.owner_id
       JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
       WHERE NOT EXISTS (SELECT 1 FROM activities a WHERE a.plot_id=p.id AND a.activity_date>=date('now','-14 days'))`, userId);
-    return [...pending, ...inactive];
+    const inactive = inactiveRows.map(row => ({
+      ...row,
+      type: 'inactive',
+      severity: 'high',
+      title: 'ขาดบันทึกกิจกรรมเกิน 14 วัน',
+      explanation: 'ไม่พบบันทึกกิจกรรมการดูแลแปลงติดต่อกันเกิน 14 วัน ควรติดตามหรือลงตรวจแปลง',
+      recommended_tab: 'record',
+    }));
+
+    let missingEvidence = [];
+    try {
+      const missingRows = await this.all(`SELECT p.id,p.id plot_id,p.name plot_name,u.name farmer_name,COUNT(*) missing_count
+        FROM activities a
+        JOIN plots p ON p.id=a.plot_id
+        JOIN users u ON u.id=p.owner_id
+        JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+        WHERE a.activity_date>=date('now','-30 days')
+          AND (a.photo_url IS NULL OR TRIM(a.photo_url)='')
+          AND NOT EXISTS (SELECT 1 FROM photo_evidence pe WHERE pe.entity_type='activity' AND pe.entity_id=a.id)
+        GROUP BY p.id,p.name,u.name`, userId);
+      missingEvidence = missingRows.map(row => ({
+        ...row,
+        type: 'missing_evidence',
+        severity: row.missing_count >= 3 ? 'medium' : 'low',
+        title: 'กิจกรรมขาดภาพถ่ายหลักฐาน',
+        explanation: `พบ ${row.missing_count} กิจกรรมในรอบ 30 วันล่าสุดที่ยังไม่มีภาพหลักฐานแนบประกอบ`,
+        recommended_tab: 'record',
+      }));
+    } catch (err) {
+      if (!/no such table: photo_evidence/i.test(String(err?.message))) throw err;
+    }
+
+    let actionRisks = [];
+    try {
+      const actionRows = await this.all(`SELECT ca.id,ca.plot_id,ca.standard_code,ca.severity,ca.finding,ca.due_date,ca.status,
+        p.name plot_name,u.name farmer_name,ru.name responsible_name,
+        CASE WHEN ca.due_date<date('now') THEN 1 ELSE 0 END is_overdue
+        FROM corrective_actions ca
+        JOIN plots p ON p.id=ca.plot_id
+        JOIN users u ON u.id=p.owner_id
+        JOIN users ru ON ru.id=ca.responsible_user_id
+        JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+        WHERE ca.status IN ('open','in_progress')`, userId);
+      actionRisks = actionRows.map(row => {
+        const overdue = Boolean(row.is_overdue);
+        return {
+          id: row.id,
+          plot_id: row.plot_id,
+          plot_name: row.plot_name,
+          farmer_name: row.farmer_name,
+          standard_code: row.standard_code,
+          due_date: row.due_date,
+          responsible_name: row.responsible_name,
+          type: overdue ? 'overdue_action' : 'open_action',
+          severity: overdue ? 'high' : (row.severity === 'high' ? 'high' : 'medium'),
+          title: overdue ? 'เกินกำหนดแก้ไขปรับปรุง (CAPA)' : 'รายการแก้ไขปรับปรุงรอดำเนินการ',
+          explanation: overdue
+            ? `ข้อบกพร่อง "${row.finding}" เกินกำหนดวันที่ ${row.due_date} (มาตรฐาน ${row.standard_code})`
+            : `ข้อบกพร่อง "${row.finding}" กำหนดแก้ไขภายในวันที่ ${row.due_date} (มาตรฐาน ${row.standard_code})`,
+          recommended_tab: 'reviews',
+        };
+      });
+    } catch (err) {
+      if (!/no such table: corrective_actions/i.test(String(err?.message))) throw err;
+    }
+
+    const severityRank = { high: 0, medium: 1, low: 2 };
+    return [...actionRisks, ...inactive, ...pending, ...missingEvidence]
+      .sort((a, b) => (severityRank[a.severity] ?? 3) - (severityRank[b.severity] ?? 3));
   }
 
   async listReviews(userId) {
-    const withEvidence = `SELECT r.*,p.name plot_name,
+    const fullQuery = `SELECT r.*,p.name plot_name,u.name farmer_name,rv.name reviewer_name,
+      (SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id,
+      ra.standard_code,ra.checklist_id,ra.checklist_results_json,
+      (SELECT COUNT(*) FROM corrective_actions ca WHERE ca.review_id=r.id AND ca.status!='resolved') open_actions_count,
+      (SELECT COUNT(*) FROM corrective_actions ca WHERE ca.review_id=r.id) total_actions_count
+      FROM reviews r
+      JOIN plots p ON p.id=r.plot_id
+      JOIN users u ON u.id=p.owner_id
+      JOIN users rv ON rv.id=r.reviewer_id
+      LEFT JOIN review_assessments ra ON ra.review_id=r.id
+      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+      ORDER BY r.id DESC`;
+    const withEvidence = `SELECT r.*,p.name plot_name,u.name farmer_name,rv.name reviewer_name,
       (SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id
-      FROM reviews r JOIN plots p ON p.id=r.plot_id
+      FROM reviews r JOIN plots p ON p.id=r.plot_id JOIN users u ON u.id=p.owner_id JOIN users rv ON rv.id=r.reviewer_id
       JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC`;
     const legacy = `SELECT r.*,p.name plot_name FROM reviews r JOIN plots p ON p.id=r.plot_id
       JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC`;
     try {
-      return await this.all(withEvidence, userId);
+      const rows = await this.all(fullQuery, userId);
+      return rows.map(row => ({
+        ...row,
+        checklist_results: this.parseJsonSafe(row.checklist_results_json, []),
+      }));
     } catch (err) {
+      if (/no such table: (?:review_assessments|corrective_actions)/i.test(String(err?.message))) {
+        try { return await this.all(withEvidence, userId); }
+        catch (innerErr) {
+          if (/no such table: photo_evidence/i.test(String(innerErr?.message))) return this.all(legacy, userId);
+          throw innerErr;
+        }
+      }
       if (/no such table: photo_evidence/i.test(String(err?.message))) return this.all(legacy, userId);
       throw err;
     }

@@ -36,7 +36,15 @@ CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id INTEGER 
 CREATE TABLE IF NOT EXISTS photo_evidence(id INTEGER PRIMARY KEY,owner_user_id INTEGER NOT NULL REFERENCES users(id),uploaded_by INTEGER NOT NULL REFERENCES users(id),plot_id INTEGER NOT NULL REFERENCES plots(id),entity_type TEXT NOT NULL CHECK(entity_type IN ('activity','review')),entity_id INTEGER,object_key TEXT NOT NULL UNIQUE,content_type TEXT NOT NULL CHECK(content_type IN ('image/jpeg','image/png','image/webp')),size_bytes INTEGER NOT NULL CHECK(size_bytes > 0 AND size_bytes <= 5242880),sha256_hex TEXT NOT NULL,storage_backend TEXT NOT NULL DEFAULT 'local' CHECK(storage_backend IN ('r2','local')),created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE INDEX IF NOT EXISTS idx_photo_evidence_plot ON photo_evidence(plot_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_photo_evidence_entity ON photo_evidence(entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_photo_evidence_owner ON photo_evidence(owner_user_id);`);
+CREATE INDEX IF NOT EXISTS idx_photo_evidence_owner ON photo_evidence(owner_user_id);
+CREATE TABLE IF NOT EXISTS inspection_checklists(id INTEGER PRIMARY KEY, standard_code TEXT NOT NULL CHECK(standard_code IN ('PGS','EU_ORGANIC','FAIRTRADE')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', items_json TEXT NOT NULL, validation_status TEXT NOT NULL DEFAULT 'draft_unvalidated' CHECK(validation_status IN ('draft_unvalidated','validated')), is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)), created_by INTEGER REFERENCES users(id), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS idx_inspection_checklists_std ON inspection_checklists(standard_code, is_active);
+CREATE TABLE IF NOT EXISTS review_assessments(review_id INTEGER PRIMARY KEY REFERENCES reviews(id) ON DELETE CASCADE, standard_code TEXT NOT NULL CHECK(standard_code IN ('PGS','EU_ORGANIC','FAIRTRADE')), checklist_id INTEGER REFERENCES inspection_checklists(id), checklist_results_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS idx_review_assessments_std ON review_assessments(standard_code);
+CREATE TABLE IF NOT EXISTS corrective_actions(id INTEGER PRIMARY KEY, plot_id INTEGER NOT NULL REFERENCES plots(id), review_id INTEGER REFERENCES reviews(id) ON DELETE SET NULL, standard_code TEXT NOT NULL DEFAULT 'PGS' CHECK(standard_code IN ('PGS','EU_ORGANIC','FAIRTRADE')), severity TEXT NOT NULL DEFAULT 'medium' CHECK(severity IN ('low','medium','high')), finding TEXT NOT NULL, action_required TEXT NOT NULL, responsible_user_id INTEGER NOT NULL REFERENCES users(id), due_date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','in_progress','resolved')), resolution_note TEXT NOT NULL DEFAULT '', resolved_at TEXT, created_by INTEGER NOT NULL REFERENCES users(id), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS idx_corrective_actions_plot ON corrective_actions(plot_id, status, due_date);
+CREATE INDEX IF NOT EXISTS idx_corrective_actions_review ON corrective_actions(review_id);
+CREATE INDEX IF NOT EXISTS idx_corrective_actions_due ON corrective_actions(status, due_date);`);
 const evidenceStorage = createLocalEvidenceStorage(process.env.EVIDENCE_DIR || path.join(__dirname, 'data', 'evidence'));
 if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get() || !db.prepare('SELECT 1 FROM schema_migrations WHERE version=2').get()) {
   db.close();
@@ -97,6 +105,117 @@ const photoUrl = value => {
   if (parsed.protocol !== 'https:') throw new HttpError(400, 'ลิงก์รูปภาพต้องเป็น HTTPS');
   return parsed.toString();
 };
+const ALLOWED_STANDARDS = new Set(['PGS', 'EU_ORGANIC', 'FAIRTRADE']);
+const ALLOWED_SEVERITIES = new Set(['low', 'medium', 'high']);
+const ALLOWED_CAPA_STATUSES = new Set(['open', 'in_progress', 'resolved']);
+const ALLOWED_CHECKLIST_RESULT_STATUSES = new Set(['pass', 'fail', 'na']);
+
+function parseJsonSafe(raw, fallback) {
+  if (!raw || typeof raw !== 'string') return fallback;
+  try { return JSON.parse(raw); } catch { return fallback; }
+}
+
+function standardCodeValue(raw, fallback = null) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+  const val = String(raw).trim().toUpperCase();
+  if (!ALLOWED_STANDARDS.has(val)) throw new HttpError(400, 'รหัสมาตรฐานไม่ถูกต้อง (รองรับเฉพาะ PGS, EU_ORGANIC, FAIRTRADE)');
+  return val;
+}
+
+function severityValue(raw, fallback = 'medium') {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+  const val = String(raw).trim().toLowerCase();
+  if (!ALLOWED_SEVERITIES.has(val)) throw new HttpError(400, 'ระดับความรุนแรงไม่ถูกต้อง');
+  return val;
+}
+
+function validateChecklistItems(raw) {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 30) {
+    throw new HttpError(400, 'รายการตรวจต้องมีอย่างน้อย 1 รายการ และไม่เกิน 30 รายการ');
+  }
+  return raw.map((item, idx) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new HttpError(400, `หัวข้อตรวจลำดับที่ ${idx + 1} ไม่ถูกต้อง`);
+    }
+    const label = text(item.label, `หัวข้อตรวจลำดับที่ ${idx + 1}`, 300);
+    const rawKey = typeof item.key === 'string' ? item.key.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 64) : '';
+    const key = /^[a-z0-9_-]{1,64}$/.test(rawKey) ? rawKey : `item_${idx + 1}`;
+    return { key, label, required: Boolean(item.required) };
+  });
+}
+
+function validateChecklistResults(raw) {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > 30) {
+    throw new HttpError(400, 'ผลตรวจตามรายการไม่ถูกต้อง');
+  }
+  return raw.map((item, idx) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new HttpError(400, `ผลตรวจตามรายการลำดับที่ ${idx + 1} ไม่ถูกต้อง`);
+    }
+    const rawStatus = String(item.status || 'na').trim().toLowerCase();
+    if (!ALLOWED_CHECKLIST_RESULT_STATUSES.has(rawStatus)) {
+      throw new HttpError(400, 'สถานะรายการตรวจต้องเป็น pass, fail หรือ na');
+    }
+    const label = optionalText(item.label, 'หัวข้อตรวจ', 300) || `รายการที่ ${idx + 1}`;
+    const rawKey = typeof item.key === 'string' ? item.key.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 64) : '';
+    const key = /^[a-z0-9_-]{1,64}$/.test(rawKey) ? rawKey : `item_${idx + 1}`;
+    const note = optionalText(item.note, 'หมายเหตุรายการตรวจ', 500);
+    return { key, label, status: rawStatus, ...(note ? { note } : {}) };
+  });
+}
+
+function validateReviewFindings(raw, defaultStandard, defaultResponsibleUserId) {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > 10) {
+    throw new HttpError(400, 'รายการข้อบกพร่องต้องมีไม่เกิน 10 รายการ');
+  }
+  return raw.map((item, idx) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new HttpError(400, `ข้อบกพร่องลำดับที่ ${idx + 1} ไม่ถูกต้อง`);
+    }
+    const std = standardCodeValue(item.standard_code, defaultStandard);
+    const severity = severityValue(item.severity, 'medium');
+    const finding = text(item.finding, `ข้อบกพร่องลำดับที่ ${idx + 1}`, 1000);
+    const actionRequired = text(item.action_required, `แนวทางแก้ไขลำดับที่ ${idx + 1}`, 1000);
+    const dueDate = isoDate(item.due_date, `กำหนดแก้ไขลำดับที่ ${idx + 1}`);
+    const responsibleUserId = item.responsible_user_id !== undefined && item.responsible_user_id !== null && item.responsible_user_id !== ''
+      ? positiveId(item.responsible_user_id, 'รหัสผู้รับผิดชอบ')
+      : defaultResponsibleUserId;
+    return { standardCode: std, severity, finding, actionRequired, dueDate, responsibleUserId };
+  });
+}
+
+function formatChecklistRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    standard_code: row.standard_code,
+    title: row.title,
+    description: row.description || '',
+    items: parseJsonSafe(row.items_json, []),
+    validation_status: row.validation_status,
+    is_active: Boolean(row.is_active),
+    created_by: row.created_by ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function findCorrectiveActionDetail(id) {
+  const row = db.prepare(`SELECT ca.*,p.name plot_name,u.name farmer_name,ru.name responsible_name,
+    r.result review_result,
+    CASE WHEN ca.status!='resolved' AND ca.due_date<date('now') THEN 1 ELSE 0 END is_overdue
+    FROM corrective_actions ca
+    JOIN plots p ON p.id=ca.plot_id
+    JOIN users u ON u.id=p.owner_id
+    JOIN users ru ON ru.id=ca.responsible_user_id
+    LEFT JOIN reviews r ON r.id=ca.review_id
+    WHERE ca.id=?`).get(id);
+  return row ? { ...row, is_overdue: Boolean(row.is_overdue) } : null;
+}
+
+const icsOrAdmin = (req, res, next) => ['ics', 'admin'].includes(req.user.role) ? next() : res.status(403).json({ error: 'เฉพาะเจ้าหน้าที่ ICS หรือผู้ดูแลระบบ' });
 const makeSession = userId => {
   const token = crypto.randomBytes(32).toString('hex');
   const hash = crypto.createHash('sha256').update(token).digest('hex');
@@ -490,22 +609,361 @@ app.get('/api/lots', auth, wrap((req, res) => {
   res.json(db.prepare('SELECT l.*,p.name plot_name FROM lots l JOIN plots p ON p.id=l.plot_id WHERE p.owner_id=? ORDER BY l.id DESC').all(req.user.id));
 }));
 app.post('/api/lots', auth, wrap((req, res) => { if (req.user.role !== 'farmer') throw new HttpError(403, 'เฉพาะเกษตรกร'); const plot = ownPlot(req, req.body.plot_id), code = text(req.body.code, 'รหัสล็อต', 100), crop = text(req.body.crop, 'ชนิดผลผลิต', 100), harvestDate = isoDate(req.body.harvest_date, 'วันที่เก็บเกี่ยว'), quantity = Number(req.body.quantity); if (!Number.isFinite(quantity) || quantity < 0) throw new HttpError(400, 'ปริมาณไม่ถูกต้อง'); const result = db.prepare('INSERT INTO lots(plot_id,code,crop,harvest_date,quantity) VALUES(?,?,?,?,?)').run(plot.id, code, crop, harvestDate, quantity); res.status(201).json({ id: result.lastInsertRowid }); }));
-app.get('/api/risks', auth, ics, wrap((req, res) => { const pending = db.prepare("SELECT a.id,a.input_name,p.name plot_name,'pending' type FROM approvals a JOIN plots p ON p.id=a.plot_id JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL WHERE a.status='pending'").all(req.user.id); const inactive = db.prepare("SELECT p.id,p.name plot_name,'inactive' type FROM plots p JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL WHERE NOT EXISTS (SELECT 1 FROM activities a WHERE a.plot_id=p.id AND a.activity_date>=date('now','-14 days'))").all(req.user.id); res.json([...pending, ...inactive]); }));
-app.get('/api/reviews', auth, ics, wrap((req, res) => res.json(db.prepare("SELECT r.*,p.name plot_name,(SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id FROM reviews r JOIN plots p ON p.id=r.plot_id JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC").all(req.user.id))));
+app.get('/api/risks', auth, ics, wrap((req, res) => {
+  const pendingRows = db.prepare(`SELECT a.id,a.plot_id,a.input_name,p.name plot_name,u.name farmer_name
+    FROM approvals a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=p.owner_id
+    JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+    WHERE a.status='pending'`).all(req.user.id);
+  const pending = pendingRows.map(row => ({
+    ...row,
+    type: 'pending',
+    severity: 'medium',
+    title: 'คำขอใช้ปัจจัยการผลิตรอพิจารณา',
+    explanation: `คำขอ "${row.input_name}" รอเจ้าหน้าที่ ICS พิจารณาก่อนนำไปใช้ในแปลง`,
+    recommended_tab: 'approval',
+  }));
+
+  const inactiveRows = db.prepare(`SELECT p.id,p.id plot_id,p.name plot_name,u.name farmer_name
+    FROM plots p JOIN users u ON u.id=p.owner_id
+    JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+    WHERE NOT EXISTS (SELECT 1 FROM activities a WHERE a.plot_id=p.id AND a.activity_date>=date('now','-14 days'))`).all(req.user.id);
+  const inactive = inactiveRows.map(row => ({
+    ...row,
+    type: 'inactive',
+    severity: 'high',
+    title: 'ขาดบันทึกกิจกรรมเกิน 14 วัน',
+    explanation: 'ไม่พบกิจกรรมการดูแลแปลงติดต่อกันเกิน 14 วัน ควรติดตามหรือลงตรวจแปลง',
+    recommended_tab: 'record',
+  }));
+
+  const missingRows = db.prepare(`SELECT p.id,p.id plot_id,p.name plot_name,u.name farmer_name,COUNT(*) missing_count
+    FROM activities a
+    JOIN plots p ON p.id=a.plot_id
+    JOIN users u ON u.id=p.owner_id
+    JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+    WHERE a.activity_date>=date('now','-30 days')
+      AND (a.photo_url IS NULL OR TRIM(a.photo_url)='')
+      AND NOT EXISTS (SELECT 1 FROM photo_evidence pe WHERE pe.entity_type='activity' AND pe.entity_id=a.id)
+    GROUP BY p.id,p.name,u.name`).all(req.user.id);
+  const missingEvidence = missingRows.map(row => ({
+    ...row,
+    type: 'missing_evidence',
+    severity: row.missing_count >= 3 ? 'medium' : 'low',
+    title: 'กิจกรรมขาดภาพถ่ายหลักฐาน',
+    explanation: `พบ ${row.missing_count} กิจกรรมในรอบ 30 วันล่าสุดที่ยังไม่มีภาพหลักฐานแนบประกอบ`,
+    recommended_tab: 'record',
+  }));
+
+  const actionRows = db.prepare(`SELECT ca.id,ca.plot_id,ca.standard_code,ca.severity,ca.finding,ca.due_date,ca.status,
+    p.name plot_name,u.name farmer_name,ru.name responsible_name,
+    CASE WHEN ca.due_date<date('now') THEN 1 ELSE 0 END is_overdue
+    FROM corrective_actions ca
+    JOIN plots p ON p.id=ca.plot_id
+    JOIN users u ON u.id=p.owner_id
+    JOIN users ru ON ru.id=ca.responsible_user_id
+    JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+    WHERE ca.status IN ('open','in_progress')`).all(req.user.id);
+  const actionRisks = actionRows.map(row => {
+    const overdue = Boolean(row.is_overdue);
+    return {
+      id: row.id,
+      plot_id: row.plot_id,
+      plot_name: row.plot_name,
+      farmer_name: row.farmer_name,
+      standard_code: row.standard_code,
+      due_date: row.due_date,
+      responsible_name: row.responsible_name,
+      type: overdue ? 'overdue_action' : 'open_action',
+      severity: overdue ? 'high' : (row.severity === 'high' ? 'high' : 'medium'),
+      title: overdue ? 'เกินกำหนดแก้ไขปรับปรุง (CAPA)' : 'รายการแก้ไขปรับปรุงรอดำเนินการ',
+      explanation: overdue
+        ? `ข้อบกพร่อง "${row.finding}" เกินกำหนดวันที่ ${row.due_date} (มาตรฐาน ${row.standard_code})`
+        : `ข้อบกพร่อง "${row.finding}" กำหนดแก้ไขภายในวันที่ ${row.due_date} (มาตรฐาน ${row.standard_code})`,
+      recommended_tab: 'reviews',
+    };
+  });
+
+  const severityRank = { high: 0, medium: 1, low: 2 };
+  res.json([...actionRisks, ...inactive, ...pending, ...missingEvidence].sort((a, b) => (severityRank[a.severity] ?? 3) - (severityRank[b.severity] ?? 3)));
+}));
+app.get('/api/reviews', auth, ics, wrap((req, res) => {
+  const rows = db.prepare(`SELECT r.*,p.name plot_name,u.name farmer_name,rv.name reviewer_name,
+    (SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id,
+    ra.standard_code,ra.checklist_id,ra.checklist_results_json,
+    (SELECT COUNT(*) FROM corrective_actions ca WHERE ca.review_id=r.id AND ca.status!='resolved') open_actions_count,
+    (SELECT COUNT(*) FROM corrective_actions ca WHERE ca.review_id=r.id) total_actions_count
+    FROM reviews r
+    JOIN plots p ON p.id=r.plot_id
+    JOIN users u ON u.id=p.owner_id
+    JOIN users rv ON rv.id=r.reviewer_id
+    LEFT JOIN review_assessments ra ON ra.review_id=r.id
+    JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+    ORDER BY r.id DESC`).all(req.user.id);
+  res.json(rows.map(row => ({ ...row, checklist_results: parseJsonSafe(row.checklist_results_json, []) })));
+}));
 app.post('/api/reviews', auth, ics, wrap((req, res) => {
   const plot = ownPlot(req, req.body.plot_id), resultText = text(req.body.result, 'ผลตรวจ', 100), note = text(req.body.note, 'บันทึกผลตรวจ', 2000);
   const evidenceId = validatePendingEvidenceForEntity(req, req.body.evidence_id, plot.id, 'review');
-  const id = db.transaction(() => {
+
+  let standardCode = standardCodeValue(req.body.standard_code, null);
+  let checklistId = null;
+  if (req.body.checklist_id !== undefined && req.body.checklist_id !== null && String(req.body.checklist_id).trim() !== '') {
+    checklistId = positiveId(req.body.checklist_id, 'รหัสชุดรายการตรวจ');
+    const checklist = formatChecklistRow(db.prepare('SELECT * FROM inspection_checklists WHERE id=?').get(checklistId));
+    if (!checklist || !checklist.is_active) throw new HttpError(404, 'ไม่พบชุดรายการตรวจที่ใช้งานได้');
+    if (standardCode && checklist.standard_code !== standardCode) {
+      throw new HttpError(400, 'ชุดรายการตรวจไม่ตรงกับมาตรฐานที่เลือก');
+    }
+    standardCode = checklist.standard_code;
+  }
+
+  const checklistResults = validateChecklistResults(req.body.checklist_results);
+  const defaultStd = standardCode || 'PGS';
+  const findings = validateReviewFindings(req.body.findings, defaultStd, req.user.id);
+  for (const item of findings) {
+    if (item.responsibleUserId !== req.user.id) {
+      const targetUser = db.prepare("SELECT id FROM users WHERE id=? AND role='ics' AND status='active'").get(item.responsibleUserId);
+      if (!targetUser) throw new HttpError(400, 'ผู้รับผิดชอบต้องเป็นเจ้าหน้าที่ ICS ที่ใช้งานอยู่');
+    }
+  }
+
+  const created = db.transaction(() => {
     const result = db.prepare('INSERT INTO reviews(plot_id,reviewer_id,result,note) VALUES(?,?,?,?)').run(plot.id, req.user.id, resultText, note);
     const reviewId = result.lastInsertRowid;
+    if (standardCode || checklistId || checklistResults.length) {
+      db.prepare('INSERT INTO review_assessments(review_id,standard_code,checklist_id,checklist_results_json) VALUES(?,?,?,?)')
+        .run(reviewId, standardCode || 'PGS', checklistId ?? null, JSON.stringify(checklistResults));
+    }
     if (evidenceId !== null) {
       const attached = db.prepare("UPDATE photo_evidence SET entity_id=? WHERE id=? AND uploaded_by=? AND plot_id=? AND entity_type='review' AND entity_id IS NULL").run(reviewId, evidenceId, req.user.id, plot.id);
       if (attached.changes !== 1) throw new HttpError(400, 'ไม่สามารถผูกภาพหลักฐานนี้ได้');
     }
-    writeAudit('review.created', req.user.id, 'review', reviewId, { plotId: plot.id, result: resultText });
-    return reviewId;
+    writeAudit('review.created', req.user.id, 'review', reviewId, {
+      plotId: plot.id,
+      result: resultText,
+      ...(standardCode ? { standardCode } : {}),
+      ...(findings.length ? { findingsCount: findings.length } : {}),
+    });
+    const correctiveActionIds = [];
+    for (const item of findings) {
+      const actionResult = db.prepare(
+        `INSERT INTO corrective_actions(plot_id,review_id,standard_code,severity,finding,action_required,responsible_user_id,due_date,created_by)
+         VALUES(?,?,?,?,?,?,?,?,?)`
+      ).run(plot.id, reviewId, item.standardCode, item.severity, item.finding, item.actionRequired, item.responsibleUserId, item.dueDate, req.user.id);
+      const actionId = actionResult.lastInsertRowid;
+      correctiveActionIds.push(actionId);
+      writeAudit('corrective_action.created', req.user.id, 'corrective_action', actionId, {
+        plotId: plot.id, reviewId, standardCode: item.standardCode, severity: item.severity, dueDate: item.dueDate, responsibleUserId: item.responsibleUserId,
+      });
+    }
+    return { reviewId, correctiveActionIds };
   }).immediate();
-  res.status(201).json({ id, ...(evidenceId !== null ? { evidence_id: evidenceId } : {}) });
+  res.status(201).json({
+    id: created.reviewId,
+    ...(evidenceId !== null ? { evidence_id: evidenceId } : {}),
+    ...(standardCode ? { standard_code: standardCode } : {}),
+    ...(created.correctiveActionIds.length ? { corrective_action_ids: created.correctiveActionIds } : {}),
+  });
+}));
+app.get('/api/checklists', auth, icsOrAdmin, wrap((req, res) => {
+  const standardCode = standardCodeValue(req.query.standard_code, null);
+  const includeInactive = ['1', 'true'].includes(req.query.include_inactive);
+  const clauses = [];
+  const params = [];
+  if (standardCode) { clauses.push('standard_code=?'); params.push(standardCode); }
+  if (!includeInactive) clauses.push('is_active=1');
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = db.prepare(`SELECT * FROM inspection_checklists ${where} ORDER BY standard_code, id`).all(...params);
+  res.json(rows.map(formatChecklistRow));
+}));
+app.post('/api/checklists', auth, icsOrAdmin, wrap((req, res) => {
+  const standardCode = standardCodeValue(req.body.standard_code, null);
+  if (!standardCode) throw new HttpError(400, 'กรุณาระบุรหัสมาตรฐาน (PGS, EU_ORGANIC หรือ FAIRTRADE)');
+  const title = text(req.body.title, 'ชื่อชุดรายการตรวจ', 200);
+  const description = optionalText(req.body.description, 'คำอธิบายชุดรายการตรวจ', 1000);
+  const items = validateChecklistItems(req.body.items);
+  const validationStatus = req.body.validation_status ? String(req.body.validation_status).trim() : 'draft_unvalidated';
+  if (!['draft_unvalidated', 'validated'].includes(validationStatus)) throw new HttpError(400, 'สถานะการยืนยันเกณฑ์ไม่ถูกต้อง');
+  if (validationStatus === 'validated' && req.user.role !== 'admin') {
+    throw new HttpError(403, 'เฉพาะผู้ดูแลระบบสามารถยืนยันสถานะเกณฑ์มาตรฐานได้');
+  }
+  const id = db.transaction(() => {
+    const result = db.prepare('INSERT INTO inspection_checklists(standard_code,title,description,items_json,validation_status,created_by) VALUES(?,?,?,?,?,?)')
+      .run(standardCode, title, description, JSON.stringify(items), validationStatus, req.user.id);
+    writeAudit('checklist.created', req.user.id, 'inspection_checklist', result.lastInsertRowid, { standardCode, validationStatus, itemCount: items.length });
+    return result.lastInsertRowid;
+  }).immediate();
+  res.status(201).json(formatChecklistRow(db.prepare('SELECT * FROM inspection_checklists WHERE id=?').get(id)));
+}));
+app.patch('/api/checklists/:id', auth, icsOrAdmin, wrap((req, res) => {
+  const id = positiveId(req.params.id, 'รหัสชุดรายการตรวจ');
+  const existing = db.prepare('SELECT * FROM inspection_checklists WHERE id=?').get(id);
+  if (!existing) throw new HttpError(404, 'ไม่พบชุดรายการตรวจ');
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const allowed = new Set(['title', 'description', 'items', 'is_active', 'validation_status']);
+  if (Object.keys(body).some(key => !allowed.has(key))) throw new HttpError(400, 'มีข้อมูลที่ไม่อนุญาตให้แก้ไข');
+  const sets = [];
+  const params = [];
+  const updatedFields = [];
+  if (Object.hasOwn(body, 'title')) { sets.push('title=?'); params.push(text(body.title, 'ชื่อชุดรายการตรวจ', 200)); updatedFields.push('title'); }
+  if (Object.hasOwn(body, 'description')) { sets.push('description=?'); params.push(optionalText(body.description, 'คำอธิบายชุดรายการตรวจ', 1000)); updatedFields.push('description'); }
+  if (Object.hasOwn(body, 'items')) { sets.push('items_json=?'); params.push(JSON.stringify(validateChecklistItems(body.items))); updatedFields.push('items'); }
+  if (Object.hasOwn(body, 'is_active')) { sets.push('is_active=?'); params.push(body.is_active ? 1 : 0); updatedFields.push('is_active'); }
+  if (Object.hasOwn(body, 'validation_status')) {
+    const nextValidation = String(body.validation_status).trim();
+    if (!['draft_unvalidated', 'validated'].includes(nextValidation)) throw new HttpError(400, 'สถานะการยืนยันเกณฑ์ไม่ถูกต้อง');
+    if (nextValidation === 'validated' && req.user.role !== 'admin') {
+      throw new HttpError(403, 'เฉพาะผู้ดูแลระบบสามารถยืนยันสถานะเกณฑ์มาตรฐานได้');
+    }
+    sets.push('validation_status=?');
+    params.push(nextValidation);
+    updatedFields.push('validation_status');
+  }
+  if (!updatedFields.length) throw new HttpError(400, 'ไม่มีข้อมูลสำหรับแก้ไข');
+  sets.push('updated_at=CURRENT_TIMESTAMP');
+  db.transaction(() => {
+    db.prepare(`UPDATE inspection_checklists SET ${sets.join(',')} WHERE id=?`).run(...params, id);
+    writeAudit('checklist.updated', req.user.id, 'inspection_checklist', id, { fields: updatedFields });
+  }).immediate();
+  res.json(formatChecklistRow(db.prepare('SELECT * FROM inspection_checklists WHERE id=?').get(id)));
+}));
+app.get('/api/corrective-actions', auth, icsOrAdmin, wrap((req, res) => {
+  const clauses = [];
+  const params = [];
+  let assignmentJoin = '';
+  if (req.user.role === 'ics') {
+    assignmentJoin = 'JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL';
+    params.push(req.user.id);
+  }
+  if (req.query.status !== undefined && req.query.status !== '') {
+    if (!ALLOWED_CAPA_STATUSES.has(String(req.query.status))) throw new HttpError(400, 'สถานะการแก้ไขไม่ถูกต้อง');
+    clauses.push('ca.status=?');
+    params.push(String(req.query.status));
+  }
+  if (req.query.plot_id !== undefined && req.query.plot_id !== '') {
+    clauses.push('ca.plot_id=?');
+    params.push(positiveId(req.query.plot_id, 'รหัสแปลง'));
+  }
+  const standardCode = standardCodeValue(req.query.standard_code, null);
+  if (standardCode) { clauses.push('ca.standard_code=?'); params.push(standardCode); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = db.prepare(`SELECT ca.*,p.name plot_name,u.name farmer_name,ru.name responsible_name,
+    r.result review_result,
+    CASE WHEN ca.status!='resolved' AND ca.due_date<date('now') THEN 1 ELSE 0 END is_overdue
+    FROM corrective_actions ca
+    JOIN plots p ON p.id=ca.plot_id
+    JOIN users u ON u.id=p.owner_id
+    JOIN users ru ON ru.id=ca.responsible_user_id
+    LEFT JOIN reviews r ON r.id=ca.review_id
+    ${assignmentJoin}
+    ${where}
+    ORDER BY CASE ca.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END, ca.due_date ASC, ca.id DESC`).all(...params);
+  res.json(rows.map(row => ({ ...row, is_overdue: Boolean(row.is_overdue) })));
+}));
+app.post('/api/corrective-actions', auth, ics, wrap((req, res) => {
+  const plot = ownPlot(req, req.body.plot_id);
+  let reviewId = null;
+  if (req.body.review_id !== undefined && req.body.review_id !== null && String(req.body.review_id).trim() !== '') {
+    reviewId = positiveId(req.body.review_id, 'รหัสผลตรวจ');
+    const review = db.prepare('SELECT * FROM reviews WHERE id=?').get(reviewId);
+    if (!review) throw new HttpError(404, 'ไม่พบผลตรวจอ้างอิง');
+    if (review.plot_id !== plot.id) throw new HttpError(400, 'ผลตรวจอ้างอิงไม่ตรงกับแปลงที่เลือก');
+  }
+  const standardCode = standardCodeValue(req.body.standard_code, 'PGS');
+  const severity = severityValue(req.body.severity, 'medium');
+  const finding = text(req.body.finding, 'ข้อบกพร่องที่พบ', 1000);
+  const actionRequired = text(req.body.action_required, 'แนวทางแก้ไข', 1000);
+  const dueDate = isoDate(req.body.due_date, 'กำหนดแก้ไข');
+  const responsibleUserId = req.body.responsible_user_id !== undefined && req.body.responsible_user_id !== null && String(req.body.responsible_user_id).trim() !== ''
+    ? positiveId(req.body.responsible_user_id, 'รหัสผู้รับผิดชอบ')
+    : req.user.id;
+  if (responsibleUserId !== req.user.id && !db.prepare("SELECT id FROM users WHERE id=? AND role='ics' AND status='active'").get(responsibleUserId)) {
+    throw new HttpError(400, 'ผู้รับผิดชอบต้องเป็นเจ้าหน้าที่ ICS ที่ใช้งานอยู่');
+  }
+  const createdId = db.transaction(() => {
+    const result = db.prepare(
+      `INSERT INTO corrective_actions(plot_id,review_id,standard_code,severity,finding,action_required,responsible_user_id,due_date,created_by)
+       VALUES(?,?,?,?,?,?,?,?,?)`
+    ).run(plot.id, reviewId, standardCode, severity, finding, actionRequired, responsibleUserId, dueDate, req.user.id);
+    writeAudit('corrective_action.created', req.user.id, 'corrective_action', result.lastInsertRowid, {
+      plotId: plot.id, reviewId, standardCode, severity, dueDate, responsibleUserId,
+    });
+    return result.lastInsertRowid;
+  }).immediate();
+  res.status(201).json(findCorrectiveActionDetail(createdId));
+}));
+app.patch('/api/corrective-actions/:id', auth, ics, wrap((req, res) => {
+  const id = positiveId(req.params.id, 'รหัสรายการแก้ไข');
+  const existing = db.prepare('SELECT * FROM corrective_actions WHERE id=?').get(id);
+  if (!existing) throw new HttpError(404, 'ไม่พบรายการแก้ไขปรับปรุง');
+  ownPlot(req, existing.plot_id);
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const allowed = new Set(['status', 'resolution_note', 'due_date', 'severity', 'responsible_user_id', 'finding', 'action_required']);
+  if (Object.keys(body).some(key => !allowed.has(key))) throw new HttpError(400, 'มีข้อมูลที่ไม่อนุญาตให้แก้ไข');
+  const sets = [];
+  const params = [];
+  let hasField = false;
+  let nextStatus = existing.status;
+  let nextNote = existing.resolution_note || '';
+  if (Object.hasOwn(body, 'status')) {
+    const val = String(body.status || '').trim();
+    if (!ALLOWED_CAPA_STATUSES.has(val)) throw new HttpError(400, 'สถานะการแก้ไขไม่ถูกต้อง');
+    sets.push('status=?');
+    params.push(val);
+    if (val === 'resolved') sets.push('resolved_at=CURRENT_TIMESTAMP');
+    else sets.push('resolved_at=NULL');
+    nextStatus = val;
+    hasField = true;
+  }
+  if (Object.hasOwn(body, 'resolution_note')) {
+    nextNote = optionalText(body.resolution_note, 'สรุปผลการแก้ไข', 1000);
+    sets.push('resolution_note=?');
+    params.push(nextNote);
+    hasField = true;
+  }
+  if (Object.hasOwn(body, 'due_date')) { sets.push('due_date=?'); params.push(isoDate(body.due_date, 'กำหนดแก้ไข')); hasField = true; }
+  if (Object.hasOwn(body, 'severity')) { sets.push('severity=?'); params.push(severityValue(body.severity)); hasField = true; }
+  if (Object.hasOwn(body, 'finding')) { sets.push('finding=?'); params.push(text(body.finding, 'ข้อบกพร่องที่พบ', 1000)); hasField = true; }
+  if (Object.hasOwn(body, 'action_required')) { sets.push('action_required=?'); params.push(text(body.action_required, 'แนวทางแก้ไข', 1000)); hasField = true; }
+  if (Object.hasOwn(body, 'responsible_user_id')) {
+    const nextResponsible = positiveId(body.responsible_user_id, 'รหัสผู้รับผิดชอบ');
+    if (!db.prepare("SELECT id FROM users WHERE id=? AND role='ics' AND status='active'").get(nextResponsible)) {
+      throw new HttpError(400, 'ผู้รับผิดชอบต้องเป็นเจ้าหน้าที่ ICS ที่ใช้งานอยู่');
+    }
+    sets.push('responsible_user_id=?');
+    params.push(nextResponsible);
+    hasField = true;
+  }
+  if (!hasField) throw new HttpError(400, 'ไม่มีข้อมูลสำหรับแก้ไข');
+  if (nextStatus === 'resolved' && !String(nextNote).trim()) {
+    throw new HttpError(400, 'กรุณาระบุสรุปผลการแก้ไขก่อนปิดรายการ');
+  }
+  sets.push('updated_at=CURRENT_TIMESTAMP');
+  db.transaction(() => {
+    db.prepare(`UPDATE corrective_actions SET ${sets.join(',')} WHERE id=?`).run(...params, id);
+    writeAudit('corrective_action.updated', req.user.id, 'corrective_action', id, { plotId: existing.plot_id, fromStatus: existing.status, toStatus: nextStatus });
+  }).immediate();
+  res.json(findCorrectiveActionDetail(id));
+}));
+app.get('/api/audit-logs', auth, icsOrAdmin, wrap((req, res) => {
+  const rows = req.user.role === 'admin'
+    ? db.prepare(`SELECT l.id,l.actor_user_id,u.name actor_name,l.event_type,l.target_type,l.target_id,l.metadata_json,l.created_at
+        FROM audit_logs l LEFT JOIN users u ON u.id=l.actor_user_id ORDER BY l.id DESC LIMIT 100`).all()
+    : db.prepare(`SELECT l.id,l.actor_user_id,u.name actor_name,l.event_type,l.target_type,l.target_id,l.metadata_json,l.created_at
+        FROM audit_logs l LEFT JOIN users u ON u.id=l.actor_user_id
+        WHERE l.actor_user_id=?
+          AND l.event_type IN ('review.created','approval.reviewed','corrective_action.created','corrective_action.updated','checklist.created','checklist.updated','evidence.uploaded')
+        ORDER BY l.id DESC LIMIT 100`).all(req.user.id);
+  res.set('Cache-Control', 'private, no-store').json(rows.map(row => ({
+    id: row.id,
+    actor_user_id: row.actor_user_id,
+    actor_name: row.actor_name || null,
+    event_type: row.event_type,
+    target_type: row.target_type,
+    target_id: row.target_id,
+    metadata: parseJsonSafe(row.metadata_json, {}),
+    created_at: row.created_at,
+  })));
 }));
 app.get('/api/health', (req, res) => res.json({ ok: true, service: 'ready-to-grow' }));
 app.get('/api/config', (req, res) => res.json({ liffId: process.env.LIFF_ID || '', development: devAuthEnabled && isLoopback(req), evidenceUploadEnabled: evidenceStorage.configured }));

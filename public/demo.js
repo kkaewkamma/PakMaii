@@ -86,10 +86,65 @@
     const plotCodes = ['A-03', 'B-01', 'C-12', 'D-05', 'A-04'];
     const conversionYears = ['ระยะปรับเปลี่ยนปีที่ 1', 'ระยะปรับเปลี่ยนปีที่ 2', 'ระยะปรับเปลี่ยนปีที่ 1', 'ผ่านการรับรอง PGS', 'ระยะปรับเปลี่ยนปีที่ 3'];
     const waterStatuses = ['Low - Groundwater Bank / Solar Pump needed', 'Normal', 'Low - Groundwater Bank / Solar Pump needed', 'Normal', 'Normal'];
+    const stamp = now.toISOString();
+    const daysAgo = days => isoDay(new Date(now.getTime() - days * 86_400_000));
+
+    const DEFAULT_CHECKLISTS = [
+      {
+        id: 1,
+        standard_code: 'PGS',
+        title: 'รายการตรวจภายใน PGS (ร่างโครงสร้าง — รอการยืนยันเกณฑ์)',
+        description: 'โครงสร้างรายการตรวจภายในกลุ่ม PGS สำหรับติดตามการปฏิบัติงานในแปลง ไม่ใช่การรับรองมาตรฐานอย่างเป็นทางการ',
+        items: [
+          { key: 'pgs_buffer_zone', label: 'ตรวจแนวกันชนรอบแปลงและป้องกันการปนเปื้อนจากแปลงข้างเคียง', required: true },
+          { key: 'pgs_no_synthetic', label: 'ไม่พบการใช้สารเคมีสังเคราะห์หรือสารต้องห้ามในแปลง', required: true },
+          { key: 'pgs_input_approved', label: 'ปัจจัยการผลิตที่ใช้ผ่านการอนุมัติล่วงหน้าจาก ICS แล้ว', required: true },
+          { key: 'pgs_activity_log', label: 'เกษตรกรบันทึกกิจกรรมสม่ำเสมอและสอดคล้องกับสภาพแปลงจริง', required: false },
+        ],
+        validation_status: 'draft_unvalidated',
+        is_active: true,
+        created_by: null,
+        created_at: stamp,
+        updated_at: stamp,
+      },
+      {
+        id: 2,
+        standard_code: 'EU_ORGANIC',
+        title: 'รายการตรวจภายใน EU Organic (ร่างโครงสร้าง — รอการยืนยันเกณฑ์)',
+        description: 'โครงสร้างรายการตรวจภายในแยกตามหมวดหมู่ EU Organic อยู่ระหว่างรอการยืนยันเกณฑ์จากผู้ตรวจรับรองภายนอก',
+        items: [
+          { key: 'eu_conversion_period', label: 'ตรวจบันทึกประวัติระยะปรับเปลี่ยนและการแยกพื้นที่ปลูกตามรอบการผลิต', required: true },
+          { key: 'eu_segregation', label: 'การแยกจัดเก็บผลผลิตและเครื่องมือไม่ปะปนกับผลผลิตเคมี', required: true },
+          { key: 'eu_traceable_inputs', label: 'เอกสารที่มาและสัดส่วนปัจจัยการผลิตสามารถตรวจสอบย้อนกลับได้', required: true },
+          { key: 'eu_evidence_records', label: 'มีภาพหลักฐานและบันทึกกิจกรรมรองรับรอบการตรวจ', required: false },
+        ],
+        validation_status: 'draft_unvalidated',
+        is_active: true,
+        created_by: null,
+        created_at: stamp,
+        updated_at: stamp,
+      },
+      {
+        id: 3,
+        standard_code: 'FAIRTRADE',
+        title: 'รายการตรวจภายใน Fairtrade (ร่างโครงสร้าง — รอการยืนยันเกณฑ์)',
+        description: 'โครงสร้างรายการตรวจภายในแยกตามหมวดหมู่ Fairtrade อยู่ระหว่างรอการยืนยันเกณฑ์จากผู้ตรวจรับรองภายนอก',
+        items: [
+          { key: 'ft_member_consent', label: 'บันทึกความโปร่งใสและการมีส่วนร่วมของสมาชิกในกลุ่ม', required: true },
+          { key: 'ft_labor_safety', label: 'สภาพการทำงานและความปลอดภัยของแรงงานในแปลงเป็นไปตามข้อตกลงกลุ่ม', required: true },
+          { key: 'ft_premium_record', label: 'บันทึกปริมาณผลผลิตและการส่งมอบเพื่อตรวจย้อนกลับระดับกลุ่ม', required: false },
+        ],
+        validation_status: 'draft_unvalidated',
+        is_active: true,
+        created_by: null,
+        created_at: stamp,
+        updated_at: stamp,
+      },
+    ];
 
     const store = {
       version: STORE_VERSION,
-      seq: { plots: 0, activities: 0, approvals: 0, lots: 0, reviews: 0 },
+      seq: { plots: 0, activities: 0, approvals: 0, lots: 0, reviews: 0, checklists: 3, corrective_actions: 0, audit_logs: 0 },
       metrics: {
         totalMembers: 65,
         totalPlots: 120,
@@ -101,10 +156,11 @@
       activities: [],
       approvals: [],
       lots: [],
-      reviews: []
+      reviews: [],
+      checklists: clone(DEFAULT_CHECKLISTS),
+      corrective_actions: [],
+      audit_logs: []
     };
-    const stamp = now.toISOString();
-    const daysAgo = days => isoDay(new Date(now.getTime() - days * 86_400_000));
 
     ACCOUNTS.filter(account => account.role === 'farmer').forEach((farmer, index) => {
       const n = index + 1;
@@ -256,10 +312,42 @@
           reviewer_id: 910101 + Math.floor(index / 5),
           result: 'ผ่าน',
           note: 'ตรวจแปลงประจำรอบการผลิต สภาพแปลงสมบูรณ์ แนวกันชนปลอดภัย มีการจดบันทึกสม่ำเสมอ แหล่งน้ำปลอดภัย',
+          standard_code: 'PGS',
+          checklist_id: 1,
+          checklist_results: [],
           created_at: daysAgo(5),
         });
       }
     });
+    if (store.plots[2]) {
+      store.corrective_actions.push({
+        id: ++store.seq.corrective_actions,
+        plot_id: store.plots[2].id,
+        review_id: null,
+        standard_code: 'PGS',
+        severity: 'high',
+        finding: 'บันทึกการไถกลบไม่สอดคล้องกับรอบพักดินตามข้อตกลงกลุ่ม',
+        action_required: 'ลงตรวจแปลงซ้ำและวางแผนรอบพักดินใหม่ร่วมกับเกษตรกร',
+        responsible_user_id: 910101,
+        due_date: daysAgo(2),
+        status: 'open',
+        resolution_note: '',
+        resolved_at: null,
+        created_by: 910101,
+        created_at: daysAgo(9),
+        updated_at: daysAgo(9),
+      });
+      store.audit_logs.push({
+        id: ++store.seq.audit_logs,
+        actor_user_id: 910101,
+        actor_name: byId.get(910101)?.name || 'ICS',
+        event_type: 'corrective_action.created',
+        target_type: 'corrective_action',
+        target_id: '1',
+        metadata: { plotId: store.plots[2].id, standardCode: 'PGS', severity: 'high' },
+        created_at: daysAgo(9),
+      });
+    }
     return store;
   }
 
@@ -295,7 +383,21 @@
     function load() {
       try {
         const parsed = JSON.parse(storage.getItem(STORAGE_KEY) || 'null');
-        if (parsed && parsed.version === STORE_VERSION && Array.isArray(parsed.plots)) return parsed;
+        if (parsed && parsed.version === STORE_VERSION && Array.isArray(parsed.plots)) {
+          if (!Array.isArray(parsed.checklists) || !Array.isArray(parsed.corrective_actions) || !Array.isArray(parsed.audit_logs)) {
+            const baseline = seed(now());
+            parsed.checklists ||= baseline.checklists;
+            parsed.corrective_actions ||= baseline.corrective_actions;
+            parsed.audit_logs ||= baseline.audit_logs;
+            parsed.seq = {
+              checklists: parsed.checklists.length,
+              corrective_actions: parsed.corrective_actions.length,
+              audit_logs: parsed.audit_logs.length,
+              ...(parsed.seq || {}),
+            };
+          }
+          return parsed;
+        }
       } catch { /* corrupted demo data is re-seeded below */ }
       const fresh = seed(now());
       storage.setItem(STORAGE_KEY, JSON.stringify(fresh));
@@ -324,9 +426,23 @@
     const farmerName = id => byId.get(id)?.name || '-';
     const byIdDesc = (a, b) => b.id - a.id;
 
+    function recordDemoAudit(store, actorId, eventType, targetType, targetId, metadata = {}) {
+      store.audit_logs.unshift({
+        id: ++store.seq.audit_logs,
+        actor_user_id: actorId,
+        actor_name: byId.get(actorId)?.name || 'เจ้าหน้าที่ ICS',
+        event_type: eventType,
+        target_type: targetType,
+        target_id: String(targetId),
+        metadata,
+        created_at: now().toISOString(),
+      });
+    }
+
     function request(user, rawPath, rawMethod = 'GET', body = {}) {
       const account = sessionAccount(user);
-      const path = String(rawPath).split('?')[0];
+      const [path, queryString = ''] = String(rawPath).split('?');
+      const params = new URLSearchParams(queryString);
       const method = String(rawMethod).toUpperCase();
       if (path === '/admin' || path.startsWith('/admin/') || path.startsWith('/auth/')) throw new DemoError(403, 'โหมด Demo ไม่สามารถเข้าถึงเมนูผู้ดูแลระบบ', 'DEMO_ADMIN_FORBIDDEN');
       const input = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
@@ -335,6 +451,9 @@
       const ownsPlot = item => owners.has(ownerOf(store, item.plot_id));
       const plotMatch = path.match(/^\/plots\/([^/]+)$/);
       const approvalMatch = path.match(/^\/approvals\/([^/]+)$/);
+      const checklistMatch = path.match(/^\/checklists\/([^/]+)$/);
+      const capaMatch = path.match(/^\/corrective-actions\/([^/]+)$/);
+      const todayIso = isoDay(now());
 
       if (method === 'GET' && path === '/me') return publicUser(account);
       if (method === 'POST' && path === '/logout') return { ok: true };
@@ -427,20 +546,115 @@
       }
       if (method === 'GET' && path === '/risks') {
         requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
-        const since = isoDay(new Date(now().getTime() - 14 * 86_400_000));
+        const since14 = isoDay(new Date(now().getTime() - 14 * 86_400_000));
+        const since30 = isoDay(new Date(now().getTime() - 30 * 86_400_000));
         const pending = store.approvals.filter(item => item.status === 'pending' && ownsPlot(item))
-          .map(item => ({ id: item.id, input_name: item.input_name, plot_name: plotName(store, item.plot_id), farmer_name: farmerName(item.user_id), type: 'pending' }));
-        const inactive = store.plots.filter(plot => owners.has(plot.owner_id) && !store.activities.some(item => item.plot_id === plot.id && item.activity_date >= since))
-          .map(plot => ({ id: plot.id, plot_name: plot.name, farmer_name: farmerName(plot.owner_id), type: 'inactive' }));
-        return clone([...pending, ...inactive]);
+          .map(item => ({
+            id: item.id,
+            plot_id: item.plot_id,
+            input_name: item.input_name,
+            plot_name: plotName(store, item.plot_id),
+            farmer_name: farmerName(item.user_id),
+            type: 'pending',
+            severity: 'medium',
+            title: 'คำขอใช้ปัจจัยการผลิตรอพิจารณา',
+            explanation: `คำขอ "${item.input_name}" รอเจ้าหน้าที่ ICS พิจารณาก่อนนำไปใช้ในแปลง`,
+            recommended_tab: 'approval',
+          }));
+        const inactive = store.plots.filter(plot => owners.has(plot.owner_id) && !store.activities.some(item => item.plot_id === plot.id && item.activity_date >= since14))
+          .map(plot => ({
+            id: plot.id,
+            plot_id: plot.id,
+            plot_name: plot.name,
+            farmer_name: farmerName(plot.owner_id),
+            type: 'inactive',
+            severity: 'high',
+            title: 'ขาดบันทึกกิจกรรมเกิน 14 วัน',
+            explanation: 'ไม่พบบันทึกกิจกรรมการดูแลแปลงติดต่อกันเกิน 14 วัน ควรติดตามหรือลงตรวจแปลง',
+            recommended_tab: 'record',
+          }));
+        const missingEvidence = store.plots
+          .filter(plot => owners.has(plot.owner_id))
+          .map(plot => {
+            const count = store.activities.filter(a => a.plot_id === plot.id && a.activity_date >= since30 && !a.photo_url).length;
+            if (!count) return null;
+            return {
+              id: plot.id,
+              plot_id: plot.id,
+              plot_name: plot.name,
+              farmer_name: farmerName(plot.owner_id),
+              missing_count: count,
+              type: 'missing_evidence',
+              severity: count >= 3 ? 'medium' : 'low',
+              title: 'กิจกรรมขาดภาพถ่ายหลักฐาน',
+              explanation: `พบ ${count} กิจกรรมในรอบ 30 วันล่าสุดที่ยังไม่มีภาพหลักฐานแนบประกอบ`,
+              recommended_tab: 'record',
+            };
+          })
+          .filter(Boolean);
+        const actionRisks = store.corrective_actions
+          .filter(ca => ca.status !== 'resolved' && ownsPlot(ca))
+          .map(ca => {
+            const overdue = ca.due_date < todayIso;
+            return {
+              id: ca.id,
+              plot_id: ca.plot_id,
+              plot_name: plotName(store, ca.plot_id),
+              farmer_name: farmerName(ownerOf(store, ca.plot_id)),
+              standard_code: ca.standard_code,
+              due_date: ca.due_date,
+              responsible_name: byId.get(ca.responsible_user_id)?.name || 'เจ้าหน้าที่ ICS',
+              type: overdue ? 'overdue_action' : 'open_action',
+              severity: overdue ? 'high' : (ca.severity === 'high' ? 'high' : 'medium'),
+              title: overdue ? 'เกินกำหนดแก้ไขปรับปรุง (CAPA)' : 'รายการแก้ไขปรับปรุงรอดำเนินการ',
+              explanation: overdue
+                ? `ข้อบกพร่อง "${ca.finding}" เกินกำหนดวันที่ ${ca.due_date} (มาตรฐาน ${ca.standard_code})`
+                : `ข้อบกพร่อง "${ca.finding}" กำหนดแก้ไขภายในวันที่ ${ca.due_date} (มาตรฐาน ${ca.standard_code})`,
+              recommended_tab: 'reviews',
+            };
+          });
+        const severityRank = { high: 0, medium: 1, low: 2 };
+        return clone([...actionRisks, ...inactive, ...pending, ...missingEvidence].sort((a, b) => (severityRank[a.severity] ?? 3) - (severityRank[b.severity] ?? 3)));
       }
       if (method === 'GET' && path === '/reviews') {
-        return clone(store.reviews.filter(ownsPlot).sort(byIdDesc).map(item => ({
-          ...item,
-          plot_name: plotName(store, item.plot_id),
-          farmer_name: farmerName(ownerOf(store, item.plot_id)),
-          reviewer_name: byId.get(item.reviewer_id)?.name || 'เจ้าหน้าที่ ICS',
-        })));
+        return clone(store.reviews.filter(ownsPlot).sort(byIdDesc).map(item => {
+          const actions = store.corrective_actions.filter(ca => ca.review_id === item.id);
+          return {
+            ...item,
+            plot_name: plotName(store, item.plot_id),
+            farmer_name: farmerName(ownerOf(store, item.plot_id)),
+            reviewer_name: byId.get(item.reviewer_id)?.name || 'เจ้าหน้าที่ ICS',
+            checklist_results: Array.isArray(item.checklist_results) ? item.checklist_results : [],
+            open_actions_count: actions.filter(ca => ca.status !== 'resolved').length,
+            total_actions_count: actions.length,
+          };
+        }));
+      }
+      if (method === 'GET' && path === '/checklists') {
+        requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
+        const std = params.get('standard_code');
+        const includeInactive = ['1', 'true'].includes(params.get('include_inactive'));
+        return clone(store.checklists.filter(c => (!std || c.standard_code === std.toUpperCase()) && (includeInactive || c.is_active)));
+      }
+      if (method === 'GET' && path === '/corrective-actions') {
+        requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
+        const st = params.get('status');
+        const pId = params.get('plot_id') ? Number(params.get('plot_id')) : null;
+        const std = params.get('standard_code');
+        return clone(store.corrective_actions
+          .filter(ca => ownsPlot(ca) && (!st || ca.status === st) && (!pId || ca.plot_id === pId) && (!std || ca.standard_code === std.toUpperCase()))
+          .map(ca => ({
+            ...ca,
+            plot_name: plotName(store, ca.plot_id),
+            farmer_name: farmerName(ownerOf(store, ca.plot_id)),
+            responsible_name: byId.get(ca.responsible_user_id)?.name || 'เจ้าหน้าที่ ICS',
+            review_result: store.reviews.find(r => r.id === ca.review_id)?.result || null,
+            is_overdue: ca.status !== 'resolved' && ca.due_date < todayIso,
+          })));
+      }
+      if (method === 'GET' && path === '/audit-logs') {
+        requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
+        return clone(store.audit_logs.slice(0, 100));
       }
       if (method === 'GET' && path === '/ics/farmers') {
         requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
@@ -544,9 +758,153 @@
       if (method === 'POST' && path === '/reviews') {
         requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
         const plot = ownPlot(store, account, input.plot_id);
-        const item = { id: ++store.seq.reviews, plot_id: plot.id, reviewer_id: account.id, result: text(input.result, 'ผลตรวจ', 100), note: text(input.note, 'บันทึกผลตรวจ', 2000), created_at: now().toISOString() };
-        store.reviews.push(item); save(store);
-        return { id: item.id };
+        const allowedStd = new Set(['PGS', 'EU_ORGANIC', 'FAIRTRADE']);
+        const standardCode = input.standard_code ? String(input.standard_code).trim().toUpperCase() : null;
+        if (standardCode && !allowedStd.has(standardCode)) throw new DemoError(400, 'รหัสมาตรฐานไม่ถูกต้อง');
+        let checklistId = null;
+        let resolvedStandard = standardCode;
+        if (input.checklist_id) {
+          checklistId = positiveId(input.checklist_id, 'รหัสชุดรายการตรวจ');
+          const cl = store.checklists.find(c => c.id === checklistId && c.is_active);
+          if (!cl) throw new DemoError(404, 'ไม่พบชุดรายการตรวจที่ใช้งานได้');
+          if (standardCode && cl.standard_code !== standardCode) throw new DemoError(400, 'ชุดรายการตรวจไม่ตรงกับมาตรฐานที่เลือก');
+          resolvedStandard = cl.standard_code;
+        }
+        const checklistResults = Array.isArray(input.checklist_results) ? input.checklist_results : [];
+        const item = {
+          id: ++store.seq.reviews,
+          plot_id: plot.id,
+          reviewer_id: account.id,
+          result: text(input.result, 'ผลตรวจ', 100),
+          note: text(input.note, 'บันทึกผลตรวจ', 2000),
+          ...(resolvedStandard ? { standard_code: resolvedStandard } : {}),
+          ...(checklistId ? { checklist_id: checklistId } : {}),
+          checklist_results: checklistResults,
+          created_at: now().toISOString(),
+        };
+        store.reviews.push(item);
+        const createdActions = [];
+        if (Array.isArray(input.findings)) {
+          for (const f of input.findings) {
+            const ca = {
+              id: ++store.seq.corrective_actions,
+              plot_id: plot.id,
+              review_id: item.id,
+              standard_code: (f.standard_code && allowedStd.has(String(f.standard_code).toUpperCase())) ? String(f.standard_code).toUpperCase() : (resolvedStandard || 'PGS'),
+              severity: ['low', 'medium', 'high'].includes(String(f.severity || '').toLowerCase()) ? String(f.severity).toLowerCase() : 'medium',
+              finding: text(f.finding, 'ข้อบกพร่องที่พบ', 1000),
+              action_required: text(f.action_required, 'แนวทางแก้ไข', 1000),
+              responsible_user_id: account.id,
+              due_date: isoDate(f.due_date, 'กำหนดแก้ไข'),
+              status: 'open',
+              resolution_note: '',
+              resolved_at: null,
+              created_by: account.id,
+              created_at: now().toISOString(),
+              updated_at: now().toISOString(),
+            };
+            store.corrective_actions.push(ca);
+            createdActions.push(ca.id);
+            recordDemoAudit(store, account.id, 'corrective_action.created', 'corrective_action', ca.id, { plotId: plot.id, reviewId: item.id, standardCode: ca.standard_code });
+          }
+        }
+        recordDemoAudit(store, account.id, 'review.created', 'review', item.id, { plotId: plot.id, result: item.result, ...(resolvedStandard ? { standardCode: resolvedStandard } : {}) });
+        save(store);
+        return {
+          id: item.id,
+          ...(resolvedStandard ? { standard_code: resolvedStandard } : {}),
+          ...(createdActions.length ? { corrective_action_ids: createdActions } : {}),
+        };
+      }
+      if (method === 'POST' && path === '/checklists') {
+        requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
+        const std = String(input.standard_code || '').trim().toUpperCase();
+        if (!['PGS', 'EU_ORGANIC', 'FAIRTRADE'].includes(std)) throw new DemoError(400, 'รหัสมาตรฐานไม่ถูกต้อง');
+        if (input.validation_status === 'validated') throw new DemoError(403, 'เฉพาะผู้ดูแลระบบสามารถยืนยันสถานะเกณฑ์มาตรฐานได้');
+        if (!Array.isArray(input.items) || !input.items.length) throw new DemoError(400, 'รายการตรวจต้องมีอย่างน้อย 1 รายการ');
+        const created = {
+          id: ++store.seq.checklists,
+          standard_code: std,
+          title: text(input.title, 'ชื่อชุดรายการตรวจ', 200),
+          description: optionalText(input.description, 'คำอธิบายชุดรายการตรวจ', 1000),
+          items: input.items.map((it, idx) => ({ key: `item_${idx + 1}`, label: text(it.label, 'หัวข้อตรวจ', 300), required: Boolean(it.required) })),
+          validation_status: 'draft_unvalidated',
+          is_active: true,
+          created_by: account.id,
+          created_at: now().toISOString(),
+          updated_at: now().toISOString(),
+        };
+        store.checklists.push(created);
+        recordDemoAudit(store, account.id, 'checklist.created', 'inspection_checklist', created.id, { standardCode: std });
+        save(store);
+        return clone(created);
+      }
+      if (method === 'PATCH' && checklistMatch) {
+        requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
+        const id = positiveId(checklistMatch[1], 'รหัสชุดรายการตรวจ');
+        const cl = store.checklists.find(c => c.id === id);
+        if (!cl) throw new DemoError(404, 'ไม่พบชุดรายการตรวจ');
+        if (input.validation_status === 'validated') throw new DemoError(403, 'เฉพาะผู้ดูแลระบบสามารถยืนยันสถานะเกณฑ์มาตรฐานได้');
+        if (Object.hasOwn(input, 'title')) cl.title = text(input.title, 'ชื่อชุดรายการตรวจ', 200);
+        if (Object.hasOwn(input, 'description')) cl.description = optionalText(input.description, 'คำอธิบายชุดรายการตรวจ', 1000);
+        if (Object.hasOwn(input, 'is_active')) cl.is_active = Boolean(input.is_active);
+        if (Object.hasOwn(input, 'items')) cl.items = input.items.map((it, idx) => ({ key: it.key || `item_${idx + 1}`, label: text(it.label, 'หัวข้อตรวจ', 300), required: Boolean(it.required) }));
+        cl.updated_at = now().toISOString();
+        recordDemoAudit(store, account.id, 'checklist.updated', 'inspection_checklist', cl.id, {});
+        save(store);
+        return clone(cl);
+      }
+      if (method === 'POST' && path === '/corrective-actions') {
+        requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
+        const plot = ownPlot(store, account, input.plot_id);
+        const std = input.standard_code ? String(input.standard_code).trim().toUpperCase() : 'PGS';
+        if (!['PGS', 'EU_ORGANIC', 'FAIRTRADE'].includes(std)) throw new DemoError(400, 'รหัสมาตรฐานไม่ถูกต้อง');
+        const severity = input.severity ? String(input.severity).trim().toLowerCase() : 'medium';
+        if (!['low', 'medium', 'high'].includes(severity)) throw new DemoError(400, 'ระดับความรุนแรงไม่ถูกต้อง');
+        const ca = {
+          id: ++store.seq.corrective_actions,
+          plot_id: plot.id,
+          review_id: input.review_id ? positiveId(input.review_id) : null,
+          standard_code: std,
+          severity,
+          finding: text(input.finding, 'ข้อบกพร่องที่พบ', 1000),
+          action_required: text(input.action_required, 'แนวทางแก้ไข', 1000),
+          responsible_user_id: account.id,
+          due_date: isoDate(input.due_date, 'กำหนดแก้ไข'),
+          status: 'open',
+          resolution_note: '',
+          resolved_at: null,
+          created_by: account.id,
+          created_at: now().toISOString(),
+          updated_at: now().toISOString(),
+        };
+        store.corrective_actions.push(ca);
+        recordDemoAudit(store, account.id, 'corrective_action.created', 'corrective_action', ca.id, { plotId: plot.id, standardCode: std, severity });
+        save(store);
+        return clone({ ...ca, plot_name: plot.name, farmer_name: farmerName(plot.owner_id), responsible_name: account.name, is_overdue: ca.due_date < todayIso });
+      }
+      if (method === 'PATCH' && capaMatch) {
+        requireRole(account, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
+        const id = positiveId(capaMatch[1], 'รหัสรายการแก้ไข');
+        const ca = store.corrective_actions.find(c => c.id === id);
+        if (!ca) throw new DemoError(404, 'ไม่พบรายการแก้ไขปรับปรุง');
+        ownPlot(store, account, ca.plot_id);
+        const fromStatus = ca.status;
+        if (Object.hasOwn(input, 'status')) {
+          if (!['open', 'in_progress', 'resolved'].includes(input.status)) throw new DemoError(400, 'สถานะการแก้ไขไม่ถูกต้อง');
+          ca.status = input.status;
+          ca.resolved_at = input.status === 'resolved' ? now().toISOString() : null;
+        }
+        if (Object.hasOwn(input, 'resolution_note')) ca.resolution_note = optionalText(input.resolution_note, 'สรุปผลการแก้ไข', 1000);
+        if (ca.status === 'resolved' && !String(ca.resolution_note || '').trim()) {
+          throw new DemoError(400, 'กรุณาระบุสรุปผลการแก้ไขก่อนปิดรายการ');
+        }
+        if (Object.hasOwn(input, 'due_date')) ca.due_date = isoDate(input.due_date, 'กำหนดแก้ไข');
+        if (Object.hasOwn(input, 'severity')) ca.severity = String(input.severity).toLowerCase();
+        ca.updated_at = now().toISOString();
+        recordDemoAudit(store, account.id, 'corrective_action.updated', 'corrective_action', ca.id, { plotId: ca.plot_id, fromStatus, toStatus: ca.status });
+        save(store);
+        return clone({ ...ca, plot_name: plotName(store, ca.plot_id), farmer_name: farmerName(ownerOf(store, ca.plot_id)), responsible_name: byId.get(ca.responsible_user_id)?.name || account.name, is_overdue: ca.status !== 'resolved' && ca.due_date < todayIso });
       }
       throw new DemoError(404, 'ไม่พบ API ในโหมด Demo');
     }

@@ -4,48 +4,50 @@
 
 ---
 
-## 1. ภาพรวมสถานะโครงการปัจจุบัน (Current Status: PHASE 1-2 SPRINT UPDATED)
+## 1. ภาพรวมสถานะโครงการปัจจุบัน (Current Status: PHASE 1-3 SPRINT UPDATED)
 
-- **ความพร้อมของระบบ:** อัปเดต Phase 1 (End-to-End Workflow Reliability) และ Phase 2 (Real Photo Evidence Storage Abstraction & R2-Ready Layer) แล้ว; ต้องสร้าง/ผูก Cloudflare R2 Bucket (`EVIDENCE_BUCKET`) เพิ่มเมื่อขึ้น Staging/Production
+- **ความพร้อมของระบบ:** อัปเดต Phase 1 (End-to-End Workflow Reliability + CSP `font-src` commit `959a201`), Phase 2 (Real Photo Evidence Storage Abstraction & R2-Ready Layer), และ Phase 3 (ICS Audit Assistant: Configurable Checklists, Multi-Signal Risk Detection, Findings & Corrective Actions / CAPA, Audit Logs) แล้ว
 - **Automated Tests:**
-  - ชุดทดสอบ Worker / Miniflare D1 / Frontend Security / Demo / Staging: ผ่าน **56/56 รายการ (100% Pass)**
-  - `npm test` เต็มชุดบนเครื่องที่ใช้ Node.js v26.13.0: ติด `better-sqlite3` ขาด native binary (`better_sqlite3.node`) ในไฟล์เทสต์ฝั่ง SQLite (`api.test.js`, `migration.test.js`, `invitation.test.js`, `d1-local-migration.test.js`, `production-dev-login.test.js`, `worker-contract.test.js`) — ต้องรันด้วย Node.js 20/22 LTS เพื่อตรวจ SQLite suite ครบทั้งหมด
+  - ชุดทดสอบเป้าหมาย Phase 1–3 (`worker-ics-audit.test.js`, `worker-e2e-workflow.test.js`, `worker-photo-evidence.test.js`, `frontend-security.test.js`, `demo-mode.test.js`, `public-demo-worker.test.js`): ผ่าน **38/38 รายการ (100% Pass)**
+  - หมายเหตุเรื่อง `better-sqlite3` บน Node.js v26.13.0: ไฟล์เทสต์ฝั่ง Express + SQLite ใน `npm test` ยังต้องรันด้วย Node.js 20/22 LTS เพื่อตรวจ native binary (`better_sqlite3.node`)
 - **Public Demo Environment:** Deploy แยกต่างหากบน Cloudflare Workers:
-  `https://ready-to-grow-demo.readytogrow-app.workers.dev` (แยกจากระบบจริงทั้งหมด)
+  `https://ready-to-grow-demo.readytogrow-app.workers.dev` (แยกจากระบบจริงทั้งหมด; ยังไม่ได้ re-deploy หลังอัปเดต Phase 1–3)
 
 ---
 
 ## 2. สิ่งที่พัฒนาเสร็จสมบูรณ์แล้ว (Completed Features)
 
 ### ก. ระบบแกนกลางและฐานข้อมูล (Core & Database)
-- [x] โครงสร้างฐานข้อมูลเชิงสัมพันธ์สมบูรณ์ รองรับ Foreign Keys, Triggers, และ Audit Logs (`approval.reviewed`, `review.created`, `evidence.uploaded`)
+- [x] โครงสร้างฐานข้อมูลเชิงสัมพันธ์สมบูรณ์ รองรับ Foreign Keys, Triggers, และ Audit Logs (`approval.reviewed`, `review.created`, `evidence.uploaded`, `checklist.created`, `checklist.updated`, `corrective_action.created`, `corrective_action.updated`)
 - [x] ระบบ Dual-Runtime รองรับทั้ง Express + SQLite (Local) และ Cloudflare Workers + D1 (Edge)
-- [x] D1 Migrations: `0001` – `0007` (เพิ่ม `0007_photo_evidence.sql` สำหรับ metadata ภาพหลักฐาน) และ SQLite Migrations `001` – `003`
-- [x] Backend E2E Integration Test (`test/worker-e2e-workflow.test.js`) และ Photo Evidence Test (`test/worker-photo-evidence.test.js`) บน Miniflare D1
+- [x] D1 Migrations: `0001` – `0008` (เพิ่ม `0007_photo_evidence.sql` และ `0008_ics_audit_assistant.sql`) และ SQLite Migrations `001` – `004`
+- [x] Automated Tests บน Miniflare D1: `test/worker-e2e-workflow.test.js`, `test/worker-photo-evidence.test.js`, `test/worker-ics-audit.test.js`
 
 ### ข. ระบบความปลอดภัยและสิทธิ์ผู้ใช้ (Security & RBAC)
 - [x] แยกบทบาทชัดเจนระหว่าง Farmer, ICS, และ Admin
 - [x] ป้องกันการเข้าถึงข้อมูลข้ามเกษตรกร (Farmer 1 ไม่เห็นข้อมูลและภาพหลักฐานของ Farmer 2)
-- [x] ป้องกัน ICS เข้าถึงข้อมูลเกษตรกรนอกสายงาน (ICS 1 ไม่สามารถอนุมัติคำขอหรือเปิดภาพหลักฐานของ Farmer สายงาน ICS 2)
+- [x] ป้องกัน ICS เข้าถึงข้อมูลเกษตรกรนอกสายงาน (ICS 1 ไม่สามารถอนุมัติคำขอ เปิดภาพหลักฐาน บันทึกผลตรวจ หรือสร้าง/ปิด CAPA ของ Farmer สายงาน ICS 2)
+- [x] เฉพาะ Admin สามารถยืนยันสถานะชุดรายการตรวจ (`validation_status='validated'`) และตั้งค่าเริ่มต้นเป็น `draft_unvalidated` เพื่อไม่ให้สับสนระหว่างการตรวจภายใน ICS กับการรับรองมาตรฐานอย่างเป็นทางการ
 - [x] Public Demo ทำงานเป็น Client-Side Sandbox ตัดสิทธิ์การเข้าถึง Admin API เด็ดขาด
-- [x] มี Security Headers และ CSP ที่เข้มงวด ป้องกัน XSS และ Injection (ตรวจสอบ magic bytes ภาพ JPEG/PNG/WebP ก่อนจัดเก็บ และเปิดดูผ่าน Authenticated Endpoint)
+- [x] Security Headers และ CSP เข้มงวด (รวม `font-src 'self' data:` สำหรับฟอนต์ self-hosted `IBM Plex Sans Thai`, Magic-byte check ภาพ JPEG/PNG/WebP และ `default-src 'none'; sandbox` เมื่อเสิร์ฟภาพหลักฐาน)
 
-### ค. ประสบการณ์ผู้ใช้และภาพหลักฐาน (UX, Mobile/LIFF & Evidence)
+### ค. ประสบการณ์ผู้ใช้ ภาพหลักฐาน และผู้ช่วยตรวจ ICS (UX, Evidence & Audit Assistant)
 - [x] แถบจังหวะบันทึก 14 วัน (`create14DayRhythmTrack`), Sidebar/Bottom 4+เพิ่มเติม, 3-Step Activity Wizard, Split-View Approval, Admin Overview & RBAC Matrix
 - [x] ระบบอัปโหลดภาพหลักฐานแบบ R2-ready (`worker/storage.js`) และ Local private storage (`lib/evidence-storage.js`) รองรับกล้อง + คลังภาพ ย่อขนาดฝั่ง client แสดงความคืบหน้า และแยกป้ายตัวอย่างในโหมด Demo ชัดเจน
+- [x] ระบบผู้ช่วยตรวจประเมินภายใน ICS Audit Assistant: แยกหมวดหมู่ `PGS` / `EU_ORGANIC` / `FAIRTRADE` อิสระ, รายการตรวจกำหนดเอง (`checklist`), คัดกรองความเสี่ยง 5 ประเภทใน `/api/risks` (รวมขาดภาพหลักฐานและ CAPA เกินกำหนด), บันทึกข้อบกพร่องและติดตามการแก้ไข (`corrective-actions`) พร้อมสรุปผลก่อนปิดรายการ และตาราง Audit Log
 
 ---
 
 ## 3. ปัญหาที่ยังพบและข้อจำกัดปัจจุบัน (Known Limitations)
 
-1. **Cloudflare R2 Bucket สำหรับ Staging/Production:**
-   - ชั้นแอปพลิเคชัน (`POST /api/evidence`, `GET /api/evidence/:id`, `GET /api/evidence/:id/content`) และ Migration `0007` พร้อมแล้ว แต่ยังไม่ได้สร้าง R2 Bucket จริงและเพิ่ม `r2_buckets` binding (`EVIDENCE_BUCKET`) ลงใน `wrangler.jsonc` / `wrangler.staging.jsonc` (หากยังไม่ผูก binding API จะ fail-closed คืน `503 EVIDENCE_STORAGE_UNAVAILABLE`)
-2. **การจัดเก็บข้อมูลในโหมด Demo (Standalone Client Storage):**
+1. **Cloudflare R2 Bucket & Remote D1 Migration สำหรับ Staging/Production:**
+   - ชั้นแอปพลิเคชันและ Migration (`0007_photo_evidence.sql`, `0008_ics_audit_assistant.sql`) พร้อมแล้ว แต่ยังไม่ได้รัน Migration บน Remote D1 หรือสร้าง R2 Bucket (`EVIDENCE_BUCKET`) จริง (หากยังไม่ผูก R2 API จะ fail-closed คืน `503 EVIDENCE_STORAGE_UNAVAILABLE`)
+2. **การยืนยันเกณฑ์มาตรฐาน Checklist อย่างเป็นทางการ:**
+   - ชุดรายการตรวจเริ่มต้นของ `PGS`, `EU_ORGANIC` และ `FAIRTRADE` ถูกทำเครื่องหมายเป็น `draft_unvalidated` ("รอการยืนยันเกณฑ์") จนกว่าผู้ดูแลระบบ/คณะกรรมการมาตรฐานจะตรวจสอบและกดยืนยันเกณฑ์
+3. **การจัดเก็บข้อมูลในโหมด Demo (Standalone Client Storage):**
    - โหมด Demo ยังเก็บข้อมูลและภาพตัวอย่างเฉพาะในเบราว์เซอร์ (`localStorage`) ตามหลักการแยก Sandbox ออกจากระบบจริง
-3. **การแจ้งเตือน LINE Messaging API, Real Public QR Traceability และ ICS Audit Assistant:**
-   - ยังอยู่ใน Phase 3–7 ถัดไป
-4. **CSP `font-src` สำหรับฟอนต์ Self-hosted:**
-   - `public/_headers` และ `server.js` ยังไม่มี `font-src 'self' data:` จึงต้องขออนุมัติก่อนแก้ Header ความปลอดภัยเพื่อให้ `IBM Plex Sans Thai` โหลดจาก `/fonts/` ได้จริง
+4. **งานที่เหลือใน Phase 4–7:**
+   - Real QR Traceability (`GET /api/public/lots/:code` + SVG QR), Smart Farm Log + Production Cost Tracking, LINE Messaging API Notification, และ Staging/Production Readiness Audit (รวมรัน SQLite suite บน Node 20/22 LTS)
 
 ---
 
