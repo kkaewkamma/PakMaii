@@ -133,6 +133,39 @@ export const ICONS = {
     { type: 'circle', cx: '12', cy: '12', r: '1.5' },
     { type: 'circle', cx: '19', cy: '12', r: '1.5' },
     { type: 'circle', cx: '5', cy: '12', r: '1.5' }
+  ],
+  farmerAvatar: [
+    { type: 'path', d: 'M3 9c3-1.5 15-1.5 18 0' },
+    { type: 'path', d: 'M7 9c0-3 2-5 5-5s5 2 5 5' },
+    { type: 'circle', cx: '12', cy: '12.5', r: '3.2' },
+    { type: 'path', d: 'M5.5 21c1-3.2 3.6-5 6.5-5s5.5 1.8 6.5 5' }
+  ],
+  fertilizerBag: [
+    { type: 'path', d: 'M6 7h12l1.5 13a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 20L6 7z' },
+    { type: 'path', d: 'M8 7l1.5-3.5h5L16 7' },
+    { type: 'path', d: 'M12 17v-5' },
+    { type: 'path', d: 'M12 13.5c-2 0-3-1.5-3-3 1.8 0 3 1.2 3 3z' },
+    { type: 'path', d: 'M12 14.5c2 0 3-1.5 3-3-1.8 0-3 1.2-3 3z' }
+  ],
+  docReject: [
+    { type: 'path', d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6' },
+    { type: 'path', d: 'M14 2v6h6' },
+    { type: 'line', x1: '8', y1: '11', x2: '13', y2: '11' },
+    { type: 'line', x1: '8', y1: '15', x2: '11', y2: '15' },
+    { type: 'circle', cx: '17.5', cy: '17.5', r: '4.2' },
+    { type: 'line', x1: '16', y1: '16', x2: '19', y2: '19' },
+    { type: 'line', x1: '19', y1: '16', x2: '16', y2: '19' }
+  ],
+  send: [
+    { type: 'line', x1: '22', y1: '2', x2: '11', y2: '13' },
+    { type: 'polygon', points: '22 2 15 22 11 13 2 9 22 2' }
+  ],
+  headset: [
+    { type: 'path', d: 'M3 18v-6a9 9 0 0 1 18 0v6' },
+    { type: 'path', d: 'M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z' }
+  ],
+  chevronRight: [
+    { type: 'polyline', points: '9 18 15 12 9 6' }
   ]
 };
 

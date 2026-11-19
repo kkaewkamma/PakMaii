@@ -3,7 +3,7 @@
 import { api, exportCsv } from '../core/api.js';
 import { el, card, empty, selectField, dated, notify, formatLocalIsoDate } from '../core/dom.js';
 import { icon } from '../core/icons.js';
-import { openEvidenceViewer, createPhotoUploader } from '../core/photo.js';
+import { openEvidenceViewer, openPhotoPreviewModal, createPhotoUploader } from '../core/photo.js';
 import {
   AUDIT_STANDARD_LABELS,
   AUDIT_SEVERITY_LABELS,
@@ -207,6 +207,7 @@ export async function buildIcsReviewsView({ plots = [], plotSelect = null } = {}
             note: row.noteInp.value.trim(),
           })),
           evidence_id: reviewEvidenceInput.value ? Number(reviewEvidenceInput.value) : undefined,
+          photo_url: reviewEvidenceInput.dataset.uploadedDataUrl || undefined,
           ...(findings.length ? { findings } : {}),
         });
         notify('บันทึกผลตรวจประเมินภายในเรียบร้อย');
@@ -497,6 +498,14 @@ export async function buildIcsReviewsView({ plots = [], plotSelect = null } = {}
             className: 'link-btn',
             onclick: () => openEvidenceViewer(item.evidence_id)
           }, icon('camera', 13), ' ดูภาพหลักฐานที่อัปโหลด') : null,
+          item.photo_url ? el('div', { className: 'mt-8' },
+            el('img', {
+              src: item.photo_url,
+              className: 'activity-photo-thumb',
+              alt: 'ภาพหลักฐานการตรวจแปลง',
+              onclick: () => openPhotoPreviewModal(item.photo_url, `ภาพหลักฐานการตรวจแปลง ${item.plot_name || ''}`.trim())
+            })
+          ) : null,
           el('small', { className: 'muted' }, `ผู้ตรวจ: ${item.reviewer_name || 'เจ้าหน้าที่ ICS'} • ${dated(item.created_at)}`)
         );
       }));

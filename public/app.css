@@ -3316,3 +3316,383 @@ body.is-login .hero {
     padding: 24px !important;
   }
 }
+
+/* ==========================================================================
+   19. Farmer-Friendly Profile, Fertilizer Status & Next-Action Cards
+   ========================================================================== */
+.user-avatar.avatar-farmer {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #E2F2E6;
+  color: #1E6B45;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 2px 8px rgba(36, 92, 67, 0.16);
+}
+
+.user-avatar.avatar-ics,
+.user-avatar.avatar-admin {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: #EEF2EC;
+  color: var(--green-900);
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 2px 8px rgba(36, 92, 67, 0.12);
+}
+
+.identity-meta .user-code {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--green-900);
+}
+
+.identity-meta .user-role-text {
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+/* Featured Fertilizer / Input Approval Alert Card */
+.approval-hero-alert {
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 18px;
+  border: 1.5px solid #F5D0CC;
+  background-color: #FFF4F3;
+}
+
+.approval-hero-alert.tone-pending {
+  background-color: #FCF6EB;
+  border-color: #F3DCB1;
+}
+
+.approval-hero-alert.tone-approved {
+  background-color: #EFF7F1;
+  border-color: #B7DEC1;
+}
+
+.approval-hero-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.approval-doc-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background-color: #FDE2DF;
+  color: #C8322B;
+}
+
+.approval-doc-circle.tone-pending {
+  background-color: #FAE8C8;
+  color: #8A5A12;
+}
+
+.approval-doc-circle.tone-approved {
+  background-color: #D7EFE0;
+  color: #1E7E3E;
+}
+
+.approval-hero-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.approval-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.approval-main-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #9E2820;
+}
+
+.tone-pending .approval-main-title {
+  color: #7D4E0D;
+}
+
+.tone-approved .approval-main-title {
+  color: #173D2C;
+}
+
+.approval-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  background-color: #FADAD6;
+  color: #9E2820;
+}
+
+.approval-status-pill.tone-pending {
+  background-color: #F6E2BC;
+  color: #7D4E0D;
+}
+
+.approval-status-pill.tone-approved {
+  background-color: #D2ECDC;
+  color: #1A6A36;
+}
+
+.approval-date-sub {
+  margin-top: 4px;
+  font-size: 14.5px;
+  color: #4A5A50;
+}
+
+.approval-reason-card {
+  background-color: #FFF9F8;
+  border: 1px solid #F3D5D1;
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+
+.approval-reason-card.tone-pending {
+  background-color: #FFFDF9;
+  border-color: #EFE0C2;
+}
+
+.approval-reason-card.tone-approved {
+  background-color: #F8FCF9;
+  border-color: #C9E6D1;
+}
+
+.approval-reason-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1C2822;
+  margin-bottom: 8px;
+}
+
+.approval-reason-bullets {
+  margin: 0;
+  padding-left: 20px;
+  color: #25332B;
+  font-size: 15.5px;
+  line-height: 1.65;
+}
+
+.approval-reason-bullets li {
+  margin-bottom: 4px;
+}
+
+.tone-rejected .approval-reason-bullets li::marker {
+  color: #C8322B;
+}
+
+/* "กรุณาดำเนินการต่อ" Section & 2-Column Action Cards */
+.next-action-section {
+  margin: 18px 0 22px;
+}
+
+.next-action-heading {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #173D2C;
+}
+
+.next-action-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 768px) {
+  .next-action-grid {
+    grid-template-columns: 1.45fr 1fr;
+  }
+}
+
+.action-card-submit {
+  background-color: #FFFFFF;
+  border: 1.5px solid #B7DEC1;
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.action-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.bag-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1E7E3E;
+}
+
+.action-card-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: #1C2822;
+}
+
+.voice-field-group {
+  margin-top: 10px;
+}
+
+.voice-textarea-wrap {
+  position: relative;
+  margin-top: 6px;
+}
+
+.voice-textarea-wrap textarea {
+  width: 100%;
+  padding-right: 58px;
+  border-radius: 12px;
+  border: 1.5px solid #D5DED7;
+  min-height: 92px;
+}
+
+.embedded-mic-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 42px;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+  border-radius: 10px;
+  background-color: #E4F4E8 !important;
+  color: #1E7E3E !important;
+  border: 1px solid #B7DEC1 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.embedded-mic-btn:hover,
+.embedded-mic-btn.recording {
+  background-color: #1E7E3E !important;
+  color: #FFFFFF !important;
+}
+
+.voice-char-counter {
+  text-align: right;
+  font-size: 13px;
+  color: var(--ink-muted);
+  margin: 4px 2px 10px;
+}
+
+.btn-send-review {
+  width: 100%;
+  min-height: 48px;
+  background-color: #1E7E3E !important;
+  border-color: #1E7E3E !important;
+  color: #FFFFFF !important;
+  border-radius: 10px;
+  font-size: 17px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-send-review:hover {
+  background-color: #176632 !important;
+}
+
+.action-card-contact {
+  width: 100%;
+  text-align: left;
+  background-color: #FFFFFF !important;
+  color: var(--ink) !important;
+  border: 1.5px solid #E2E7DF !important;
+  border-radius: 16px !important;
+  padding: 20px 18px !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch !important;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.action-card-contact:hover {
+  border-color: #1E7E3E !important;
+  background-color: #F9FCF9 !important;
+}
+
+.contact-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.contact-headset-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #E4F4E8;
+  color: #1E7E3E;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.contact-card-title {
+  font-size: 19px;
+  font-weight: 600;
+  color: #1C2822;
+  flex: 1;
+}
+
+.contact-chevron {
+  color: var(--ink-muted);
+  display: inline-flex;
+}
+
+.contact-card-desc {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-muted);
+  line-height: 1.55;
+  white-space: normal;
+}
+
+/* Activity & Inspection Photo Thumbnails */
+.activity-photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.activity-photo-thumb {
+  display: block;
+  max-width: 180px;
+  max-height: 130px;
+  border-radius: 10px;
+  border: 1.5px solid var(--sage-300);
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.photo-preview-img {
+  cursor: pointer;
+}

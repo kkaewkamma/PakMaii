@@ -49,21 +49,51 @@ test.describe('PakMaii Critical Workflows (Demo-First & LIFF Compatibility)', ()
     await expect(next1Btn).toBeVisible();
     await next1Btn.click();
 
-    // 8. Step 2: Fill details and advance to Step 3
+    // 8. Step 2: Fill details, upload a real photo file, and advance to Step 3
     const detailsArea = page.locator('textarea[name="details"]');
     await expect(detailsArea).toBeVisible();
-    await detailsArea.fill('ทดสอบบันทึกกิจกรรมผ่าน Playwright E2E');
+    await detailsArea.fill('ทดสอบบันทึกกิจกรรมพร้อมอัปโหลดรูปภาพผ่าน Playwright E2E');
+
+    const onePixelPng = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    const fileInput = page.locator('#recordForm input[type="file"]').first();
+    await fileInput.setInputFiles({
+      name: 'farm-plot.png',
+      mimeType: 'image/png',
+      buffer: onePixelPng
+    });
+    await expect(page.locator('#recordForm .photo-preview-img')).toBeVisible();
+
     const next2Btn = page.locator('#wizardNext2Btn');
     await next2Btn.click();
 
-    // 9. Step 3: Review and submit
+    // 9. Step 3: Review (including attached photo thumbnail) and submit
     await expect(page.locator('.wizard-review-box')).toBeVisible();
-    await expect(page.locator('.wizard-review-box')).toContainText('ทดสอบบันทึกกิจกรรมผ่าน Playwright E2E');
+    await expect(page.locator('.wizard-review-box')).toContainText('ทดสอบบันทึกกิจกรรมพร้อมอัปโหลดรูปภาพผ่าน Playwright E2E');
+    await expect(page.locator('.wizard-review-box .activity-photo-thumb')).toBeVisible();
     const submitBtn = page.locator('#recordSubmitBtn');
     await submitBtn.click();
 
-    // 10. Verify notification and activity appeared in history
+    // 10. Verify notification, saved photo thumbnail on activity card, and photo viewer modal
     await expect(page.locator('#toast')).toContainText('บันทึกกิจกรรมสำเร็จ');
+    const savedThumb = page.locator('#content .activity-photo-thumb').first();
+    await expect(savedThumb).toBeVisible();
+    await savedThumb.click();
+    await expect(page.locator('.passport-overlay')).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // 11. Navigate to Fertilizer / Input Approval tab and verify new reference UI cards
+    const approvalNavBtn = isMobile
+      ? page.locator('.dock-btn:has-text("ขอปัจจัย"):visible')
+      : page.locator('#tabs button:has-text("คำขอปัจจัย"):visible');
+    await approvalNavBtn.click();
+    await expect(page.locator('.approval-hero-alert')).toBeVisible();
+    await expect(page.locator('.approval-status-pill')).toContainText('ไม่ผ่านการอนุมัติ');
+    await expect(page.locator('.next-action-heading')).toHaveText('กรุณาดำเนินการต่อ');
+    await expect(page.locator('.action-card-submit')).toContainText('ส่งปุ๋ยสูตรใหม่');
+    await expect(page.locator('.action-card-contact')).toContainText('ติดต่อเจ้าหน้าที่');
   });
 
   test('ICS Login, Risks Dashboard, and Audit Assistant', async ({ page, isMobile }) => {

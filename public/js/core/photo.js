@@ -46,11 +46,63 @@ export function compressImage(file, maxDimension = 1200, quality = 0.8) {
   });
 }
 
+export function dataUrlToBlob(dataUrl) {
+  const parts = String(dataUrl || '').split(',');
+  const mimeMatch = (parts[0] || '').match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(parts[1] || '');
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
+
 export async function compressImageToBlob(file, maxDimension = 1200, quality = 0.8) {
   const dataUrl = await compressImage(file, maxDimension, quality);
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
+  const blob = dataUrlToBlob(dataUrl);
   return { blob, dataUrl, contentType: blob.type || 'image/jpeg', size: blob.size };
+}
+
+export function openPhotoPreviewModal(src, title = 'ภาพหลักฐาน') {
+  if (!src) return;
+  const previousFocus = document.activeElement;
+  const overlay = el('div', {
+    className: 'passport-overlay',
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-label': title
+  });
+  const closeDialog = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown);
+    if (previousFocus && typeof previousFocus.focus === 'function') {
+      previousFocus.focus();
+    }
+  };
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') closeDialog();
+  };
+  document.addEventListener('keydown', onKeyDown);
+
+  const closeBtn = el('button', { type: 'button', className: 'passport-close-btn', onclick: closeDialog }, 'ปิดหน้าต่าง');
+  const cardNode = el('div', { className: 'passport-card' },
+    el('div', { className: 'passport-header' },
+      el('span', { className: 'pill success' }, icon('camera', 12), ' ภาพหลักฐานประกอบการบันทึก'),
+      el('h3', { className: 'passport-title mt-8' }, title)
+    ),
+    el('div', { className: 'passport-body' },
+      el('img', { src, className: 'evidence-viewer-img', alt: title })
+    ),
+    el('div', { className: 'passport-actions row between mt-12' },
+      closeBtn
+    )
+  );
+  overlay.append(cardNode);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
+  document.body.append(overlay);
+  closeBtn.focus();
 }
 
 export function uploadEvidenceWithProgress(blob, { plotId, entityType = 'activity', onProgress } = {}) {
@@ -158,7 +210,12 @@ export function createPhotoUploader(photoUrlInput, options = {}) {
 
   const galleryInput = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/*', className: 'hide' });
   const cameraInput = el('input', { type: 'file', accept: 'image/*', capture: 'environment', className: 'hide' });
-  const previewImg = el('img', { className: 'photo-preview-img hide', alt: 'ตัวอย่างหลักฐานภาพถ่าย' });
+  const previewImg = el('img', {
+    className: 'photo-preview-img hide',
+    alt: 'ตัวอย่างหลักฐานภาพถ่าย',
+    title: 'แตะเพื่อขยายดูภาพขนาดใหญ่',
+    onclick: () => openPhotoPreviewModal(previewImg.src, 'ตัวอย่างหลักฐานภาพถ่าย')
+  });
   const statusLine = el('small', { className: 'photo-upload-status muted hide' });
   const errorLine = el('small', { className: 'field-error hide' });
   const clearBtn = el('button', {
@@ -170,8 +227,14 @@ export function createPhotoUploader(photoUrlInput, options = {}) {
       statusLine.classList.add('hide');
       errorLine.classList.add('hide');
       clearBtn.classList.add('hide');
-      if (photoUrlInput && !photoUrlInput.value.startsWith('https://')) photoUrlInput.value = '';
-      if (evidenceIdInput) evidenceIdInput.value = '';
+      if (photoUrlInput) {
+        delete photoUrlInput.dataset.uploadedDataUrl;
+        if (!photoUrlInput.value.startsWith('https://')) photoUrlInput.value = '';
+      }
+      if (evidenceIdInput) {
+        delete evidenceIdInput.dataset.uploadedDataUrl;
+        evidenceIdInput.value = '';
+      }
       galleryInput.value = '';
       cameraInput.value = '';
     }
@@ -196,13 +259,20 @@ export function createPhotoUploader(photoUrlInput, options = {}) {
     statusLine.textContent = 'กำลังบีบอัดภาพ...';
 
     try {
-      const compressed = await compressImageToBlob(file, 1200, 0.8);
+      const compressed = await compressImageToBlob(file, 1000, 0.78);
       if (isDemoPreview) {
         previewImg.src = compressed.dataUrl;
         previewImg.classList.remove('hide');
         clearBtn.classList.remove('hide');
-        if (photoUrlInput) photoUrlInput.value = compressed.dataUrl;
-        statusLine.textContent = 'ตัวอย่างภาพในโหมดทดลอง (เก็บเฉพาะในเครื่องนี้ ไม่ได้อัปโหลดขึ้นเซิร์ฟเวอร์)';
+        if (photoUrlInput) {
+          photoUrlInput.dataset.uploadedDataUrl = compressed.dataUrl;
+          if (photoUrlInput.type === 'hidden') photoUrlInput.value = compressed.dataUrl;
+        }
+        if (evidenceIdInput) {
+          evidenceIdInput.dataset.uploadedDataUrl = compressed.dataUrl;
+        }
+        const demoSizeKb = Math.max(1, Math.round(compressed.size / 1024));
+        statusLine.textContent = `แนบภาพเรียบร้อย (${demoSizeKb} KB) • ตัวอย่างภาพในโหมดทดลอง (เก็บเฉพาะในเครื่องนี้ ไม่ได้อัปโหลดขึ้นเซิร์ฟเวอร์)`;
         notify('โหลดภาพตัวอย่างในโหมดทดลองเรียบร้อย');
         return;
       }

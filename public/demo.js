@@ -14,7 +14,7 @@
 (function (root) {
   const STORAGE_KEY = 'rtg-demo-store-v1';
   const SESSION_KEY = 'rtg-demo-account';
-  const STORE_VERSION = 1;
+  const STORE_VERSION = 2;
   const ADMIN_CODES = new Set(['ADMIN-STG-001']);
   const ROLE_LABELS = { farmer: 'Farmer', ics: 'ICS' };
 
@@ -267,6 +267,22 @@
           created_at: stamp
         });
       }
+      if (index === 0) {
+        store.approvals.push({
+          id: ++store.seq.approvals,
+          plot_id: plotId,
+          user_id: farmer.id,
+          input_name: 'แผนการใส่ปุ๋ยบำรุงต้น',
+          details: 'สูตรปุ๋ยหมักผสมกากน้ำตาลเข้มข้น อัตรา 80 กก./ไร่',
+          formula_details: 'ปุ๋ยหมักผสมกากน้ำตาลเข้มข้น',
+          expected_use_date: daysAgo(1),
+          status: 'rejected',
+          reviewer_id: 910101,
+          reviewed_at: daysAgo(1),
+          comment: 'สูตรปุ๋ยไม่เหมาะสมกับระยะการเจริญเติบโตของข้าว\nอัตราการใช้สูงกว่าคำแนะนำมาตรฐาน',
+          created_at: daysAgo(2)
+        });
+      }
 
       if (index === 0 || index === 1) {
         // Traceability lot L-12 linked to A-03 and A-04
@@ -370,8 +386,10 @@
   };
   const photoUrl = value => {
     if (!value) return null;
+    const raw = String(value).trim();
+    if (/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=\s]+$/i.test(raw)) return raw;
     let parsed;
-    try { parsed = new URL(String(value)); } catch { throw new DemoError(400, 'ลิงก์รูปภาพไม่ถูกต้อง'); }
+    try { parsed = new URL(raw); } catch { throw new DemoError(400, 'ลิงก์รูปภาพไม่ถูกต้อง'); }
     if (parsed.protocol !== 'https:') throw new DemoError(400, 'ลิงก์รูปภาพต้องเป็น HTTPS');
     return parsed.toString();
   };
@@ -779,6 +797,7 @@
           note: text(input.note, 'บันทึกผลตรวจ', 2000),
           ...(resolvedStandard ? { standard_code: resolvedStandard } : {}),
           ...(checklistId ? { checklist_id: checklistId } : {}),
+          photo_url: photoUrl(input.photo_url),
           checklist_results: checklistResults,
           created_at: now().toISOString(),
         };
