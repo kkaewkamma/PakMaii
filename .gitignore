@@ -21,3 +21,5 @@ staging-identities*.json
 .DS_Store
 Thumbs.db
 data/evidence/
+test-results/
+playwright-report/

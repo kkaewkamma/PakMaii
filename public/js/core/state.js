@@ -31,6 +31,23 @@ export function setLiffInitPromise(v) { liffInitPromise = v; }
 export function setDemoUser(v) { demoUser = v; }
 export function setLoginRole(v) { loginRole = v; }
 
+export const state = {
+  get token() { return token; },
+  set token(v) { setToken(v); },
+  get me() { return me; },
+  set me(v) { setMe(v); },
+  get plots() { return plots; },
+  set plots(v) { setPlots(v); },
+  get tab() { return tab; },
+  set tab(v) { setTab(v); },
+  get config() { return config; },
+  set config(v) { setConfig(v); },
+  get demoUser() { return demoUser; },
+  set demoUser(v) { setDemoUser(v); },
+  get loginRole() { return loginRole; },
+  set loginRole(v) { setLoginRole(v); }
+};
+
 export const tabsFarmer = [
   ['home', 'ภาพรวม', 'sprout'],
   ['plots', 'แปลงปลูก', 'mapPin'],
