@@ -291,6 +291,7 @@ export async function handleApi(request, env) {
     const status = body.status;
     const comment = optionalText(body.comment, 'ความเห็น', 1000);
     if (!['approved','rejected'].includes(status)) throw new HttpError(400, 'สถานะไม่ถูกต้อง');
+    if (status === 'rejected' && !comment) throw new HttpError(400, 'กรุณาระบุเหตุผลกรณีไม่อนุมัติ');
     if (await repository.reviewApproval(id, user.id, status, comment) !== 1) throw new HttpError(404, 'รายการนี้ถูกพิจารณาแล้วหรือไม่พบ');
     return json({ ok: true });
   }

@@ -128,8 +128,11 @@ export class D1Repository {
   }
 
   async reviewApproval(id, reviewerId, status, comment) {
-    const result = await this.run("UPDATE approvals SET status=?,comment=?,reviewer_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'", status, comment, reviewerId, id);
-    return result.meta.changes;
+    await this.guardedBatch([
+      this.statement("UPDATE approvals SET status=?,comment=?,reviewer_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'", status, comment, reviewerId, id),
+      this.statement("INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json) VALUES(?,'approval.reviewed','approval',?,?)", reviewerId, String(id), JSON.stringify({ status })),
+    ], 404, 'รายการนี้ถูกพิจารณาแล้วหรือไม่พบ');
+    return 1;
   }
 
   async createLot(plotId, code, crop, harvestDate, quantity) {
@@ -138,8 +141,11 @@ export class D1Repository {
   }
 
   async createReview(plotId, reviewerId, resultText, note) {
-    const result = await this.run('INSERT INTO reviews(plot_id,reviewer_id,result,note) VALUES(?,?,?,?)', plotId, reviewerId, resultText, note);
-    return result.meta.last_row_id;
+    const results = await this.batch([
+      this.statement('INSERT INTO reviews(plot_id,reviewer_id,result,note) VALUES(?,?,?,?)', plotId, reviewerId, resultText, note),
+      this.statement("INSERT INTO audit_logs(actor_user_id,event_type,target_type,target_id,metadata_json) VALUES(?,'review.created','review',CAST(last_insert_rowid() AS TEXT),?)", reviewerId, JSON.stringify({ plotId, result: resultText })),
+    ]);
+    return results[0].meta.last_row_id;
   }
 
   async createAdminManagedUser(actorId, name, role, credential) {

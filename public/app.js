@@ -1471,6 +1471,15 @@ async function loadAdminOverview() {
 }
 
 async function loadTab() {
+  const contentEl = $('#content');
+  if (contentEl) {
+    contentEl.replaceChildren(card(
+      el('div', { className: 'skeleton-loader', 'aria-label': 'กำลังโหลดข้อมูล...' },
+        el('div', { className: 'skeleton-line skeleton-title' }),
+        el('div', { className: 'skeleton-line skeleton-subtitle' })
+      )
+    ));
+  }
   try {
     if (me.role !== 'admin') plots = await api('/plots');
     let nodes = [];
@@ -2964,7 +2973,13 @@ async function loadTab() {
     if (!nodes.length) nodes = [empty()];
     $('#content').replaceChildren(...nodes);
   } catch (error) {
-    if (!error.handled) $('#content').replaceChildren(el('div', { className: 'notice' }, error.message));
+    if (!error.handled) {
+      $('#content').replaceChildren(el('div', { className: 'notice' },
+        el('b', {}, icon('alert', 15), ' โหลดข้อมูลไม่สำเร็จ'),
+        el('p', {}, error.message),
+        el('button', { type: 'button', className: 'secondary btn-sm', onclick: () => loadTab() }, icon('refresh', 14), ' ลองใหม่อีกครั้ง')
+      ));
+    }
   }
 }
 
