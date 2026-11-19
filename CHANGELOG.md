@@ -5,11 +5,19 @@
 ---
 
 ## [Unreleased / Roadmap — `v0.4.0`]
-แผนงาน Production Readiness Sprint ระยะถัดไป (ติดตามผ่าน GitHub Milestone `v0.4 — Production Sprint (Phases 4–7)`):
-- **[Phase 4] Real QR Traceability:** สร้าง QR Code จริง (Pure SVG ภายใต้ strict CSP) และ Public Read-Only Lot API (`/api/public/lots/:code`) โดยไม่เปิดเผยข้อมูลส่วนบุคคลของเกษตรกร
-- **[Phase 5] Farmer Convenience Improvements:** Smart Farm Log รองรับภาษาไทยพร้อมยืนยันก่อนบันทึก และระบบติดตามต้นทุนการผลิตต่อกิโลกรัม/จุดคุ้มทุน (THB)
+แผนงาน Production Readiness Sprint ระยะถัดไป (ตัดระบบ QR Traceability และ Phase 5 ออกตามขอบเขตที่กำหนด):
 - **[Phase 6] LINE Notifications:** เชื่อมต่อ LINE Messaging API ฝั่งเซิร์ฟเวอร์พร้อม Consent, Retry และ Deduplication
 - **[Phase 7] Production Readiness:** ทดสอบ LINE LIFF บนอุปกรณ์จริง iOS/Android, ตรวจ SQLite suite บน Node 20/22 LTS, และทบทวนเอกสาร Backup/Rollback
+
+---
+
+## [v0.3.1] — 2026-11-20 — Modular ES Architecture, Playwright E2E & Scope Refinement
+
+### PR #9–#12 — Incremental Architecture Refactoring & Playwright E2E
+- สกัด `shared/validation.js` และ `shared/audit-domain.js` ใช้งานร่วมกันระหว่าง Express และ Cloudflare Workers
+- แยก Monolith `public/app.js` ออกเป็น Native ES Modules (`public/js/core/` และ `public/js/views/`) พร้อมจัดโครงสร้าง `public/app.css` เป็น 18 หมวดหมู่
+- เพิ่มระบบทดสอบเบราว์เซอร์อัตโนมัติ Playwright (`Desktop` และ `Mobile-LIFF` iPhone 13 Emulation)
+- ตัดระบบ QR Traceability (`showPublicTraceabilityProposal`) และตัด Phase 5 (Smart Farm Log / Production Cost Tracking) ออกจากขอบเขตโปรเจกต์เพื่อลดความซับซ้อนเกินความจำเป็น
 
 ---
 
