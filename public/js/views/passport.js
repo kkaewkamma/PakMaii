@@ -6,7 +6,25 @@ import { create14DayRhythmTrack } from '../core/rhythm.js';
 import { api } from '../core/api.js';
 
 export async function showStoryPassport(lot) {
-  const overlay = el('div', { className: 'passport-overlay' });
+  const previousFocus = document.activeElement;
+  const overlay = el('div', {
+    className: 'passport-overlay',
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-label': `ข้อมูลย้อนกลับล็อตผลผลิต ${lot.code || lot.lot_code || ''}`.trim()
+  });
+  const closeDialog = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown);
+    if (previousFocus && typeof previousFocus.focus === 'function') {
+      previousFocus.focus();
+    }
+  };
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') closeDialog();
+  };
+  document.addEventListener('keydown', onKeyDown);
+
   const hasHarvestDate = Boolean(parseLocalIsoDate(lot.harvest_date));
   const rhythmContainer = el('div', { className: 'passport-rhythm-section mt-12' },
     el('div', { className: 'passport-section-label' },
@@ -17,6 +35,11 @@ export async function showStoryPassport(lot) {
   );
 
   const reviewStatusSpan = el('span', { className: 'muted' }, 'ยังไม่มีผลตรวจที่เชื่อมกับล็อตนี้');
+  const closeBtn = el('button', {
+    type: 'button',
+    className: 'passport-close-btn',
+    onclick: closeDialog
+  }, 'ปิดหน้าต่าง');
 
   const card = el('div', { className: 'passport-card' },
     el('div', { className: 'passport-header' },
@@ -62,17 +85,14 @@ export async function showStoryPassport(lot) {
             onclick: () => window.print()
           }, icon('printer', 14), ' พิมพ์ข้อมูลล็อต')
         ),
-        el('button', {
-          type: 'button',
-          className: 'passport-close-btn',
-          onclick: () => overlay.remove()
-        }, 'ปิดหน้าต่าง')
+        closeBtn
       )
     )
   );
   overlay.append(card);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
   document.body.append(overlay);
+  closeBtn.focus();
 
   try {
     const [activities, reviews] = await Promise.all([

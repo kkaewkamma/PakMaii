@@ -263,3 +263,12 @@ test('Phase 3 ICS Audit Assistant: separates PGS/EU_ORGANIC/FAIRTRADE, non-certi
   assert.match(script, /\/checklists/);
   assert.match(script, /\/audit-logs/);
 });
+
+test('UI/UX Pro Max & Accessibility standards: reduced-motion, focus-not-obscured, aria-current, and dialog semantics', () => {
+  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+  assert.match(css, /scroll-padding-top:/);
+  assert.match(css, /scroll-padding-bottom:/);
+  assert.match(css, /button:focus-visible/);
+  assert.match(script, /'aria-current':\s*tab === id \? 'page' : undefined/);
+  assert.match(script, /svg\.setAttribute\('focusable',\s*'false'\)/);
+});

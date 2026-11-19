@@ -164,10 +164,13 @@ test.describe('PakMaii Critical Workflows (Demo-First & LIFF Compatibility)', ()
       await page.locator('#tabs button:has-text("ล็อตผลผลิต"):visible').click();
     }
     await page.locator('.passport-trigger-btn').first().click();
+    const passportOverlay = page.locator('.passport-overlay');
     const passportCard = page.locator('.passport-card');
+    await expect(passportOverlay).toHaveAttribute('role', 'dialog');
+    await expect(passportOverlay).toHaveAttribute('aria-modal', 'true');
     await expect(passportCard).toBeVisible();
     await expect(passportCard.locator('button:has-text("ตัวอย่างหน้าสาธารณะ (QR)")')).toHaveCount(0);
-    await passportCard.locator('.passport-close-btn').click();
+    await page.keyboard.press('Escape');
     await expect(passportCard).not.toBeVisible();
   });
 });

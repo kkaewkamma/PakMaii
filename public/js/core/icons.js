@@ -148,6 +148,7 @@ export function icon(name, size = 16, className = 'ui-icon') {
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
   if (className) svg.setAttribute('class', className);
 
   const shapes = ICONS[name] || ICONS.sprout;

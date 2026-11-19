@@ -173,7 +173,19 @@
   --shadow-lg: 0 4px 16px 0 rgba(37, 51, 43, 0.14);
   --shadow-card: none;
 
-  --focus-ring: 0 0 0 3px rgba(36, 92, 67, 0.22);
+  /* Interaction & Motion Tokens (UI/UX Pro Max & Design System) */
+  --focus-ring: 0 0 0 3px rgba(36, 92, 67, 0.25);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 4/8px Spacing Rhythm Tokens */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
 }
 
 *, *::before, *::after {
@@ -182,6 +194,32 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 76px;
+  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 16px));
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--green-700);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+button:not(:disabled):active {
+  opacity: 0.88;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body {
