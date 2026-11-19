@@ -204,3 +204,20 @@ test('Phase 4 ICS experience: real /risks dashboard feed, recent activities, fil
   assert.match(css, /\.ics-split-layout\s*\{/);
   assert.match(css, /\.ics-home-lower-grid\s*\{/);
 });
+
+test('Phase 5 admin overview, RBAC matrix, public traceability proposal, and print styles', () => {
+  // Admin overview computes from /admin/users and /admin/assignments + RBAC read-only table
+  assert.match(script, /async function loadAdminOverview\(\)/);
+  assert.match(script, /api\(['"]\/admin\/users['"]\)/);
+  assert.match(script, /api\(['"]\/admin\/assignments['"]\)/);
+  assert.match(script, /ตารางสิทธิ์ตามบทบาท \(RBAC Read-Only\)/);
+
+  // Public traceability proposal clearly labeled as unlinked UI proposal
+  assert.match(script, /function showPublicTraceabilityProposal\(lot\)/);
+  assert.match(script, /ตัวอย่างข้อเสนอ \(ยังไม่เชื่อมระบบจริง\)/);
+  assert.match(css, /\.qr-proposal-box\s*\{/);
+
+  // Print styles handle desktop sidebar grid and rhythm cells
+  assert.match(css, /@media print\s*\{[\s\S]*body:not\(\.is-login\)\s*main\.wrap/);
+  assert.match(css, /@media print\s*\{[\s\S]*\.rhythm-cell\.active/);
+});

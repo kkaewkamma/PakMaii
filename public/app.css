@@ -2921,6 +2921,33 @@ body.is-login .hero {
   gap: 8px;
 }
 
+/* Phase 5: Public Traceability Proposal (QR) */
+.qr-proposal-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  margin-top: 10px;
+  border-radius: var(--radius-md);
+  background: var(--sage-50);
+  border: 1px dashed var(--sage-300);
+}
+
+.qr-proposal-svg {
+  flex-shrink: 0;
+  fill: var(--green-900);
+  background: var(--surface);
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+}
+
+.qr-proposal-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* ==========================================================================
    Print / PDF Export Styles (Official Audit & Traceability Certificate)
    ========================================================================== */
@@ -2931,6 +2958,11 @@ body.is-login .hero {
   .quick-chips-grid,
   .checklist-chips-box,
   .voice-mic-bar,
+  .ics-filter-bar,
+  .role-switcher-bar,
+  .more-sheet-overlay,
+  .passport-actions,
+  form,
   .btn-sm,
   .secondary,
   .passport-close-btn,
@@ -2941,6 +2973,16 @@ body.is-login .hero {
   .brand-badge,
   .status-indicator {
     display: none !important;
+  }
+
+  body:not(.is-login) main.wrap {
+    display: block !important;
+  }
+
+  .rhythm-cell.active {
+    background: var(--green-700) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   body {

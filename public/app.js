@@ -334,6 +334,7 @@ const tabsIcsDemo = [
   ...tabsIcs
 ];
 const tabsAdmin = [
+  ['overview', 'ภาพรวมระบบ', 'sprout'],
   ['invites', 'คำเชิญลงทะเบียน', 'user'],
   ['users', 'ผู้ใช้งาน', 'users'],
   ['assignments', 'มอบหมาย Farmer', 'clipboard']
@@ -703,7 +704,7 @@ async function start(forceLogin = false) {
     }
     document.body.classList.remove('is-login');
     me = await api('/me');
-    if (me.role === 'admin' && !tabsAdmin.some(item => item[0] === tab)) tab = 'invites';
+    if (me.role === 'admin' && !tabsAdmin.some(item => item[0] === tab)) tab = 'overview';
     if (me.role !== 'admin' && !currentTabs().some(item => item[0] === tab)) tab = 'home';
     plots = me.role === 'admin' ? [] : await api('/plots');
     
@@ -951,11 +952,18 @@ async function showStoryPassport(lot) {
       ),
       rhythmContainer,
       el('div', { className: 'passport-actions row between mt-12' },
-        el('button', {
-          type: 'button',
-          className: 'btn-sm secondary',
-          onclick: () => window.print()
-        }, icon('printer', 14), ' พิมพ์ข้อมูลล็อต'),
+        el('div', { className: 'row' },
+          el('button', {
+            type: 'button',
+            className: 'btn-sm secondary',
+            onclick: () => window.print()
+          }, icon('printer', 14), ' พิมพ์ข้อมูลล็อต'),
+          el('button', {
+            type: 'button',
+            className: 'btn-sm secondary',
+            onclick: () => showPublicTraceabilityProposal(lot)
+          }, icon('package', 14), ' ตัวอย่างหน้าสาธารณะ (QR)')
+        ),
         el('button', {
           type: 'button',
           className: 'passport-close-btn',
@@ -978,6 +986,65 @@ async function showStoryPassport(lot) {
   } catch {
     rhythmContainer.append(el('small', { className: 'muted' }, 'ไม่สามารถโหลดประวัติจังหวะบันทึกแปลงได้'));
   }
+}
+
+function showPublicTraceabilityProposal(lot) {
+  const overlay = el('div', { className: 'passport-overlay' });
+  const qrBox = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  qrBox.setAttribute('viewBox', '0 0 80 80');
+  qrBox.setAttribute('width', '80');
+  qrBox.setAttribute('height', '80');
+  qrBox.setAttribute('aria-hidden', 'true');
+  qrBox.setAttribute('class', 'qr-proposal-svg');
+  const qrShapes = [
+    { x: '4', y: '4', w: '24', h: '24' },
+    { x: '52', y: '4', w: '24', h: '24' },
+    { x: '4', y: '52', w: '24', h: '24' },
+    { x: '34', y: '34', w: '12', h: '12' },
+    { x: '52', y: '52', w: '10', h: '10' },
+    { x: '66', y: '66', w: '10', h: '10' }
+  ];
+  for (const s of qrShapes) {
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', s.x);
+    rect.setAttribute('y', s.y);
+    rect.setAttribute('width', s.w);
+    rect.setAttribute('height', s.h);
+    rect.setAttribute('rx', '2');
+    qrBox.appendChild(rect);
+  }
+
+  const card = el('div', { className: 'passport-card' },
+    el('div', { className: 'passport-header' },
+      el('span', { className: 'pill warn' }, icon('info', 12), ' ตัวอย่างข้อเสนอ (ยังไม่เชื่อมระบบจริง)'),
+      el('h3', { className: 'passport-title mt-8' }, 'หน้าตรวจสอบย้อนกลับสาธารณะสำหรับผู้ซื้อ'),
+      el('small', { className: 'passport-subtitle' }, 'ล็อต ' + (lot.code || lot.lot_code || '-') + ' • วิสาหกิจชุมชนผักไหม จ.ศรีสะเกษ')
+    ),
+    el('div', { className: 'passport-body' },
+      el('div', { className: 'notice' },
+        el('b', {}, 'ข้อจำกัดปัจจุบัน: '),
+        'ยังไม่มี Public API / URL สาธารณะสำหรับสแกน QR จริง หน้านี้เป็นต้นแบบการแสดงผลเมื่อระบบเปิดใช้งาน Public Traceability'
+      ),
+      el('div', { className: 'qr-proposal-box' },
+        qrBox,
+        el('div', { className: 'qr-proposal-meta' },
+          el('b', {}, `รหัสล็อต: ${lot.code || lot.lot_code || '-'}`),
+          el('small', { className: 'muted' }, `ผลผลิต: ${lot.crop || '-'} • แปลง: ${lot.plot_name || '-'}`),
+          lot.harvest_date ? el('small', { className: 'muted' }, `เก็บเกี่ยว: ${dated(lot.harvest_date)}`) : null,
+          el('small', { className: 'muted' }, 'QR สาธารณะ (รอเปิดใช้งาน Public Endpoint)')
+        )
+      ),
+      el('div', { className: 'passport-actions row between mt-12' },
+        el('button', {
+          type: 'button',
+          className: 'passport-close-btn',
+          onclick: () => overlay.remove()
+        }, 'ปิดหน้าต่างตัวอย่าง')
+      )
+    )
+  );
+  overlay.append(card);
+  document.body.append(overlay);
 }
 
 function sharePlotRiskToLine(w) {
@@ -1108,9 +1175,10 @@ function renderMobileDock() {
     ? ['home', 'plots', 'record', 'approval']
     : me.role === 'ics'
     ? ['home', 'risks', 'approval', 'plots']
-    : ['invites', 'users', 'assignments'];
+    : ['overview', 'invites', 'users', 'assignments'];
 
   const shortLabels = {
+    overview: 'ภาพรวม',
     home: 'ภาพรวม',
     plots: me.role === 'ics' ? 'แปลง' : 'แปลงปลูก',
     record: 'บันทึก',
@@ -1345,11 +1413,69 @@ function dataForm(id, fields, label, path, onSuccess) {
   return form;
 }
 
+async function loadAdminOverview() {
+  const [users, assignments] = await Promise.all([api('/admin/users'), api('/admin/assignments')]);
+  const activeUsers = users.filter(u => u.status === 'active').length;
+  const unlinkedUsers = users.filter(u => !u.linked).length;
+  const farmerCount = users.filter(u => u.role === 'farmer').length;
+  const icsCount = users.filter(u => u.role === 'ics').length;
+  const activeAssignments = assignments.filter(a => !a.ends_at).length;
+
+  const kpis = el('div', { className: 'grid kpi-grid' },
+    [
+      ['ผู้ใช้งานทั้งหมด', `${users.length}`, 'คน', `เปิดใช้งาน ${activeUsers} • รอผูก LINE ${unlinkedUsers}`],
+      ['เกษตรกร (Farmer)', `${farmerCount}`, 'ราย', 'บันทึกแปลงและขออนุมัติปัจจัย'],
+      ['เจ้าหน้าที่ ICS', `${icsCount}`, 'คน', 'ตรวจแปลง พิจารณาคำขอ และจุดเสี่ยง'],
+      ['การมอบหมายที่ใช้งานอยู่', `${activeAssignments}`, 'คู่', `ทั้งหมดในระบบ ${assignments.length} รายการ`]
+    ].map(([label, val, unit, desc]) =>
+      el('div', { className: 'card kpi-card' },
+        el('div', { className: 'kpi-top' }, el('span', { className: 'kpi-tag' }, label)),
+        el('div', { className: 'kpi-num' }, val, el('small', {}, ` ${unit}`)),
+        el('div', { className: 'kpi-desc muted' }, desc)
+      )
+    )
+  );
+
+  const rbacRows = [
+    ['สร้าง/แก้ไขแปลงปลูกและบันทึกกิจกรรมตนเอง', 'ได้', 'ดูในความดูแล', '—'],
+    ['ยื่นคำขออนุมัติปัจจัยการผลิต (/approvals POST)', 'ได้', '—', '—'],
+    ['พิจารณาคำขอปัจจัย (/approvals PATCH)', '—', 'ได้', '—'],
+    ['ดูความเสี่ยง (/risks) และบันทึกผลตรวจ (/reviews)', '—', 'ได้', '—'],
+    ['สร้างคำเชิญ จัดการผู้ใช้ และมอบหมาย (/admin/*)', '—', '—', 'ได้']
+  ];
+
+  const rbacTableCard = card(
+    el('div', { className: 'row between' },
+      el('h3', {}, icon('shield', 16), ' ตารางสิทธิ์ตามบทบาท (RBAC Read-Only)'),
+      el('span', { className: 'pill' }, 'อ่านอย่างเดียว')
+    ),
+    el('p', { className: 'muted card-lead' }, 'สรุปขอบเขตสิทธิ์ที่เซิร์ฟเวอร์บังคับใช้จริงสำหรับแต่ละบทบาท'),
+    el('div', { className: 'watchlist-table-wrap' },
+      el('table', { className: 'watchlist-table' },
+        el('thead', {},
+          el('tr', {},
+            el('th', {}, 'ความสามารถ / เส้นทาง API'),
+            el('th', {}, 'Farmer'),
+            el('th', {}, 'ICS'),
+            el('th', {}, 'Admin')
+          )
+        ),
+        el('tbody', {},
+          ...rbacRows.map(r => el('tr', {}, ...r.map(cell => el('td', {}, cell))))
+        )
+      )
+    )
+  );
+
+  return [kpis, rbacTableCard];
+}
+
 async function loadTab() {
   try {
     if (me.role !== 'admin') plots = await api('/plots');
     let nodes = [];
-    if (tab === 'invites') nodes = await loadInvites();
+    if (tab === 'overview' && me.role === 'admin') nodes = await loadAdminOverview();
+    else if (tab === 'invites') nodes = await loadInvites();
     else if (tab === 'users') nodes = await loadUsers();
     else if (tab === 'assignments') nodes = await loadAssignments();
     else if (tab === 'home') {
