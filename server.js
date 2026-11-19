@@ -815,8 +815,19 @@ app.get('/api/audit-logs', auth, icsOrAdmin, wrap((req, res) => {
         ORDER BY l.id DESC LIMIT 100`).all(req.user.id);
   res.set('Cache-Control', 'private, no-store').json(rows.map(formatAuditLogRow));
 }));
+const seenExpressTutorialIps = new Set();
 app.get('/api/health', (req, res) => res.json({ ok: true, service: 'ready-to-grow' }));
 app.get('/api/config', (req, res) => res.json({ liffId: process.env.LIFF_ID || '', development: devAuthEnabled && isLoopback(req), evidenceUploadEnabled: evidenceStorage.configured }));
+app.get('/api/tutorial', (req, res) => {
+  const clientIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  res.set('Cache-Control', 'no-store').json({ ok: true, clientIp, seen: seenExpressTutorialIps.has(clientIp) });
+});
+app.post('/api/tutorial', (req, res) => {
+  const clientIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  if (req.body?.reset) seenExpressTutorialIps.delete(clientIp);
+  else seenExpressTutorialIps.add(clientIp);
+  res.set('Cache-Control', 'no-store').json({ ok: true, clientIp, seen: seenExpressTutorialIps.has(clientIp) });
+});
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'ไม่พบ API' }));
 app.use((error, req, res, next) => {

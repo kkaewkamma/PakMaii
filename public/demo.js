@@ -14,7 +14,7 @@
 (function (root) {
   const STORAGE_KEY = 'rtg-demo-store-v1';
   const SESSION_KEY = 'rtg-demo-account';
-  const STORE_VERSION = 2;
+  const STORE_VERSION = 3;
   const ADMIN_CODES = new Set(['ADMIN-STG-001']);
   const ROLE_LABELS = { farmer: 'Farmer', ics: 'ICS' };
 
@@ -59,8 +59,29 @@
     }
   }
 
+  const PAKMAII_PROFILES = Object.freeze({
+    'ICS-STG-001': { thaiName: 'คุณวิชัย ผักไหม', village: 'หัวหน้าชุดผู้ตรวจประเมินภายใน (ICS) • ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ' },
+    'ICS-STG-002': { thaiName: 'คุณสายฝน ศรีห้วยทับทัน', village: 'ผู้ตรวจประเมิน ICS โซนเหนือ • ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ' },
+    'ICS-STG-003': { thaiName: 'คุณประเสริฐ ทุ่งกุลา', village: 'ผู้ตรวจประเมิน ICS โซนใต้ • ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ' },
+    'F-STG-001': { thaiName: 'คุณสมปอง คำภา', village: 'หมู่ 3 บ้านผักไหม ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ (พื้นที่ 12 ไร่)' },
+    'F-STG-002': { thaiName: 'คุณบัวผัน ศรีห้วยทับทัน', village: 'หมู่ 5 บ้านหนองสิม ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ (พื้นที่ 8 ไร่)' },
+    'F-STG-003': { thaiName: 'คุณทองมี แก้วกัลยา', village: 'หมู่ 2 บ้านคลองตากแบก ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ (พื้นที่ 10 ไร่)' },
+    'F-STG-004': { thaiName: 'คุณคำพูน พรมมา', village: 'หมู่ 7 บ้านกระสัง ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ (พื้นที่ 15 ไร่)' },
+    'F-STG-005': { thaiName: 'คุณจันทร์เพ็ญ ทองดี', village: 'หมู่ 1 บ้านผักไหม ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ (พื้นที่ 9 ไร่)' }
+  });
+
   function publicUser(account) {
-    return { id: account.id, name: account.name, role: account.role, status: 'active', agency_code: account.agencyCode, demo: true };
+    const profile = PAKMAII_PROFILES[account.agencyCode];
+    return {
+      id: account.id,
+      name: account.name,
+      thai_name: profile ? profile.thaiName : null,
+      village: profile ? profile.village : 'วิสาหกิจชุมชนเกษตรอินทรีย์ตำบลผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ',
+      role: account.role,
+      status: 'active',
+      agency_code: account.agencyCode,
+      demo: true
+    };
   }
 
   function assignedFarmerIds(icsCode) {

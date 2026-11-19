@@ -255,8 +255,8 @@ function showLogin(development) {
         onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
       },
         el('div', { className: 'persona-badge risk' }, 'แปลง A-03 • ขาดบันทึก 14 วัน'),
-        el('b', {}, 'เกษตรกร 01 (F-STG-001)'),
-        el('small', {}, 'บันทึกกิจกรรมเพื่อแก้ความเสี่ยงของแปลง')
+        el('b', {}, 'คุณสมปอง คำภา (F-STG-001)'),
+        el('small', {}, 'หมู่ 3 บ้านผักไหม • ข้าวหอมมะลิ 105 อินทรีย์ & ธนาคารน้ำใต้ดิน')
       ),
       el('button', {
         type: 'button',
@@ -264,17 +264,17 @@ function showLogin(development) {
         onclick: () => acceptDemoLogin('farmer', 'F-STG-002')
       },
         el('div', { className: 'persona-badge warn' }, 'แปลง B-01 • รออนุมัติปัจจัย'),
-        el('b', {}, 'เกษตรกร 02 (F-STG-002)'),
-        el('small', {}, 'ยื่นคำขอใช้ปุ๋ยหมักอินทรีย์ก่อนใช้งานจริง')
+        el('b', {}, 'คุณบัวผัน ศรีห้วยทับทัน (F-STG-002)'),
+        el('small', {}, 'หมู่ 5 บ้านหนองสิม • ถั่วเหลืองอินทรีย์หลังนา & ปุ๋ยหมักชีวภาพ')
       ),
       el('button', {
         type: 'button',
         className: 'persona-card-btn persona-ics',
         onclick: () => acceptDemoLogin('ics', 'ICS-STG-001')
       },
-        el('div', { className: 'persona-badge ics' }, 'ผู้ตรวจประเมิน ICS'),
-        el('b', {}, 'เจ้าหน้าที่ ICS (ICS-STG-001)'),
-        el('small', {}, 'ตรวจรายการแปลงต้องติดตาม อนุมัติปัจจัย และบันทึกผลตรวจ')
+        el('div', { className: 'persona-badge ics' }, 'หัวหน้าชุดตรวจประเมิน ICS'),
+        el('b', {}, 'คุณวิชัย ผักไหม (ICS-STG-001)'),
+        el('small', {}, 'ดูแผนภาพวงกลม อนุมัติปัจจัยการผลิต และบันทึกผลตรวจแปลง')
       )
     )
   );
@@ -414,6 +414,10 @@ async function start(forceLogin = false) {
 
     const avatarIcon = me.role === 'farmer' ? 'farmerAvatar' : roleIconName;
     const codeLabelPrefix = me.role === 'farmer' ? 'รหัสเกษตรกร : ' : 'รหัสเจ้าหน้าที่ : ';
+    const displayFullName = me.thai_name ? `${me.thai_name} (${me.name})` : (me.name || me.agency_code);
+    const villageOrRole = me.village
+      ? `${codeLabelPrefix}${me.agency_code || me.name} • ${me.village}`
+      : `${codeLabelPrefix}${me.agency_code || me.name} • ${roleLabels[me.role] || me.role} (${statusLabels[me.status] || me.status})`;
 
     $('#identity').replaceChildren(
       el('div', { className: 'identity-bar' },
@@ -422,9 +426,9 @@ async function start(forceLogin = false) {
           el('div', { className: 'identity-meta' },
             el('div', { className: 'user-code' },
               demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
-              me.name || me.agency_code
+              displayFullName
             ),
-            el('div', { className: 'user-role-text' }, `${codeLabelPrefix}${me.agency_code || me.name} • ${roleLabels[me.role] || me.role} (${statusLabels[me.status] || me.status})`)
+            el('div', { className: 'user-role-text' }, villageOrRole)
           )
         ),
         el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
@@ -445,6 +449,7 @@ async function start(forceLogin = false) {
 import { openEvidenceViewer, openPhotoPreviewModal, createPhotoUploader } from './js/core/photo.js';
 import { buildFarmerHomeView, buildFarmerActivityWizard, buildFarmerApprovalView, buildFarmerReviewsView } from './js/views/farmer.js';
 import { showStoryPassport } from './js/views/passport.js';
+import { buildIcsAnalyticsChartsPanel, openInteractiveTutorial, checkAndShowIpTutorial } from './js/views/tutorial.js';
 
 function sharePlotRiskToLine(w) {
   const text = `[แจ้งเตือนมาตรฐานเกษตรอินทรีย์ ผักไหม (PGS/ICS)]\n` +
@@ -487,6 +492,15 @@ function initFontScaleToggle() {
   if (btn) {
     btn.onclick = () => toggleLargeText();
   }
+  const tutBtn = $('#tutorialHelpBtn');
+  if (tutBtn) {
+    tutBtn.onclick = () => openInteractiveTutorial({
+      onSelectPersona: (role, code) => acceptDemoLogin(role, code)
+    });
+  }
+  checkAndShowIpTutorial({
+    onSelectPersona: (role, code) => acceptDemoLogin(role, code)
+  });
 }
 
 function scrollToTop() {
@@ -1105,9 +1119,21 @@ async function loadTab() {
             : [el('p', { className: 'muted' }, 'ยังไม่มีกิจกรรมล่าสุดในระบบ')])
         );
 
+        const icsChartsPanel = buildIcsAnalyticsChartsPanel({
+          totalPlots,
+          normalPlotsCount,
+          pendingInput,
+          riskAlerts,
+          groupReadiness,
+          plots,
+          activities,
+          isDemo
+        });
+
         nodes = [
           icsHeroCard,
           kpiGrid,
+          icsChartsPanel,
           el('div', { className: 'ics-home-lower-grid' },
             icsRisksSummaryCard,
             icsRecentActivitiesCard

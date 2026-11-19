@@ -97,8 +97,13 @@ test.describe('PakMaii Critical Workflows (Demo-First & LIFF Compatibility)', ()
   });
 
   test('ICS Login, Risks Dashboard, and Audit Assistant', async ({ page, isMobile }) => {
-    // 1. Visit landing page
-    await page.goto('/');
+    // 1. Visit landing page and verify IP First-Visit Tutorial Modal
+    await page.goto('/?tutorial=1');
+    const tutorialModal = page.locator('.tutorial-modal-overlay');
+    await expect(tutorialModal).toBeVisible();
+    await expect(tutorialModal).toContainText('เข้าชมครั้งแรกจาก IP:');
+    await page.locator('#tutorialSkipBtn').click();
+    await expect(tutorialModal).not.toBeVisible();
 
     // 2. Switch role to ICS using #demoRole-ics
     const icsRoleBtn = page.locator('#demoRole-ics');
@@ -108,8 +113,11 @@ test.describe('PakMaii Critical Workflows (Demo-First & LIFF Compatibility)', ()
     await page.fill('#demoCode', 'ICS-STG-001');
     await page.click('#demoLoginButton');
 
-    // 4. Verify ICS Dashboard loaded with ICS Officer greeting
+    // 4. Verify ICS Dashboard loaded with ICS Officer greeting, real PakMaii profile name, and Donut/Bar Charts
     await expect(page.locator('#welcome')).toContainText('สวัสดี, Demo ICS Officer 01');
+    await expect(page.locator('#identity')).toContainText('คุณวิชัย ผักไหม');
+    await expect(page.locator('.ics-donut-svg').first()).toBeVisible();
+    await expect(page.locator('.ics-bar-chart-section')).toBeVisible();
 
     // 5. Navigate to Risks dashboard
     // On desktop tabs label is "ความเสี่ยง", on mobile dock short label is "จุดเสี่ยง"

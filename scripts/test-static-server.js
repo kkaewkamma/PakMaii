@@ -17,6 +17,17 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml'
 };
 
+const seenTutorialIps = new Set();
+
+function resolveNodeClientIp(req) {
+  const cfIp = req.headers['cf-connecting-ip'];
+  if (typeof cfIp === 'string' && cfIp.trim()) return cfIp.trim();
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.trim()) return xff.split(',')[0].trim();
+  const remote = req.socket?.remoteAddress || '127.0.0.1';
+  return remote === '::1' || remote === '::ffff:127.0.0.1' ? '127.0.0.1' : remote;
+}
+
 const server = http.createServer((req, res) => {
   const parsedUrl = new URL(req.url, 'http://localhost');
   let pathname = parsedUrl.pathname;
@@ -31,6 +42,27 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', demoOnly: true }));
     return;
+  }
+  if (pathname === '/api/tutorial') {
+    const clientIp = resolveNodeClientIp(req);
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ ok: true, clientIp, seen: seenTutorialIps.has(clientIp) }));
+      return;
+    }
+    if (req.method === 'POST') {
+      let bodyText = '';
+      req.on('data', chunk => { bodyText += chunk; });
+      req.on('end', () => {
+        let body = {};
+        try { body = JSON.parse(bodyText || '{}'); } catch {}
+        if (body?.reset) seenTutorialIps.delete(clientIp);
+        else seenTutorialIps.add(clientIp);
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ ok: true, clientIp, seen: seenTutorialIps.has(clientIp) }));
+      });
+      return;
+    }
   }
 
   if (pathname === '/' || pathname === '') pathname = '/index.html';
