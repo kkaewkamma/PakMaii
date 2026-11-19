@@ -1,86 +1,159 @@
 /* ==========================================================================
    PakMaii — Internal Control System (ICS) & Organic Compliance Platform
-   Premium AgriTech Design System (CSP: style-src 'self', no inline scripts)
+   Ready to Grow Design System: "สมุดบันทึกแปลงที่ตรวจสอบได้"
    Natural Forest Green, Warm Ivory, Surface White & Elegant Minimalism
    ========================================================================== */
 
+/* Self-hosted OFL IBM Plex Sans Thai (Weights 400, 500, 600) */
+@font-face {
+  font-family: 'IBM Plex Sans Thai';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/IBMPlexSansThai-400-thai.woff2') format('woff2');
+  unicode-range: U+0E01-0E5B, U+200C-200D, U+25CC;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Thai';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/IBMPlexSansThai-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Thai';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/IBMPlexSansThai-500-thai.woff2') format('woff2');
+  unicode-range: U+0E01-0E5B, U+200C-200D, U+25CC;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Thai';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/IBMPlexSansThai-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Thai';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/IBMPlexSansThai-600-thai.woff2') format('woff2');
+  unicode-range: U+0E01-0E5B, U+200C-200D, U+25CC;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Thai';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/IBMPlexSansThai-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
-  --font-sans: "Inter", "Noto Sans Thai", "Sarabun", "Prompt", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Design System Color Tokens */
+  --green-700: #245C43;
+  --green-900: #173D2C;
+  --sage-300:  #A8BDA5;
+  --sage-50:   #EEF2EC;
+  --bg:        #F7F8F4;
+  --surface:   #FFFFFF;
+  --ink:       #25332B;
+  --ink-muted: #5E6E64;
+  --amber-700: #8A5A12;
+  --red-700:   #A3382E;
+  --ok-700:    #2F6B3F;
+
+  --font-sans: 'IBM Plex Sans Thai', "Inter", "Sarabun", "Prompt", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
-  /* Premium AgriTech Palette */
-  --forest-green:  #245B45; /* Primary */
-  --deep-forest:   #183F32; /* Primary Dark & Header */
-  --sage-green:    #8BA88E; /* Accent / Soft Green */
+  /* Typography Scale */
+  --text-xs:   13px;
+  --text-sm:   15px;
+  --text-base: 17px;
+  --text-lg:   20px;
+  --text-xl:   24px;
+  --text-2xl:  30px;
+
+  /* Palette Mappings */
+  --forest-green:  var(--green-700);
+  --deep-forest:   var(--green-900);
+  --sage-green:    var(--sage-300);
 
   /* Background Canvas & Surfaces */
-  --warm-ivory:    #F7F6EF; /* Main Page Background */
-  --surface-white: #FFFFFF; /* Cards / Surfaces */
-  --soft-sage-bg:  #EDF2EB; /* Secondary Background / Table Headers */
-  --card-border:   #E2E7DF; /* Soft Natural Border */
-  --card-border-hover: #CBD4C7;
+  --warm-ivory:    var(--bg);
+  --surface-white: var(--surface);
+  --soft-sage-bg:  var(--sage-50);
+  --card-border:   var(--sage-300);
+  --card-border-hover: var(--green-700);
 
   /* Typography Colors */
-  --text-primary:   #26352D; /* Headings & Primary Text */
-  --text-secondary: #737D74; /* Subtitles & Form Labels */
-  --text-muted:     #929A91; /* Captions & Placeholders */
+  --text-primary:   var(--ink);
+  --text-secondary: var(--ink-muted);
+  --text-muted:     var(--ink-muted);
   --white:          #FFFFFF;
 
   /* Backward Compatibility Aliases */
   --slate-950: #102921;
-  --slate-900: #183F32;
-  --slate-800: #245B45;
+  --slate-900: var(--green-900);
+  --slate-800: var(--green-700);
   --slate-700: #3E5A4D;
   --slate-600: #577366;
-  --slate-500: #737D74;
+  --slate-500: var(--ink-muted);
   --slate-400: #929A91;
-  --slate-300: #C2C9BF;
+  --slate-300: var(--sage-300);
   --slate-200: #E2E7DF;
-  --slate-100: #EDF2EB;
-  --slate-50:  #F7F6EF;
+  --slate-100: var(--sage-50);
+  --slate-50:  var(--bg);
 
-  --primary-900: #102921;
-  --primary-800: #183F32;
-  --primary-700: #245B45;
+  --primary-900: var(--green-900);
+  --primary-800: var(--green-900);
+  --primary-700: var(--green-700);
   --primary-600: #2D6E54;
   --primary-500: #3E8B6D;
   --primary-100: #D8E6DB;
-  --primary-50:  #EDF2EB;
+  --primary-50:  var(--sage-50);
 
   /* Semantic Alerts */
-  --success-text:   #1E4E2C;
-  --success-bg:     #EBF4EC;
-  --success-border: #BCD8C2;
-  --success-dot:    #54835E;
+  --success-text:   var(--ok-700);
+  --success-bg:     var(--sage-50);
+  --success-border: var(--sage-300);
+  --success-dot:    var(--ok-700);
 
-  --warning-text:   #7C5212;
+  --warning-text:   var(--amber-700);
   --warning-bg:     #FCF6EB;
   --warning-border: #F3DCB1;
-  --warning-dot:    #D69A3A;
+  --warning-dot:    var(--amber-700);
 
-  --danger-text:    #7D2D24;
+  --danger-text:    var(--red-700);
   --danger-bg:      #FDF2F0;
   --danger-border:  #F4C7C2;
-  --danger-dot:     #C65E52;
+  --danger-dot:     var(--red-700);
 
   --info-text:      #1F4664;
   --info-bg:        #EEF5FA;
   --info-border:    #BFD8EA;
   --info-dot:       #6489A4;
 
-  /* Dimensions & Elevation */
+  /* Dimensions & Radius */
   --radius-xs: 4px;
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
+  --radius-md: 8px;      /* 8px for buttons and inputs */
+  --radius-lg: 12px;     /* 12px for surfaces */
+  --radius-full: 9999px; /* pill for badges */
 
-  --shadow-xs: 0 1px 2px 0 rgba(38, 53, 45, 0.04);
-  --shadow-sm: 0 1px 3px 0 rgba(38, 53, 45, 0.06), 0 1px 2px -1px rgba(38, 53, 45, 0.04);
-  --shadow-md: 0 4px 8px -1px rgba(38, 53, 45, 0.07), 0 2px 4px -2px rgba(38, 53, 45, 0.04);
-  --shadow-lg: 0 12px 20px -3px rgba(38, 53, 45, 0.08), 0 4px 6px -4px rgba(38, 53, 45, 0.03);
+  /* Calm Single-Level Elevation */
+  --shadow-xs: 0 1px 2px 0 rgba(37, 51, 43, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(37, 51, 43, 0.06);
+  --shadow-md: 0 1px 3px 0 rgba(37, 51, 43, 0.08);
+  --shadow-lg: 0 2px 6px 0 rgba(37, 51, 43, 0.10);
+  --shadow-card: 0 1px 3px 0 rgba(37, 51, 43, 0.08);
 
-  --focus-ring: 0 0 0 3px rgba(36, 91, 69, 0.22);
+  --focus-ring: 0 0 0 3px rgba(36, 92, 67, 0.22);
 }
 
 *, *::before, *::after {
@@ -94,11 +167,12 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--warm-ivory);
-  color: var(--text-primary);
+  background-color: var(--bg);
+  color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -545,9 +619,10 @@ nav#tabs button.active svg {
 .ics-hero-graphic-card {
   margin-bottom: 18px;
   padding: 20px 22px;
-  background: linear-gradient(135deg, #ffffff 0%, var(--surface-white) 60%, var(--warm-ivory) 100%);
+  background: var(--surface);
   border: 1px solid var(--card-border);
-  box-shadow: 0 4px 16px rgba(36, 91, 69, 0.05);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .ics-hero-content {
@@ -562,6 +637,156 @@ nav#tabs button.active svg {
     grid-template-columns: 1fr;
     gap: 20px;
   }
+}
+
+/* ==========================================================================
+   14-Day Rhythm Track — "สมุดบันทึกแปลงที่ตรวจสอบได้" (Audit-ready Farm Ledger)
+   ========================================================================== */
+.rhythm-track-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.rhythm-track-wrap.compact {
+  padding: 4px 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  gap: 4px;
+}
+
+.rhythm-track-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.rhythm-track-title {
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rhythm-track-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.rhythm-track-status.status-good {
+  background: var(--sage-50);
+  color: var(--ok-700);
+  border: 1px solid var(--sage-300);
+}
+
+.rhythm-track-status.status-warn {
+  background: #FCF6EB;
+  color: var(--amber-700);
+  border: 1px solid #F3DCB1;
+}
+
+.rhythm-track-status.status-danger {
+  background: #FDF2F0;
+  color: var(--red-700);
+  border: 1px solid #F4C7C2;
+}
+
+.rhythm-track-row {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.rhythm-cell {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 22px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.rhythm-track-wrap.compact .rhythm-cell {
+  min-height: 14px;
+  border-radius: 3px;
+}
+
+.rhythm-cell.empty {
+  background: var(--sage-50);
+  border: 1px dashed var(--sage-300);
+}
+
+.rhythm-cell.active {
+  background: var(--green-700);
+  border: 1px solid var(--green-900);
+  box-shadow: 0 1px 2px rgba(36, 92, 67, 0.2);
+}
+
+.rhythm-cell.is-today {
+  outline: 2px solid var(--amber-700);
+  outline-offset: 1px;
+}
+
+.rhythm-cell .cell-date {
+  font-size: 9.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.rhythm-cell.active .cell-date {
+  color: #FFFFFF;
+}
+
+.rhythm-cell.empty .cell-date {
+  color: var(--ink-muted);
+}
+
+.rhythm-track-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink-muted);
+  gap: 8px;
+}
+
+.rhythm-summary-text {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.watchlist-rhythm-box {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.passport-rhythm-section {
+  padding: 12px 0 6px;
+  border-top: 1px dashed var(--card-border);
+}
+
+.passport-section-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 6px;
 }
 
 /* Circular Gauge */
@@ -834,22 +1059,23 @@ nav#tabs button.active svg {
   border-radius: var(--radius-lg);
   margin-bottom: 18px;
   border: 1px solid var(--card-border);
-  background: var(--surface-white);
-  box-shadow: 0 4px 16px rgba(36, 91, 69, 0.05);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .farmer-hero-graphic-card.normal {
   border-left: 5px solid var(--forest-green);
+  background: var(--surface);
 }
 
 .farmer-hero-graphic-card.warn {
   border-left: 5px solid var(--warning-dot);
-  background: linear-gradient(135deg, #ffffff 0%, #fffdf8 100%);
+  background: var(--surface);
 }
 
 .farmer-hero-graphic-card.risk {
   border-left: 5px solid var(--danger-dot);
-  background: linear-gradient(135deg, #ffffff 0%, #fff9f8 100%);
+  background: var(--surface);
 }
 
 .farmer-hero-top {
@@ -867,6 +1093,48 @@ nav#tabs button.active svg {
 
 .farmer-hero-info {
   flex: 1;
+}
+
+/* PGS Criteria Card & Grid */
+.pgs-criteria-card {
+  margin-bottom: 18px;
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.pgs-criteria-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.criteria-item {
+  background: var(--sage-50);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.criteria-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.criteria-desc {
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin: 0;
+  color: var(--ink-muted);
 }
 
 /* Milestone Roadmap Graphic */
@@ -1150,27 +1418,27 @@ nav#tabs button.active svg {
   border-radius: var(--radius-lg);
   padding: 18px 20px;
   margin-bottom: 16px;
-  border: 1px solid var(--slate-200);
-  background: var(--white);
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .farmer-status-card.risk {
   border-left: 5px solid var(--danger-dot);
-  background: linear-gradient(180deg, #fffafa 0%, #ffffff 100%);
+  background: var(--surface);
   border-color: var(--danger-border);
 }
 
 .farmer-status-card.warn {
   border-left: 5px solid var(--warning-dot);
-  background: linear-gradient(180deg, #fffdf7 0%, #ffffff 100%);
+  background: var(--surface);
   border-color: var(--warning-border);
 }
 
 .farmer-status-card.normal {
-  border-left: 5px solid var(--primary-600);
-  background: linear-gradient(180deg, #f8fdfb 0%, #ffffff 100%);
-  border-color: var(--primary-100);
+  border-left: 5px solid var(--forest-green);
+  background: var(--surface);
+  border-color: var(--card-border);
 }
 
 .farmer-status-header {
@@ -1280,18 +1548,18 @@ button {
   cursor: pointer;
   border: 1px solid var(--forest-green);
   border-radius: var(--radius-md);
-  padding: 10px 18px;
+  padding: 8px 16px;
   background: var(--forest-green);
   color: var(--white);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   transition: all 0.15s ease;
-  min-height: 44px;
+  min-height: 40px;
   box-shadow: var(--shadow-xs);
   user-select: none;
 }
@@ -2059,9 +2327,10 @@ body.is-login .hero {
 .skeleton-line {
   height: 14px;
   border-radius: var(--radius-xs);
-  background: linear-gradient(90deg, var(--slate-100) 25%, var(--slate-200) 50%, var(--slate-100) 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s infinite ease-in-out;
+  background: var(--sage-50);
+  border: 1px solid var(--card-border);
+  opacity: 0.8;
+  animation: skeleton-pulse 1.4s infinite ease-in-out;
 }
 
 .skeleton-title {
@@ -2074,9 +2343,9 @@ body.is-login .hero {
   height: 13px;
 }
 
-@keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
 }
 
 /* ==========================================================================
@@ -2098,12 +2367,12 @@ body.is-login .hero {
 }
 
 .watchlist-card-item {
-  background: var(--surface-white);
+  background: var(--surface);
   border: 1px solid var(--card-border);
   border-left: 4px solid var(--card-border);
   border-radius: var(--radius-md);
   padding: 14px 16px;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2112,17 +2381,17 @@ body.is-login .hero {
 
 .watchlist-card-item.severity-risk {
   border-left-color: var(--danger-dot);
-  background: linear-gradient(180deg, #fffafa 0%, #ffffff 100%);
+  background: var(--surface);
 }
 
 .watchlist-card-item.severity-warning {
   border-left-color: var(--warning-dot);
-  background: linear-gradient(180deg, #fffdf7 0%, #ffffff 100%);
+  background: var(--surface);
 }
 
 .watchlist-card-item.severity-normal {
   border-left-color: var(--forest-green);
-  background: linear-gradient(180deg, #f8fdfb 0%, #ffffff 100%);
+  background: var(--surface);
 }
 
 .watchlist-card-top {
@@ -2196,6 +2465,11 @@ body.is-login .hero {
 }
 
 @media (max-width: 640px) {
+  body {
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
   /* Priority 1: Hide horizontal tab bar after login on screens <= 640px */
   body:not(.is-login) nav#tabs {
     display: none !important;
@@ -2222,11 +2496,13 @@ body.is-login .hero {
     gap: 12px;
   }
 
-  /* Priority 4: 44px minimum touch target for mobile ergonomics */
+  /* Mobile ergonomic touch target (48px height, >= 44px touch targets) */
   button, .secondary, .btn-sm {
-    min-height: 44px !important;
-    padding: 10px 14px !important;
-    font-size: 13.5px !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    padding: 11px 16px !important;
+    font-size: 15px !important;
+    border-radius: var(--radius-md) !important;
   }
 
   .chip-btn {

@@ -175,6 +175,104 @@ function icon(name, size = 16, className = 'ui-icon') {
   return svg;
 }
 
+// 14-Day Rhythm Track — "สมุดบันทึกแปลงที่ตรวจสอบได้" (Audit-ready Farm Ledger)
+// Pure DOM, 100% CSP safe, no inline styles or innerHTML
+function create14DayRhythmTrack(plotId, activities = [], options = {}) {
+  const plotActivities = Array.isArray(activities)
+    ? (plotId ? activities.filter(a => a.plot_id === plotId) : activities)
+    : [];
+
+  const days = [];
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+
+    const matching = plotActivities.filter(a => {
+      const actDate = typeof a.activity_date === 'string' ? a.activity_date.slice(0, 10) : '';
+      return actDate === iso;
+    });
+
+    days.push({
+      iso,
+      dayNum: d.getDate(),
+      monthNum: d.getMonth() + 1,
+      isToday: i === 0,
+      daysAgo: i,
+      count: matching.length,
+      hasActivity: matching.length > 0,
+      activities: matching
+    });
+  }
+
+  const activeDaysCount = days.filter(d => d.hasActivity).length;
+  const recentDay = [...days].reverse().find(d => d.hasActivity);
+
+  let continuityText = 'ขาดการบันทึกเกิน 14 วัน';
+  let continuityClass = 'status-danger';
+
+  if (activeDaysCount >= 5) {
+    continuityText = 'บันทึกต่อเนื่องสม่ำเสมอ';
+    continuityClass = 'status-good';
+  } else if (activeDaysCount >= 1) {
+    continuityText = `บันทึกแล้ว ${activeDaysCount} วัน`;
+    continuityClass = 'status-warn';
+  }
+
+  const wrap = el('div', {
+    className: 'rhythm-track-wrap ' + (options.compact ? 'compact' : ''),
+    role: 'region',
+    'aria-label': `แถบจังหวะบันทึก 14 วันล่าสุด: ${continuityText}`
+  });
+
+  if (!options.compact) {
+    wrap.append(
+      el('div', { className: 'rhythm-track-header' },
+        el('span', { className: 'rhythm-track-title' },
+          icon('calendar', 14),
+          options.title || 'แถบจังหวะบันทึก 14 วันล่าสุด (PGS Rhythm)'
+        ),
+        el('span', { className: `rhythm-track-status ${continuityClass}` }, continuityText)
+      )
+    );
+  }
+
+  const cells = days.map(d => {
+    const titleText = d.hasActivity
+      ? `${d.dayNum}/${d.monthNum}: บันทึก ${d.count} กิจกรรม (${d.activities.map(a => a.activity_type || 'กิจกรรม').join(', ')})`
+      : `${d.dayNum}/${d.monthNum}: ไม่มีการบันทึก`;
+
+    const cellClass = `rhythm-cell ${d.hasActivity ? 'active' : 'empty'} ${d.isToday ? 'is-today' : ''}`;
+    return el('div', {
+      className: cellClass,
+      title: titleText,
+      'aria-label': titleText
+    }, options.compact ? null : el('span', { className: 'cell-date' }, String(d.dayNum)));
+  });
+
+  wrap.append(el('div', { className: 'rhythm-track-row' }, ...cells));
+
+  if (!options.hideFooter) {
+    const footerText = options.compact
+      ? `บันทึก ${activeDaysCount}/14 วัน`
+      : `บันทึก ${activeDaysCount} จาก 14 วัน${recentDay ? ` • ล่าสุด: ${recentDay.dayNum}/${recentDay.monthNum}` : ' • ยังไม่มีบันทึกในรอบ 14 วัน'}`;
+
+    wrap.append(
+      el('div', { className: 'rhythm-track-footer' },
+        el('span', { className: 'rhythm-summary-text' }, footerText),
+        options.compact ? null : el('small', { className: 'muted' }, 'เกณฑ์ PGS: ตรวจสอบความต่อเนื่องทุก 14 วัน')
+      )
+    );
+  }
+
+  return wrap;
+}
+
 // Pure DOM SVG Circular Progress Gauge — 100% CSP safe
 function createCircularGauge(percent, size = 100, strokeWidth = 9, colorClass = 'gauge-green') {
   const radius = (size - strokeWidth) / 2;
@@ -886,11 +984,15 @@ function createPhotoUploader(photoUrlInput) {
   return previewWrap;
 }
 
-function showStoryPassport(lot) {
+async function showStoryPassport(lot) {
   const overlay = el('div', { className: 'passport-overlay' });
+  const rhythmContainer = el('div', { className: 'passport-rhythm-section mt-12' },
+    el('div', { className: 'passport-section-label' }, 'ความต่อเนื่องการบันทึกแปลงต้นทางก่อนเก็บเกี่ยว (14 วันล่าสุด):')
+  );
+
   const card = el('div', { className: 'passport-card' },
     el('div', { className: 'passport-header' },
-      el('span', { className: 'passport-badge' }, 'ข้อมูลล็อตผลผลิต (Lot Traceability)'),
+      el('span', { className: 'passport-badge' }, 'การตรวจสอบย้อนกลับล็อตผลผลิต (Traceability Certificate)'),
       el('h3', { className: 'passport-title' }, 'ล็อตผลผลิต ' + (lot.code || '-')),
       el('small', { className: 'passport-subtitle' }, 'วิสาหกิจชุมชนเกษตรอินทรีย์ตำบลผักไหม จ.ศรีสะเกษ')
     ),
@@ -923,6 +1025,7 @@ function showStoryPassport(lot) {
         el('b', {}, 'วันที่บันทึกล็อต:'),
         el('span', {}, dated(lot.created_at))
       ),
+      rhythmContainer,
       el('div', { className: 'passport-actions row between mt-12' },
         el('button', {
           type: 'button',
@@ -939,6 +1042,17 @@ function showStoryPassport(lot) {
   );
   overlay.append(card);
   document.body.append(overlay);
+
+  try {
+    const activities = await api('/activities').catch(() => []);
+    const track = create14DayRhythmTrack(lot.plot_id, activities, {
+      title: `จังหวะบันทึกแปลง ${lot.plot_name || ''}`,
+      compact: false
+    });
+    rhythmContainer.append(track);
+  } catch {
+    rhythmContainer.append(el('small', { className: 'muted' }, 'ไม่สามารถโหลดประวัติจังหวะบันทึกแปลงได้'));
+  }
 }
 
 function sharePlotRiskToLine(w) {
@@ -1397,6 +1511,7 @@ async function loadTab() {
                   el('th', {}, 'รหัสแปลง'),
                   el('th', {}, 'เกษตรกรผู้ดูแล'),
                   el('th', {}, 'พืช & ระยะปรับเปลี่ยน'),
+                  el('th', {}, 'จังหวะ 14 วัน'),
                   el('th', {}, 'สถานะความเสี่ยง'),
                   el('th', {}, 'การดำเนินการ')
                 )
@@ -1409,6 +1524,7 @@ async function loadTab() {
                     el('td', {}, el('b', { className: 'plot-code-tag' }, w.code)),
                     el('td', {}, w.farmer),
                     el('td', {}, `${w.crop}${w.conversion ? ` (${w.conversion})` : ''}`),
+                    el('td', { className: 'rhythm-col' }, create14DayRhythmTrack(w.plot_id, activities, { compact: true })),
                     el('td', {}, el('span', { className: badgeClass }, badgePrefix + w.status)),
                     el('td', {}, buildWatchlistActionButtons(w))
                   );
@@ -1435,6 +1551,9 @@ async function loadTab() {
                   el('div', { className: 'watchlist-meta-item' },
                     icon('leaf', 14),
                     el('span', {}, `${w.crop}${w.conversion ? ` • ${w.conversion}` : ''}`)
+                  ),
+                  el('div', { className: 'watchlist-rhythm-box' },
+                    create14DayRhythmTrack(w.plot_id, activities, { compact: true })
                   )
                 ),
                 el('div', { className: 'watchlist-card-actions' },
@@ -1448,47 +1567,38 @@ async function loadTab() {
         }
 
         const normalPlotsCount = Math.max(0, totalPlots - riskAlerts - pendingInput);
-        const gaugeColorClass = groupReadiness >= 90 ? 'gauge-green' : groupReadiness >= 75 ? 'gauge-amber' : 'gauge-rose';
 
         const icsHeroCard = el('div', { className: 'card ics-hero-graphic-card' },
           el('div', { className: 'ics-hero-content' },
             el('div', { className: 'gauge-panel' },
-              el('div', { className: 'gauge-wrap' },
-                createCircularGauge(groupReadiness, 100, 9, gaugeColorClass),
-                el('div', { className: 'gauge-center' },
-                  el('span', { className: 'gauge-val' }, readinessStatText),
-                  el('small', { className: 'gauge-lbl' }, groupReadiness !== null ? 'พร้อมรับรอง' : 'รอข้อมูล')
-                )
-              ),
               el('div', { className: 'gauge-meta' },
-                el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'PGS Group Readiness' : 'เกณฑ์ควบคุมภายใน ICS'),
+                el('div', { className: 'row between' },
+                  el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'PGS Group Readiness' : 'เกณฑ์ควบคุมภายใน ICS'),
+                  el('span', { className: 'stat-pill' }, readinessStatText)
+                ),
                 el('h3', { className: 'gauge-title' }, 'ความพร้อมรับรองมาตรฐานกลุ่ม (PGS / ICS)'),
-                el('p', { className: 'muted gauge-desc' }, readinessSubtext + ' • ตำบลผักไหม จ.ศรีสะเกษ')
+                el('p', { className: 'muted gauge-desc' }, readinessSubtext + ' • ตำบลผักไหม จ.ศรีสะเกษ'),
+                el('div', { className: 'dist-legend-grid mt-12' },
+                  el('div', { className: 'legend-item' },
+                    el('span', { className: 'legend-dot dot-green' }),
+                    el('span', { className: 'legend-label' }, 'ปกติ/ผ่านเกณฑ์:'),
+                    el('b', { className: 'legend-val' }, `${normalPlotsCount} แปลง`)
+                  ),
+                  el('div', { className: 'legend-item' },
+                    el('span', { className: 'legend-dot dot-amber' }),
+                    el('span', { className: 'legend-label' }, 'รออนุมัติปัจจัย:'),
+                    el('b', { className: 'legend-val text-amber' }, `${pendingInput} แปลง`)
+                  ),
+                  el('div', { className: 'legend-item' },
+                    el('span', { className: 'legend-dot dot-rose' }),
+                    el('span', { className: 'legend-label' }, 'จุดเสี่ยงเฝ้าระวัง:'),
+                    el('b', { className: 'legend-val text-rose' }, `${riskAlerts} จุด`)
+                  )
+                )
               )
             ),
-            el('div', { className: 'dist-panel' },
-              el('div', { className: 'dist-header row between' },
-                el('b', { className: 'dist-title' }, icon('sprout', 14), ' สัดส่วนสถานะแปลงทั้งตำบล'),
-                el('small', { className: 'muted' }, `รวม ${totalPlots} แปลง (${totalMembers} สมาชิก)`)
-              ),
-              createDistributionBar(totalPlots, normalPlotsCount, pendingInput, riskAlerts),
-              el('div', { className: 'dist-legend-grid' },
-                el('div', { className: 'legend-item' },
-                  el('span', { className: 'legend-dot dot-green' }),
-                  el('span', { className: 'legend-label' }, 'ปกติ/ผ่านเกณฑ์:'),
-                  el('b', { className: 'legend-val' }, `${normalPlotsCount} แปลง`)
-                ),
-                el('div', { className: 'legend-item' },
-                  el('span', { className: 'legend-dot dot-amber' }),
-                  el('span', { className: 'legend-label' }, 'รออนุมัติปัจจัย:'),
-                  el('b', { className: 'legend-val text-amber' }, `${pendingInput} แปลง`)
-                ),
-                el('div', { className: 'legend-item' },
-                  el('span', { className: 'legend-dot dot-rose' }),
-                  el('span', { className: 'legend-label' }, 'จุดเสี่ยงเฝ้าระวัง:'),
-                  el('b', { className: 'legend-val text-rose' }, `${riskAlerts} จุด`)
-                )
-              )
+            el('div', { className: 'ics-hero-rhythm' },
+              create14DayRhythmTrack(null, activities, { title: 'ความต่อเนื่องการบันทึกกิจกรรมทั้งตำบล (14 วันล่าสุด)' })
             )
           )
         );
@@ -1597,18 +1707,9 @@ async function loadTab() {
         }
 
         const statusBadgeClass = `badge-${statusTier}`;
-        const farmerGaugeVal = daysSince === null ? 0 : Math.max(0, Math.round(((14 - Math.min(14, daysSince)) / 14) * 100));
-        const farmerGaugeColor = isOverdue ? 'gauge-rose' : isWarning ? 'gauge-amber' : 'gauge-green';
 
         const farmerHeroCard = el('div', { className: `farmer-hero-graphic-card ${statusTier}` },
           el('div', { className: 'farmer-hero-top' },
-            el('div', { className: 'farmer-gauge-wrap' },
-              createCircularGauge(farmerGaugeVal, 96, 8, farmerGaugeColor),
-              el('div', { className: 'gauge-center' },
-                el('span', { className: `gauge-val val-${statusTier}` }, daysSince === null ? '-' : daysSince === 0 ? 'วันนี้' : `${daysSince}ว.`),
-                el('small', { className: 'gauge-lbl' }, 'บันทึกล่าสุด')
-              )
-            ),
             el('div', { className: 'farmer-hero-info' },
               el('div', { className: 'status-badge-row' },
                 el('span', { className: `pill ${statusBadgeClass}` }, statusBadgeText),
@@ -1619,7 +1720,8 @@ async function loadTab() {
               el('p', { className: 'farmer-status-desc' }, statusDesc)
             )
           ),
-          alertAdvice ? el('div', { className: `farmer-advice-box advice-${statusTier}` },
+          create14DayRhythmTrack(myPlot?.id, activities, { title: 'ความต่อเนื่องการบันทึกแปลงของคุณ (14 วันล่าสุด)' }),
+          alertAdvice ? el('div', { className: `farmer-advice-box advice-${statusTier} mt-12` },
             icon('alert', 15),
             el('span', {}, alertAdvice)
           ) : null,
@@ -1642,14 +1744,30 @@ async function loadTab() {
           )
         );
 
-        const currentMilestoneStep = isOverdue ? 1 : pendingCount > 0 ? 2 : 1;
-        const milestoneCard = el('div', { className: 'card milestone-card' },
+        const pgsCriteriaCard = el('div', { className: 'card pgs-criteria-card' },
           el('div', { className: 'row between' },
-            el('h4', { className: 'milestone-header' }, icon('shield', 16), ' เส้นทางมาตรฐานเกษตรอินทรีย์ (PGS / ICS Milestones)'),
-            el('span', { className: 'pill' }, 'วิสาหกิจชุมชนผักไหม')
+            el('h4', { className: 'milestone-header' }, icon('shield', 16), ' ข้อกำหนดมาตรฐานเกษตรอินทรีย์ PGS (วิสาหกิจชุมชนผักไหม)'),
+            el('span', { className: 'pill success' }, 'เกณฑ์รับรองกลุ่ม')
           ),
-          el('p', { className: 'muted card-lead' }, 'แนวทางการดำเนินงาน 4 ขั้นตอน เพื่อรักษามาตรฐานความปลอดภัยและสร้างมูลค่าผลผลิตอินทรีย์ร่วมกันทั้งชุมชน'),
-          createMilestoneGraphic(currentMilestoneStep)
+          el('p', { className: 'muted card-lead' }, 'แนวทางปฏิบัติ 4 ข้อสำคัญเพื่อรักษามาตรฐานอินทรีย์และเตรียมความพร้อมก่อนการตรวจประเมิน'),
+          el('div', { className: 'grid pgs-criteria-grid mt-12' },
+            el('div', { className: 'criteria-item' },
+              el('b', { className: 'criteria-title' }, icon('calendar', 14), ' 1. บันทึกแปลงต่อเนื่อง'),
+              el('p', { className: 'criteria-desc muted' }, 'บันทึกการดูแลแปลงอย่างน้อยทุก 14 วัน เพื่อให้ตรวจสอบย้อนกลับได้')
+            ),
+            el('div', { className: 'criteria-item' },
+              el('b', { className: 'criteria-title' }, icon('clipboard', 14), ' 2. ขออนุมัติปัจจัยการผลิต'),
+              el('p', { className: 'criteria-desc muted' }, 'ยื่นขออนุมัติปุ๋ยอินทรีย์และชีวภัณฑ์กับเจ้าหน้าที่ ICS ก่อนใช้ในแปลงจริง')
+            ),
+            el('div', { className: 'criteria-item' },
+              el('b', { className: 'criteria-title' }, icon('mapPin', 14), ' 3. แนวกันชนปลอดภัย'),
+              el('p', { className: 'criteria-desc muted' }, 'ดูแลแนวกันชนรอบแปลงเพื่อป้องกันสารเคมีจากภายนอกพัดพาเข้ามา')
+            ),
+            el('div', { className: 'criteria-item' },
+              el('b', { className: 'criteria-title' }, icon('shield', 14), ' 4. ตรวจประเมินแปลง'),
+              el('p', { className: 'criteria-desc muted' }, 'พร้อมรับการตรวจประเมินแปลงประจำฤดูกาลโดยคณะกรรมการกลุ่ม PGS')
+            )
+          )
         );
 
         const farmerStatMeta = {
@@ -1678,7 +1796,7 @@ async function loadTab() {
 
         nodes = [
           farmerHeroCard,
-          milestoneCard,
+          pgsCriteriaCard,
           farmerKpiGrid
         ];
       }

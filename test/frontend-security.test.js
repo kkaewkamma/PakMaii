@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
 const script = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const headers = fs.readFileSync(new URL('../public/_headers', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../public/app.css', import.meta.url), 'utf8');
 
 test('frontend has external assets only and CSP allows no inline script or style', () => {
   assert.match(html, /<link rel="stylesheet" href="\/app\.css">/);
@@ -84,4 +85,46 @@ test('Phase 0 data integrity: app.js contains no fake fallbacks, hardcoded metri
   assert.doesNotMatch(script, /ปลอดสารเคมีสังเคราะห์ 100%/);
   assert.doesNotMatch(script, /'L-12'/);
   assert.doesNotMatch(script, /แปลง A-03, A-04/);
+});
+
+test('Phase 1 design system: IBM Plex Sans Thai, color tokens, and 14-day rhythm track', () => {
+  // Self-hosted OFL IBM Plex Sans Thai font-face declarations
+  assert.match(css, /@font-face\s*\{[^}]*font-family:\s*['"]IBM Plex Sans Thai['"][^}]*src:\s*url\(['"]\/fonts\/IBMPlexSansThai-400-thai\.woff2['"]\)/);
+  assert.match(css, /@font-face\s*\{[^}]*font-family:\s*['"]IBM Plex Sans Thai['"][^}]*src:\s*url\(['"]\/fonts\/IBMPlexSansThai-500-thai\.woff2['"]\)/);
+  assert.match(css, /@font-face\s*\{[^}]*font-family:\s*['"]IBM Plex Sans Thai['"][^}]*src:\s*url\(['"]\/fonts\/IBMPlexSansThai-600-thai\.woff2['"]\)/);
+
+  // Design system color tokens
+  const requiredTokens = [
+    '--green-700: #245C43;',
+    '--green-900: #173D2C;',
+    '--sage-300:  #A8BDA5;',
+    '--sage-50:   #EEF2EC;',
+    '--bg:        #F7F8F4;',
+    '--surface:   #FFFFFF;',
+    '--ink:       #25332B;',
+    '--ink-muted: #5E6E64;',
+    '--amber-700: #8A5A12;',
+    '--red-700:   #A3382E;',
+    '--ok-700:    #2F6B3F;'
+  ];
+  for (const token of requiredTokens) {
+    assert.ok(css.includes(token), `app.css must define token ${token}`);
+  }
+
+  // Zero linear-gradient in CSS
+  assert.doesNotMatch(css, /linear-gradient/);
+
+  // Tabular numbers enabled
+  assert.match(css, /font-variant-numeric:\s*tabular-nums/);
+
+  // 14-Day Rhythm Track function exists and implemented
+  assert.match(script, /function create14DayRhythmTrack\(plotId,\s*activities\s*=\s*\[\],\s*options\s*=\s*\{\}\)/);
+  assert.match(script, /rhythm-track-wrap/);
+  assert.match(script, /rhythm-track-row/);
+  assert.match(script, /rhythm-cell/);
+
+  // Rhythm track integrated into farmer home, watchlist, and traceability certificate
+  assert.match(script, /create14DayRhythmTrack\(myPlot\?\.id,\s*activities/);
+  assert.match(script, /create14DayRhythmTrack\(w\.plot_id,\s*activities,\s*\{\s*compact:\s*true\s*\}\)/);
+  assert.match(script, /create14DayRhythmTrack\(lot\.plot_id,\s*activities/);
 });
