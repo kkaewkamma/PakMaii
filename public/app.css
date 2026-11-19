@@ -253,9 +253,10 @@ header#main-header {
 
 .header-wrap {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px 16px;
 }
 
 .header-brand {
@@ -3781,9 +3782,10 @@ body.is-login .hero {
 
 .chart-legend-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px 10px;
   background-color: #FFFFFF;
   border: 1px solid #E2E7DF;
   border-radius: 10px;
