@@ -7,15 +7,22 @@ import {
   buildEvidenceObjectKey,
   createEvidenceStorage,
 } from './storage.js';
-
-class HttpError extends Error {
-  constructor(status, message, code) {
-    super(message);
-    this.status = status;
-    this.code = code;
-    this.expose = true;
-  }
-}
+import {
+  HttpError,
+  ALLOWED_CAPA_STATUSES,
+  ALLOWED_VALIDATION_STATUSES,
+  landingForRole,
+  text,
+  optionalText,
+  positiveId,
+  isoDate,
+  photoUrl,
+  standardCodeValue,
+  severityValue,
+  validateChecklistItems,
+  validateChecklistResults,
+  validateReviewFindings,
+} from '../shared/validation.js';
 
 const jsonHeaders = { 'Content-Type': 'application/json; charset=utf-8' };
 const securityHeaders = {
@@ -39,107 +46,6 @@ function randomHexBytes(length = 16) {
   return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-const text = (value, field, max = 500) => {
-  if (value === undefined || value === null || String(value).trim() === '') throw new HttpError(400, `กรุณากรอก ${field}`);
-  const clean = String(value).trim();
-  if (clean.length > max) throw new HttpError(400, `${field} ยาวเกินกำหนด`);
-  return clean;
-};
-const optionalText = (value, field, max = 500) => value === undefined || value === null || String(value).trim() === '' ? '' : text(value, field, max);
-const positiveId = (value, field = 'รหัส') => {
-  const id = Number(value);
-  if (!Number.isSafeInteger(id) || id <= 0) throw new HttpError(400, `${field} ไม่ถูกต้อง`);
-  return id;
-};
-const isoDate = (value, field) => {
-  const date = text(value, field, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) throw new HttpError(400, `${field} ไม่ถูกต้อง`);
-  return date;
-};
-const photoUrl = value => {
-  if (!value) return null;
-  let parsed;
-  try { parsed = new URL(String(value)); } catch { throw new HttpError(400, 'ลิงก์รูปภาพไม่ถูกต้อง'); }
-  if (parsed.protocol !== 'https:') throw new HttpError(400, 'ลิงก์รูปภาพต้องเป็น HTTPS');
-  return parsed.toString();
-};
-
-const ALLOWED_STANDARDS = new Set(['PGS', 'EU_ORGANIC', 'FAIRTRADE']);
-const ALLOWED_SEVERITIES = new Set(['low', 'medium', 'high']);
-const ALLOWED_CAPA_STATUSES = new Set(['open', 'in_progress', 'resolved']);
-const ALLOWED_CHECKLIST_RESULT_STATUSES = new Set(['pass', 'fail', 'na']);
-
-function standardCodeValue(raw, fallback = null) {
-  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
-  const val = String(raw).trim().toUpperCase();
-  if (!ALLOWED_STANDARDS.has(val)) throw new HttpError(400, 'รหัสมาตรฐานไม่ถูกต้อง (รองรับเฉพาะ PGS, EU_ORGANIC, FAIRTRADE)');
-  return val;
-}
-
-function severityValue(raw, fallback = 'medium') {
-  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
-  const val = String(raw).trim().toLowerCase();
-  if (!ALLOWED_SEVERITIES.has(val)) throw new HttpError(400, 'ระดับความรุนแรงไม่ถูกต้อง');
-  return val;
-}
-
-function validateChecklistItems(raw) {
-  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 30) {
-    throw new HttpError(400, 'รายการตรวจต้องมีอย่างน้อย 1 รายการ และไม่เกิน 30 รายการ');
-  }
-  return raw.map((item, idx) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      throw new HttpError(400, `หัวข้อตรวจลำดับที่ ${idx + 1} ไม่ถูกต้อง`);
-    }
-    const label = text(item.label, `หัวข้อตรวจลำดับที่ ${idx + 1}`, 300);
-    const rawKey = typeof item.key === 'string' ? item.key.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 64) : '';
-    const key = /^[a-z0-9_-]{1,64}$/.test(rawKey) ? rawKey : `item_${idx + 1}`;
-    return { key, label, required: Boolean(item.required) };
-  });
-}
-
-function validateChecklistResults(raw) {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw) || raw.length > 30) {
-    throw new HttpError(400, 'ผลตรวจตามรายการไม่ถูกต้อง');
-  }
-  return raw.map((item, idx) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      throw new HttpError(400, `ผลตรวจตามรายการลำดับที่ ${idx + 1} ไม่ถูกต้อง`);
-    }
-    const rawStatus = String(item.status || 'na').trim().toLowerCase();
-    if (!ALLOWED_CHECKLIST_RESULT_STATUSES.has(rawStatus)) {
-      throw new HttpError(400, 'สถานะรายการตรวจต้องเป็น pass, fail หรือ na');
-    }
-    const label = optionalText(item.label, 'หัวข้อตรวจ', 300) || `รายการที่ ${idx + 1}`;
-    const rawKey = typeof item.key === 'string' ? item.key.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').slice(0, 64) : '';
-    const key = /^[a-z0-9_-]{1,64}$/.test(rawKey) ? rawKey : `item_${idx + 1}`;
-    const note = optionalText(item.note, 'หมายเหตุรายการตรวจ', 500);
-    return { key, label, status: rawStatus, ...(note ? { note } : {}) };
-  });
-}
-
-function validateReviewFindings(raw, defaultStandard, defaultResponsibleUserId) {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw) || raw.length > 10) {
-    throw new HttpError(400, 'รายการข้อบกพร่องต้องมีไม่เกิน 10 รายการ');
-  }
-  return raw.map((item, idx) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      throw new HttpError(400, `ข้อบกพร่องลำดับที่ ${idx + 1} ไม่ถูกต้อง`);
-    }
-    const std = standardCodeValue(item.standard_code, defaultStandard);
-    const severity = severityValue(item.severity, 'medium');
-    const finding = text(item.finding, `ข้อบกพร่องลำดับที่ ${idx + 1}`, 1000);
-    const actionRequired = text(item.action_required, `แนวทางแก้ไขลำดับที่ ${idx + 1}`, 1000);
-    const dueDate = isoDate(item.due_date, `กำหนดแก้ไขลำดับที่ ${idx + 1}`);
-    const responsibleUserId = item.responsible_user_id !== undefined && item.responsible_user_id !== null && item.responsible_user_id !== ''
-      ? positiveId(item.responsible_user_id, 'รหัสผู้รับผิดชอบ')
-      : defaultResponsibleUserId;
-    return { standardCode: std, severity, finding, actionRequired, dueDate, responsibleUserId };
-  });
-}
-
 async function requestBody(request) {
   const length = Number(request.headers.get('content-length') || 0);
   if (length > 102_400) throw new HttpError(413, 'ข้อมูลมีขนาดใหญ่เกินกำหนด');
@@ -161,7 +67,6 @@ async function agencyCredential(agencyCode, rawKeyRing) {
   }
 }
 
-const landingForRole = role => ({ farmer: 'home', ics: 'risks', admin: 'invites' })[role];
 const isLoopbackHost = hostname => hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
 const trustedClientAddress = request => request.cf ? request.headers.get('cf-connecting-ip') || 'cloudflare-unknown' : 'local-untrusted';
 
@@ -580,7 +485,7 @@ export async function handleApi(request, env) {
     const description = optionalText(body.description, 'คำอธิบายชุดรายการตรวจ', 1000);
     const items = validateChecklistItems(body.items);
     const validationStatus = body.validation_status ? String(body.validation_status).trim() : 'draft_unvalidated';
-    if (!['draft_unvalidated', 'validated'].includes(validationStatus)) throw new HttpError(400, 'สถานะการยืนยันเกณฑ์ไม่ถูกต้อง');
+    if (!ALLOWED_VALIDATION_STATUSES.has(validationStatus)) throw new HttpError(400, 'สถานะการยืนยันเกณฑ์ไม่ถูกต้อง');
     if (validationStatus === 'validated' && user.role !== 'admin') {
       throw new HttpError(403, 'เฉพาะผู้ดูแลระบบสามารถยืนยันสถานะเกณฑ์มาตรฐานได้');
     }
@@ -602,7 +507,7 @@ export async function handleApi(request, env) {
     if (Object.hasOwn(body, 'is_active')) updates.is_active = Boolean(body.is_active);
     if (Object.hasOwn(body, 'validation_status')) {
       const nextValidation = String(body.validation_status).trim();
-      if (!['draft_unvalidated', 'validated'].includes(nextValidation)) throw new HttpError(400, 'สถานะการยืนยันเกณฑ์ไม่ถูกต้อง');
+      if (!ALLOWED_VALIDATION_STATUSES.has(nextValidation)) throw new HttpError(400, 'สถานะการยืนยันเกณฑ์ไม่ถูกต้อง');
       if (nextValidation === 'validated' && user.role !== 'admin') {
         throw new HttpError(403, 'เฉพาะผู้ดูแลระบบสามารถยืนยันสถานะเกณฑ์มาตรฐานได้');
       }

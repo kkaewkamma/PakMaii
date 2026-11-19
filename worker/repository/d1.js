@@ -1,3 +1,15 @@
+import { parseJsonSafe } from '../../shared/validation.js';
+import {
+  formatChecklistRow,
+  formatCorrectiveActionRow,
+  formatAuditLogRow,
+  formatPendingRisk,
+  formatInactiveRisk,
+  formatMissingEvidenceRisk,
+  formatCorrectiveActionRisk,
+  sortRisksBySeverity,
+} from '../../shared/audit-domain.js';
+
 export class D1Repository {
   constructor(database) {
     if (!database) throw new Error('D1 binding DB is required');
@@ -407,27 +419,6 @@ export class D1Repository {
     return this.all('SELECT l.*,p.name plot_name FROM lots l JOIN plots p ON p.id=l.plot_id WHERE p.owner_id=? ORDER BY l.id DESC', user.id);
   }
 
-  parseJsonSafe(raw, fallback) {
-    if (!raw || typeof raw !== 'string') return fallback;
-    try { return JSON.parse(raw); } catch { return fallback; }
-  }
-
-  formatChecklist(row) {
-    if (!row) return null;
-    return {
-      id: row.id,
-      standard_code: row.standard_code,
-      title: row.title,
-      description: row.description || '',
-      items: this.parseJsonSafe(row.items_json, []),
-      validation_status: row.validation_status,
-      is_active: Boolean(row.is_active),
-      created_by: row.created_by ?? null,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    };
-  }
-
   async listChecklists({ standardCode = null, includeInactive = false } = {}) {
     const clauses = [];
     const params = [];
@@ -435,12 +426,12 @@ export class D1Repository {
     if (!includeInactive) clauses.push('is_active=1');
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const rows = await this.all(`SELECT * FROM inspection_checklists ${where} ORDER BY standard_code, id`, ...params);
-    return rows.map(row => this.formatChecklist(row));
+    return rows.map(formatChecklistRow);
   }
 
   async findChecklist(id) {
     const row = await this.first('SELECT * FROM inspection_checklists WHERE id=?', id);
-    return this.formatChecklist(row);
+    return formatChecklistRow(row);
   }
 
   async createChecklist({ actorId, standardCode, title, description = '', items, validationStatus = 'draft_unvalidated' }) {
@@ -489,7 +480,7 @@ export class D1Repository {
       JOIN users ru ON ru.id=ca.responsible_user_id
       LEFT JOIN reviews r ON r.id=ca.review_id
       WHERE ca.id=?`, id);
-    return row ? { ...row, is_overdue: Boolean(row.is_overdue) } : null;
+    return formatCorrectiveActionRow(row);
   }
 
   async listCorrectiveActions(user, { status = null, plotId = null, standardCode = null } = {}) {
@@ -515,7 +506,7 @@ export class D1Repository {
       ${assignmentJoin}
       ${where}
       ORDER BY CASE ca.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END, ca.due_date ASC, ca.id DESC`, ...params);
-    return rows.map(row => ({ ...row, is_overdue: Boolean(row.is_overdue) }));
+    return rows.map(formatCorrectiveActionRow);
   }
 
   async createCorrectiveAction({ plotId, reviewId = null, standardCode = 'PGS', severity = 'medium', finding, actionRequired, responsibleUserId, dueDate, createdBy }) {
@@ -569,16 +560,7 @@ export class D1Repository {
           WHERE l.actor_user_id=?
             AND l.event_type IN ('review.created','approval.reviewed','corrective_action.created','corrective_action.updated','checklist.created','checklist.updated','evidence.uploaded')
           ORDER BY l.id DESC LIMIT 100`, user.id);
-    return rows.map(row => ({
-      id: row.id,
-      actor_user_id: row.actor_user_id,
-      actor_name: row.actor_name || null,
-      event_type: row.event_type,
-      target_type: row.target_type,
-      target_id: row.target_id,
-      metadata: this.parseJsonSafe(row.metadata_json, {}),
-      created_at: row.created_at,
-    }));
+    return rows.map(formatAuditLogRow);
   }
 
   async listRisks(userId) {
@@ -586,27 +568,13 @@ export class D1Repository {
       FROM approvals a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=p.owner_id
       JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
       WHERE a.status='pending'`, userId);
-    const pending = pendingRows.map(row => ({
-      ...row,
-      type: 'pending',
-      severity: 'medium',
-      title: 'คำขอใช้ปัจจัยการผลิตรอพิจารณา',
-      explanation: `คำขอ "${row.input_name}" รอเจ้าหน้าที่ ICS พิจารณาก่อนนำไปใช้ในแปลง`,
-      recommended_tab: 'approval',
-    }));
+    const pending = pendingRows.map(formatPendingRisk);
 
     const inactiveRows = await this.all(`SELECT p.id,p.id plot_id,p.name plot_name,u.name farmer_name
       FROM plots p JOIN users u ON u.id=p.owner_id
       JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
       WHERE NOT EXISTS (SELECT 1 FROM activities a WHERE a.plot_id=p.id AND a.activity_date>=date('now','-14 days'))`, userId);
-    const inactive = inactiveRows.map(row => ({
-      ...row,
-      type: 'inactive',
-      severity: 'high',
-      title: 'ขาดบันทึกกิจกรรมเกิน 14 วัน',
-      explanation: 'ไม่พบบันทึกกิจกรรมการดูแลแปลงติดต่อกันเกิน 14 วัน ควรติดตามหรือลงตรวจแปลง',
-      recommended_tab: 'record',
-    }));
+    const inactive = inactiveRows.map(formatInactiveRisk);
 
     let missingEvidence = [];
     try {
@@ -619,14 +587,7 @@ export class D1Repository {
           AND (a.photo_url IS NULL OR TRIM(a.photo_url)='')
           AND NOT EXISTS (SELECT 1 FROM photo_evidence pe WHERE pe.entity_type='activity' AND pe.entity_id=a.id)
         GROUP BY p.id,p.name,u.name`, userId);
-      missingEvidence = missingRows.map(row => ({
-        ...row,
-        type: 'missing_evidence',
-        severity: row.missing_count >= 3 ? 'medium' : 'low',
-        title: 'กิจกรรมขาดภาพถ่ายหลักฐาน',
-        explanation: `พบ ${row.missing_count} กิจกรรมในรอบ 30 วันล่าสุดที่ยังไม่มีภาพหลักฐานแนบประกอบ`,
-        recommended_tab: 'record',
-      }));
+      missingEvidence = missingRows.map(formatMissingEvidenceRisk);
     } catch (err) {
       if (!/no such table: photo_evidence/i.test(String(err?.message))) throw err;
     }
@@ -642,32 +603,12 @@ export class D1Repository {
         JOIN users ru ON ru.id=ca.responsible_user_id
         JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
         WHERE ca.status IN ('open','in_progress')`, userId);
-      actionRisks = actionRows.map(row => {
-        const overdue = Boolean(row.is_overdue);
-        return {
-          id: row.id,
-          plot_id: row.plot_id,
-          plot_name: row.plot_name,
-          farmer_name: row.farmer_name,
-          standard_code: row.standard_code,
-          due_date: row.due_date,
-          responsible_name: row.responsible_name,
-          type: overdue ? 'overdue_action' : 'open_action',
-          severity: overdue ? 'high' : (row.severity === 'high' ? 'high' : 'medium'),
-          title: overdue ? 'เกินกำหนดแก้ไขปรับปรุง (CAPA)' : 'รายการแก้ไขปรับปรุงรอดำเนินการ',
-          explanation: overdue
-            ? `ข้อบกพร่อง "${row.finding}" เกินกำหนดวันที่ ${row.due_date} (มาตรฐาน ${row.standard_code})`
-            : `ข้อบกพร่อง "${row.finding}" กำหนดแก้ไขภายในวันที่ ${row.due_date} (มาตรฐาน ${row.standard_code})`,
-          recommended_tab: 'reviews',
-        };
-      });
+      actionRisks = actionRows.map(formatCorrectiveActionRisk);
     } catch (err) {
       if (!/no such table: corrective_actions/i.test(String(err?.message))) throw err;
     }
 
-    const severityRank = { high: 0, medium: 1, low: 2 };
-    return [...actionRisks, ...inactive, ...pending, ...missingEvidence]
-      .sort((a, b) => (severityRank[a.severity] ?? 3) - (severityRank[b.severity] ?? 3));
+    return sortRisksBySeverity([...actionRisks, ...inactive, ...pending, ...missingEvidence]);
   }
 
   async listReviews(userId) {
@@ -693,7 +634,7 @@ export class D1Repository {
       const rows = await this.all(fullQuery, userId);
       return rows.map(row => ({
         ...row,
-        checklist_results: this.parseJsonSafe(row.checklist_results_json, []),
+        checklist_results: parseJsonSafe(row.checklist_results_json, []),
       }));
     } catch (err) {
       if (/no such table: (?:review_assessments|corrective_actions)/i.test(String(err?.message))) {
