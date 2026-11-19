@@ -163,3 +163,24 @@ test('Phase 2 shell & navigation: 3-tier responsive shell, 4+More mobile dock, a
   assert.match(script, /function currentTabs\(\)/);
   assert.match(script, /me\.role === 'admin' \? tabsAdmin : me\.role === 'ics'/);
 });
+
+test('Phase 3 farmer experience: today action hero, 3-step activity wizard, and factual plot/approval UI', () => {
+  // Farmer home "สิ่งที่ต้องทำวันนี้" with single primary CTA
+  assert.match(script, /สิ่งที่ต้องทำวันนี้/);
+  assert.match(script, /id:\s*'farmerPrimaryRecordBtn'/);
+
+  // 3-step activity wizard
+  assert.match(script, /wizard-steps/);
+  assert.match(script, /1\. แปลงและประเภท/);
+  assert.match(script, /2\. รายละเอียดและปริมาณ/);
+  assert.match(script, /3\. ทบทวนแล้วบันทึก/);
+  assert.match(script, /wizard-review-box/);
+  assert.match(script, /field-error/);
+  assert.match(css, /\.wizard-steps\s*\{/);
+  assert.match(css, /\.wizard-review-box\s*\{/);
+
+  // Factual plot conversion_year (no hardcoded 'Year 1') & clean Thai labels
+  assert.doesNotMatch(script, /\|\|\s*'Year 1'/);
+  assert.doesNotMatch(script, /Daily Farm Log/);
+  assert.doesNotMatch(script, /Input Approval/);
+});

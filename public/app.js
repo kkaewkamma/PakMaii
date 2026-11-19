@@ -1736,6 +1736,7 @@ async function loadTab() {
           el('div', { className: 'farmer-hero-top' },
             el('div', { className: 'farmer-hero-info' },
               el('div', { className: 'status-badge-row' },
+                el('span', { className: 'pill' }, 'สิ่งที่ต้องทำวันนี้'),
                 statusBadge(statusTier, statusBadgeText),
                 myPlot?.conversion_year ? el('span', { className: 'pill' }, myPlot.conversion_year) : null,
                 myPlot?.plot_code ? el('span', { className: 'pill' }, `รหัสแปลง: ${myPlot.plot_code}`) : null
@@ -1752,19 +1753,10 @@ async function loadTab() {
           el('div', { className: 'row farmer-actions-row mt-12' },
             el('button', {
               type: 'button',
+              id: 'farmerPrimaryRecordBtn',
               className: isOverdue ? 'pulse' : '',
               onclick: async () => { tab = 'record'; renderTabs(); await loadTab(); }
-            }, icon('calendar', 14), ' บันทึกกิจกรรมแปลงด่วน'),
-            el('button', {
-              type: 'button',
-              className: 'secondary',
-              onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
-            }, icon('clipboard', 14), ' ขออนุมัติปัจจัยการผลิต'),
-            el('button', {
-              type: 'button',
-              className: 'secondary',
-              onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
-            }, icon('shield', 14), ' ผลตรวจประเมินแปลง')
+            }, icon('calendar', 16), ' บันทึกกิจกรรม')
           )
         );
 
@@ -1894,7 +1886,7 @@ async function loadTab() {
                   p.name || '-',
                   p.crop || '-',
                   p.area || '-',
-                  p.conversion_year || 'Year 1',
+                  p.conversion_year || '-',
                   p.owner || p.farmer || '-',
                   dated(p.created_at)
                 ]);
@@ -1905,7 +1897,7 @@ async function loadTab() {
         );
       }
       const buildPlotCard = (plot) => {
-        const conversionYear = plot.conversion_year || 'Year 1';
+        const conversionYear = plot.conversion_year || '';
 
         if (me.role !== 'farmer') {
           return card(
@@ -1913,10 +1905,9 @@ async function loadTab() {
               el('b', {}, `${plot.plot_code ? `[${plot.plot_code}] ` : ''}${plot.name}`),
               el('span', { className: 'pill success' }, icon('leaf', 11), plot.crop)
             ),
-            el('div', { className: 'plot-badges-row' },
-              el('span', { className: 'pill' }, 'ระยะปรับเปลี่ยน: ' + conversionYear),
-              el('span', { className: 'badge-normal' }, 'ระบบควบคุมภายใน PGS & ICS')
-            ),
+            conversionYear ? el('div', { className: 'plot-badges-row' },
+              el('span', { className: 'pill' }, 'ระยะปรับเปลี่ยน: ' + conversionYear)
+            ) : null,
             el('p', {}, `ขนาดพื้นที่: ${plot.area || 'ไม่ระบุ'}`),
             el('p', { className: 'muted' }, `เจ้าของแปลง: ${plot.owner || '-'}`),
             el('div', { className: 'row' },
@@ -1936,10 +1927,9 @@ async function loadTab() {
             el('b', {}, `${plot.plot_code ? `[${plot.plot_code}] ` : ''}${plot.name}`),
             el('span', { className: 'pill success' }, icon('leaf', 11), plot.crop)
           ),
-          el('div', { className: 'plot-badges-row' },
-            el('span', { className: 'pill' }, 'ระยะปรับเปลี่ยน: ' + conversionYear),
-            el('span', { className: 'badge-normal' }, 'มาตรฐานอินทรีย์กลุ่มผักไหม')
-          ),
+          conversionYear ? el('div', { className: 'plot-badges-row' },
+            el('span', { className: 'pill' }, 'ระยะปรับเปลี่ยน: ' + conversionYear)
+          ) : null,
           el('p', {}, `ขนาดพื้นที่: ${plot.area || 'ไม่ระบุ'}`),
           el('small', { className: 'muted' }, `สร้างเมื่อ ${dated(plot.created_at)}`),
           el('div', { className: 'row mt-12' },
@@ -2034,19 +2024,25 @@ async function loadTab() {
       const rows = await api('/activities');
       if (me.role === 'farmer') {
         if (plots.length) {
-          const todayIso = new Date().toISOString().slice(0, 10);
-          const detailsArea = el('textarea', { name: 'details', required: true, placeholder: 'ระบุการปฏิบัติงาน เช่น ชนิดปุ๋ยอินทรีย์ อัตราส่วน แหนแดง ปอเทือง สภาพแปลง หรือปัญหาที่พบ' });
-          const photoInput = el('input', { name: 'photo_url', type: 'url', placeholder: 'https:// หรือใช้ปุ่มอัปโหลดภาพหลักฐาน' });
+          const todayIso = formatLocalIsoDate(new Date());
+          const plotSel = plotSelect();
+          const kindSel = selectField('kind', 'ประเภทกิจกรรม', ['ปลูก', 'ให้น้ำ', 'ใส่ปุ๋ย', 'กำจัดวัชพืช', 'ป้องกันกำจัดศัตรูพืช', 'เก็บเกี่ยว', 'อื่นๆ'].map(value => ({ value, label: value })));
+          const dateField = inputField('activity_date', 'วันที่ทำกิจกรรม', 'date', true, todayIso);
+          const inputUsedField = el('input', { name: 'input_used', type: 'text', maxlength: 120, placeholder: 'เช่น ปุ๋ยหมักอินทรีย์, แหนแดง, น้ำส้มควันไม้ (ถ้ามี)' });
+          const amountField = el('input', { name: 'amount_qty', type: 'text', maxlength: 60, placeholder: 'เช่น 20 กก., 5 ลิตร (ถ้ามี)' });
+          const detailsArea = el('textarea', { name: 'details', required: true, placeholder: 'ระบุการปฏิบัติงาน สภาพแปลง หรือสิ่งที่สังเกตเห็น' });
+          const detailsError = el('small', { className: 'field-error hide' }, 'กรุณาระบุรายละเอียดกิจกรรมอย่างน้อยสั้น ๆ เพื่อให้ตรวจสอบย้อนกลับได้');
+          const photoInput = el('input', { name: 'photo_url', type: 'url', placeholder: 'https://...' });
 
           const quickPresets = [
-            { kindTag: 'ปลูก', label: 'ปลูกข้าวหอมมะลิ 105', kind: 'ปลูก', details: 'ปลูกข้าวหอมมะลิ 105 อินทรีย์ ตามมาตรฐานกลุ่มวิสาหกิจชุมชนผักไหม' },
-            { kindTag: 'ให้น้ำ', label: 'สูบน้ำเข้าแปลงนาอินทรีย์', kind: 'ให้น้ำ', details: 'สูบน้ำเข้าแปลงนาอินทรีย์ ตรวจสอบคันนาและแนวกันชนรอบแปลงสมบูรณ์ ปราศจากน้ำไหลย้อนจากแปลงเคมีภายนอก' },
-            { kindTag: 'ใส่ปุ๋ย', label: 'ปล่อยแหนแดงตรึงไนโตรเจน', kind: 'ใส่ปุ๋ย', details: 'ปล่อยแหนแดง (Azolla) ในแปลงนา เพื่อตรึงไนโตรเจนตามธรรมชาติและคลุมวัชพืชแทนการใช้สารเคมี' },
-            { kindTag: 'ใส่ปุ๋ย', label: 'พ่นน้ำหมักชีวภาพสูตรกลุ่ม', kind: 'ใส่ปุ๋ย', details: 'ฉีดพ่นปุ๋ยหมักอินทรีย์และจุลินทรีย์หน่อกล้วยบำรุงต้นข้าวตามสูตรที่ได้รับอนุมัติจาก ICS' },
-            { kindTag: 'กำจัดวัชพืช', label: 'ดายหญ้าด้วยมือรอบแปลง', kind: 'กำจัดวัชพืช', details: 'กำจัดวัชพืชด้วยแรงงานคนและตัดหญ้าแนวกันชนรอบแปลง ปลอดการใช้สารเคมีกำจัดวัชพืช 100%' },
-            { kindTag: 'ป้องกันศัตรูพืช', label: 'ฉีดพ่นน้ำส้มควันไม้', kind: 'ป้องกันกำจัดศัตรูพืช', details: 'ฉีดพ่นน้ำส้มควันไม้เจือจางเพื่อไล่แมลงและเพลี้ย ปลอดภัยต่อระบบนิเวศอินทรีย์' },
-            { kindTag: 'บำรุงดิน', label: 'ไถกลบตอซังไม่เผาฟาง', kind: 'อื่นๆ', details: 'ไถกลบตอซังข้าวและหว่านปอเทืองบำรุงดิน รณรงค์วิสาหกิจชุมชนผักไหมไม่เผาฟาง 100%' },
-            { kindTag: 'เก็บเกี่ยว', label: 'เก็บเกี่ยวผลผลิตอินทรีย์', kind: 'เก็บเกี่ยว', details: 'เก็บเกี่ยวผลผลิตข้าวหอมมะลิอินทรีย์ ตรวจทำความสะอาดเครื่องมือก่อนเก็บเกี่ยวเพื่อป้องกันสิ่งปนเปื้อน' }
+            { kindTag: 'ปลูก', label: 'ปลูกข้าวหอมมะลิ 105', kind: 'ปลูก', inputUsed: 'เมล็ดพันธุ์ข้าวหอมมะลิ 105 อินทรีย์', details: 'ปลูกข้าวหอมมะลิ 105 อินทรีย์ ตามมาตรฐานกลุ่มวิสาหกิจชุมชนผักไหม' },
+            { kindTag: 'ให้น้ำ', label: 'สูบน้ำเข้าแปลงนา', kind: 'ให้น้ำ', inputUsed: '', details: 'สูบน้ำเข้าแปลงนาอินทรีย์ ตรวจคันนาและแนวกันชนรอบแปลงเรียบร้อย' },
+            { kindTag: 'ใส่ปุ๋ย', label: 'ปล่อยแหนแดงบำรุงดิน', kind: 'ใส่ปุ๋ย', inputUsed: 'แหนแดงสด', details: 'ปล่อยแหนแดงในแปลงนาเพื่อบำรุงดินตามธรรมชาติ' },
+            { kindTag: 'ใส่ปุ๋ย', label: 'พ่นน้ำหมักชีวภาพ', kind: 'ใส่ปุ๋ย', inputUsed: 'น้ำหมักชีวภาพสูตรกลุ่ม', details: 'ฉีดพ่นปุ๋ยหมักอินทรีย์และจุลินทรีย์หน่อกล้วยตามสูตรที่ได้รับอนุมัติจาก ICS' },
+            { kindTag: 'ถอนหญ้า', label: 'ดายหญ้ารอบแปลง', kind: 'กำจัดวัชพืช', inputUsed: '', details: 'กำจัดวัชพืชด้วยแรงงานคนและตัดหญ้าแนวกันชนรอบแปลง ไม่ใช้สารเคมี' },
+            { kindTag: 'ป้องกันแมลง', label: 'พ่นน้ำส้มควันไม้', kind: 'ป้องกันกำจัดศัตรูพืช', inputUsed: 'น้ำส้มควันไม้', details: 'ฉีดพ่นน้ำส้มควันไม้เจือจางเพื่อไล่แมลงและเพลี้ย' },
+            { kindTag: 'บำรุงดิน', label: 'ไถกลบตอซังไม่เผาฟาง', kind: 'อื่นๆ', inputUsed: 'ปอเทืองบำรุงดิน', details: 'ไถกลบตอซังข้าวและหว่านปอเทืองบำรุงดิน ไม่เผาฟาง' },
+            { kindTag: 'เก็บเกี่ยว', label: 'เก็บเกี่ยวผลผลิต', kind: 'เก็บเกี่ยว', inputUsed: '', details: 'เก็บเกี่ยวผลผลิตอินทรีย์ ทำความสะอาดเครื่องมือก่อนเก็บเกี่ยว' }
           ];
 
           const chipsGrid = el('div', { className: 'quick-chips-grid' });
@@ -2055,15 +2051,14 @@ async function loadTab() {
               type: 'button',
               className: 'chip-btn',
               onclick: () => {
-                const form = $('#recordForm');
-                if (form) {
-                  const kindSelect = form.querySelector('select[name="kind"]');
-                  if (kindSelect) kindSelect.value = preset.kind;
-                  detailsArea.value = preset.details;
-                  chipsGrid.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
-                  btn.classList.add('active');
-                  notify(`เลือกกิจกรรม: "${preset.label}"`);
-                }
+                const kindSelect = kindSel.querySelector('select[name="kind"]');
+                if (kindSelect) kindSelect.value = preset.kind;
+                inputUsedField.value = preset.inputUsed;
+                detailsArea.value = preset.details;
+                detailsError.classList.add('hide');
+                chipsGrid.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                notify(`เลือกกิจกรรม: "${preset.label}"`);
               }
             },
               el('span', { className: 'chip-tag' }, preset.kindTag),
@@ -2072,28 +2067,138 @@ async function loadTab() {
             chipsGrid.append(btn);
           });
 
-          const formNode = dataForm('recordForm', [
-            el('h3', {}, icon('calendar', 16), ' บันทึกกิจกรรมในแปลงปลูก (Daily Farm Log)'),
-            el('small', { className: 'muted helper-label' }, 'เลือกกิจกรรมมาตรฐาน หรือกดปุ่มบันทึกด้วยเสียงภาษาไทย:'),
+          let wizardStep = 1;
+          const stepTabs = [
+            el('div', { className: 'wizard-step-pill active' }, '1. แปลงและประเภท'),
+            el('div', { className: 'wizard-step-pill' }, '2. รายละเอียดและปริมาณ'),
+            el('div', { className: 'wizard-step-pill' }, '3. ทบทวนแล้วบันทึก')
+          ];
+          const reviewBox = el('div', { className: 'wizard-review-box' });
+          const submitBtn = el('button', { type: 'submit', id: 'recordSubmitBtn' }, icon('checkCircle', 16), ' บันทึกกิจกรรม');
+
+          const step1Panel = el('div', { className: 'wizard-panel' },
+            plotSel,
+            el('small', { className: 'muted helper-label' }, 'เลือกงานที่ใช้บ่อยจากปุ่มลัด หรือเลือกประเภทด้านล่าง:'),
             chipsGrid,
-            plotSelect(),
-            selectField('kind', 'ประเภทกิจกรรม', ['ปลูก', 'ให้น้ำ', 'ใส่ปุ๋ย', 'กำจัดวัชพืช', 'ป้องกันกำจัดศัตรูพืช', 'เก็บเกี่ยว', 'อื่นๆ'].map(value => ({ value, label: value }))),
-            inputField('activity_date', 'วันที่ทำกิจกรรม', 'date', true, todayIso),
+            kindSel,
+            dateField,
+            el('div', { className: 'row mt-12' },
+              el('button', {
+                type: 'button',
+                id: 'wizardNext1Btn',
+                onclick: () => setWizardStep(2)
+              }, 'ถัดไป: ระบุรายละเอียด')
+            )
+          );
+
+          const step2Panel = el('div', { className: 'wizard-panel hide' },
+            el('label', {}, 'ปัจจัยที่ใช้ (ถ้ามี)', inputUsedField),
+            el('label', {}, 'ปริมาณและหน่วย (ถ้ามี)', amountField),
             el('label', {},
               'รายละเอียดกิจกรรม',
               detailsArea,
+              detailsError,
               createVoiceInput(detailsArea)
             ),
             el('label', {},
-              'ลิงก์รูปภาพหลักฐาน HTTPS (ถ้ามี)',
+              'ลิงก์รูปภาพหลักฐาน (ถ้ามี)',
               photoInput,
               createPhotoUploader(photoInput)
             ),
-          ], 'บันทึกกิจกรรมเข้าสู่ระบบ', '/activities');
+            el('div', { className: 'row between mt-12' },
+              el('button', { type: 'button', className: 'secondary', onclick: () => setWizardStep(1) }, 'ย้อนกลับ'),
+              el('button', {
+                type: 'button',
+                id: 'wizardNext2Btn',
+                onclick: () => {
+                  if (!detailsArea.value.trim()) {
+                    detailsError.classList.remove('hide');
+                    detailsArea.focus();
+                    return;
+                  }
+                  detailsError.classList.add('hide');
+                  setWizardStep(3);
+                }
+              }, 'ถัดไป: ทบทวนข้อมูล')
+            )
+          );
 
-          nodes.push(formNode);
+          const step3Panel = el('div', { className: 'wizard-panel hide' },
+            reviewBox,
+            el('div', { className: 'row between mt-12' },
+              el('button', { type: 'button', className: 'secondary', onclick: () => setWizardStep(2) }, 'แก้ไขข้อมูล'),
+              submitBtn
+            )
+          );
+
+          const renderReviewBox = () => {
+            const plotSelectEl = plotSel.querySelector('select[name="plot_id"]');
+            const kindSelectEl = kindSel.querySelector('select[name="kind"]');
+            const dateInputEl = dateField.querySelector('input[name="activity_date"]');
+            const plotLabel = plotSelectEl?.selectedOptions?.[0]?.textContent || '-';
+            const inputText = [inputUsedField.value.trim(), amountField.value.trim()].filter(Boolean).join(' • ');
+            reviewBox.replaceChildren(
+              el('div', { className: 'passport-row' }, el('b', {}, 'แปลงปลูก:'), el('span', {}, plotLabel)),
+              el('div', { className: 'passport-row' }, el('b', {}, 'ประเภทกิจกรรม:'), el('span', {}, kindSelectEl?.value || '-')),
+              el('div', { className: 'passport-row' }, el('b', {}, 'วันที่ทำกิจกรรม:'), el('span', {}, dateInputEl?.value || '-')),
+              inputText ? el('div', { className: 'passport-row' }, el('b', {}, 'ปัจจัยและปริมาณ:'), el('span', {}, inputText)) : null,
+              el('div', { className: 'passport-row' }, el('b', {}, 'รายละเอียด:'), el('span', {}, detailsArea.value.trim() || '-'))
+            );
+          };
+
+          const setWizardStep = (nextStep) => {
+            wizardStep = nextStep;
+            stepTabs.forEach((pill, idx) => {
+              pill.classList.toggle('active', idx + 1 === wizardStep);
+              pill.classList.toggle('done', idx + 1 < wizardStep);
+            });
+            step1Panel.classList.toggle('hide', wizardStep !== 1);
+            step2Panel.classList.toggle('hide', wizardStep !== 2);
+            step3Panel.classList.toggle('hide', wizardStep !== 3);
+            if (wizardStep === 3) renderReviewBox();
+          };
+
+          const recordForm = el('form', { id: 'recordForm', className: 'card' },
+            el('h3', {}, icon('calendar', 16), ' บันทึกกิจกรรมแปลง'),
+            el('div', { className: 'wizard-steps' }, ...stepTabs),
+            step1Panel,
+            step2Panel,
+            step3Panel
+          );
+
+          recordForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            if (submitBtn.disabled) return;
+            const formData = new FormData(recordForm);
+            const rawDetails = String(formData.get('details') || '').trim();
+            const used = String(formData.get('input_used') || '').trim();
+            const qty = String(formData.get('amount_qty') || '').trim();
+            const prefix = [used ? `ปัจจัย: ${used}` : '', qty ? `ปริมาณ: ${qty}` : ''].filter(Boolean).join(' | ');
+            const finalDetails = prefix ? `${prefix} — ${rawDetails}` : rawDetails;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'กำลังบันทึก...';
+            try {
+              await api('/activities', 'POST', {
+                plot_id: formData.get('plot_id'),
+                kind: formData.get('kind'),
+                activity_date: formData.get('activity_date'),
+                details: finalDetails,
+                photo_url: formData.get('photo_url') || ''
+              });
+              notify('บันทึกกิจกรรมสำเร็จ');
+              await loadTab();
+            } catch (error) {
+              if (!error.handled) notify(error.message);
+            } finally {
+              submitBtn.disabled = false;
+              submitBtn.replaceChildren(icon('checkCircle', 16), document.createTextNode(' บันทึกกิจกรรม'));
+            }
+          });
+
+          nodes.push(recordForm);
         } else {
-          nodes.push(el('div', { className: 'notice' }, 'กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถบันทึกกิจกรรมได้'));
+          nodes.push(empty('กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถบันทึกกิจกรรมได้', 'ไปหน้าแปลงปลูก', async () => { tab = 'plots'; renderTabs(); await loadTab(); }));
         }
       }
       nodes.push(el('div', { className: 'notice' },
@@ -2160,14 +2265,14 @@ async function loadTab() {
           );
 
           nodes.push(dataForm('approvalForm', [
-            el('h3', {}, icon('clipboard', 16), ' ส่งคำขออนุมัติปัจจัยการผลิตก่อนใช้จริง (Input Approval)'),
+            el('h3', {}, icon('clipboard', 16), ' ส่งคำขออนุมัติปัจจัยการผลิตก่อนใช้จริง'),
             formulaBtns,
             plotSelect(),
             el('label', {}, 'ชื่อปัจจัยการผลิต', inputNameField),
             el('label', {}, 'ส่วนประกอบ สูตรการผลิต และวิธีใช้', detailsField),
           ], 'ยื่นคำขอให้ ICS ตรวจสอบ', '/approvals'));
         } else {
-          nodes.push(el('div', { className: 'notice' }, 'กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถส่งคำขออนุมัติปัจจัยการผลิตได้'));
+          nodes.push(empty('กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถส่งคำขออนุมัติปัจจัยการผลิตได้', 'ไปหน้าแปลงปลูก', async () => { tab = 'plots'; renderTabs(); await loadTab(); }));
         }
       }
 

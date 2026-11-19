@@ -2739,6 +2739,68 @@ body.is-login .hero {
   gap: 2px;
 }
 
+/* 3-Step Activity Wizard & Field Error */
+.wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.wizard-step-pill {
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: var(--sage-50);
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.wizard-step-pill.active {
+  background: var(--green-700);
+  border-color: var(--green-900);
+  color: var(--white);
+}
+
+.wizard-step-pill.done {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+
+.wizard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizard-review-box {
+  background: var(--sage-50);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-error {
+  color: var(--danger-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-top: 4px;
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .wizard-steps {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
 /* ==========================================================================
    Print / PDF Export Styles (Official Audit & Traceability Certificate)
    ========================================================================== */
