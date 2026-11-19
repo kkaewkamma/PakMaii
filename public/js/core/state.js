@@ -32,7 +32,7 @@ export function setDemoUser(v) { demoUser = v; }
 export function setLoginRole(v) { loginRole = v; }
 
 export const state = {
-  get token() { return token; },
+  get token() { return token || sessionStorage.getItem('token'); },
   set token(v) { setToken(v); },
   get me() { return me; },
   set me(v) { setMe(v); },
@@ -42,7 +42,7 @@ export const state = {
   set tab(v) { setTab(v); },
   get config() { return config; },
   set config(v) { setConfig(v); },
-  get demoUser() { return demoUser; },
+  get demoUser() { return demoUser || (demoSession && !token ? demoSession.restore() : null); },
   set demoUser(v) { setDemoUser(v); },
   get loginRole() { return loginRole; },
   set loginRole(v) { setLoginRole(v); }

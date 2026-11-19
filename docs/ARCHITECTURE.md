@@ -12,7 +12,7 @@ flowchart LR
     HTML["public/index.html (2.7 KB)"]
     APP["public/app.js (Main Orchestrator)"]
     CORE["public/js/core/ (icons, dom, state, api, auth, photo, rhythm)"]
-    VIEWS["public/js/views/ (admin, ics, passport)"]
+    VIEWS["public/js/views/ (farmer, ics, admin, passport)"]
     CSS["public/app.css (18 Structured Sections)"]
     DEMO["public/demo.js (Client Sandbox)"]
     HDR["public/_headers (Strict CSP)"]

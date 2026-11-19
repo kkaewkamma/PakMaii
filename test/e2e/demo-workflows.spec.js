@@ -104,18 +104,70 @@ test.describe('PakMaii Critical Workflows (Demo-First & LIFF Compatibility)', ()
       await expect(dock).toBeVisible();
 
       // Tap "เพิ่มเติม" button to open more sheet
-      const moreBtn = dock.locator('.dock-more-btn');
-      if (await moreBtn.isVisible()) {
-        await moreBtn.click();
-        const moreSheet = page.locator('.more-sheet');
-        await expect(moreSheet).toBeVisible();
-        await expect(moreSheet).toHaveAttribute('aria-modal', 'true');
+      const moreBtn = dock.locator('.dock-btn:has-text("เพิ่มเติม")');
+      await expect(moreBtn).toBeVisible();
+      await moreBtn.click();
+      const moreSheet = page.locator('.more-sheet');
+      await expect(moreSheet).toBeVisible();
+      await expect(moreSheet).toHaveAttribute('aria-modal', 'true');
 
-        // Close more sheet
-        const closeBtn = page.locator('.more-sheet-close');
-        await closeBtn.click();
-        await expect(moreSheet).not.toBeVisible();
-      }
+      // Close more sheet
+      const closeBtn = page.locator('button[aria-label="ปิดเมนูเพิ่มเติม"]');
+      await closeBtn.click();
+      await expect(moreSheet).not.toBeVisible();
     }
+  });
+
+  test('Cross-Role ICS Inspection Review, Farmer Review Visibility, and Lot Story Passport', async ({ page, isMobile }) => {
+    await page.goto('/');
+
+    // 1. Login as ICS Officer
+    await page.click('#demoRole-ics');
+    await page.fill('#demoCode', 'ICS-STG-001');
+    await page.click('#demoLoginButton');
+    await expect(page.locator('#welcome')).toContainText('สวัสดี, Demo ICS Officer 01');
+
+    // 2. Navigate to Reviews ("ผลตรวจ")
+    if (isMobile) {
+      await page.locator('#mobile-dock .dock-btn:has-text("เพิ่มเติม")').click();
+      await page.locator('.more-sheet-item:has-text("ผลตรวจ")').click();
+    } else {
+      await page.locator('#tabs button:has-text("ผลตรวจ"):visible').click();
+    }
+
+    // 3. Verify ICS Audit Assistant inspection form renders and submit an inspection review for Plot 1 (A-03)
+    const reviewForm = page.locator('#reviewForm');
+    await expect(reviewForm).toBeVisible();
+    await reviewForm.locator('select[name="plot_id"]').selectOption('1');
+    await reviewForm.locator('textarea[name="note"]').fill('ตรวจแปลงผ่านเกณฑ์ แนวกันชนสมบูรณ์');
+    await reviewForm.locator('button[type="submit"]').click();
+    await expect(page.locator('#toast')).toContainText('บันทึกผลตรวจประเมินภายในเรียบร้อย');
+
+    // 4. Switch to Farmer A-03 via quick switcher bar
+    await page.locator('button:has-text("เกษตรกร A-03 (F-STG-001)")').click();
+    await expect(page.locator('#welcome')).toContainText('สวัสดี, Demo Farmer 01');
+
+    // 5. Navigate to Farmer Reviews ("ผลตรวจแปลง") and verify the inspection appears
+    if (isMobile) {
+      await page.locator('#mobile-dock .dock-btn:has-text("เพิ่มเติม")').click();
+      await page.locator('.more-sheet-item:has-text("ผลตรวจแปลง")').click();
+    } else {
+      await page.locator('#tabs button:has-text("ผลตรวจแปลง"):visible').click();
+    }
+    await expect(page.locator('#content')).toContainText('ตรวจแปลงผ่านเกณฑ์ แนวกันชนสมบูรณ์');
+
+    // 6. Navigate to Lots ("ล็อตผลผลิต") and open Story Passport
+    if (isMobile) {
+      await page.locator('#mobile-dock .dock-btn:has-text("เพิ่มเติม")').click();
+      await page.locator('.more-sheet-item:has-text("ล็อตผลผลิต")').click();
+    } else {
+      await page.locator('#tabs button:has-text("ล็อตผลผลิต"):visible').click();
+    }
+    await page.locator('.passport-trigger-btn').first().click();
+    const passportCard = page.locator('.passport-card');
+    await expect(passportCard).toBeVisible();
+    await expect(passportCard.locator('button:has-text("ตัวอย่างหน้าสาธารณะ (QR)")')).toHaveCount(0);
+    await passportCard.locator('.passport-close-btn').click();
+    await expect(passportCard).not.toBeVisible();
   });
 });

@@ -16,6 +16,8 @@ export async function showStoryPassport(lot) {
     )
   );
 
+  const reviewStatusSpan = el('span', { className: 'muted' }, 'ยังไม่มีผลตรวจที่เชื่อมกับล็อตนี้');
+
   const card = el('div', { className: 'passport-card' },
     el('div', { className: 'passport-header' },
       el('span', { className: 'passport-badge' }, 'ข้อมูลย้อนกลับล็อตผลผลิต'),
@@ -45,7 +47,7 @@ export async function showStoryPassport(lot) {
       ) : null,
       el('div', { className: 'passport-row' },
         el('b', {}, 'ผลการตรวจประเมิน:'),
-        el('span', { className: 'muted' }, 'ยังไม่มีผลตรวจที่เชื่อมกับล็อตนี้')
+        reviewStatusSpan
       ),
       el('div', { className: 'passport-row' },
         el('b', {}, 'วันที่บันทึกล็อต:'),
@@ -69,10 +71,22 @@ export async function showStoryPassport(lot) {
     )
   );
   overlay.append(card);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
 
   try {
-    const activities = await api('/activities').catch(() => []);
+    const [activities, reviews] = await Promise.all([
+      api('/activities').catch(() => []),
+      api('/reviews').catch(() => [])
+    ]);
+    const matchingReview = Array.isArray(reviews) ? reviews.find(r => r.plot_id === lot.plot_id) : null;
+    if (matchingReview) {
+      reviewStatusSpan.className = matchingReview.result === 'ผ่าน' ? 'pill success' : 'pill warn';
+      reviewStatusSpan.textContent = `${matchingReview.result} (${dated(matchingReview.reviewed_at || matchingReview.created_at)})`;
+    } else if (lot.ics_review_status === 'approved') {
+      reviewStatusSpan.className = 'pill success';
+      reviewStatusSpan.textContent = 'ผ่านการตรวจ ICS (ตัวอย่าง)';
+    }
     const track = create14DayRhythmTrack(lot.plot_id, activities, {
       title: `จังหวะบันทึกแปลง ${lot.plot_name || ''}`.trim(),
       endDate: lot.harvest_date || undefined,
