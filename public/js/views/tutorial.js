@@ -281,10 +281,10 @@ export function openInteractiveTutorial({ clientIp = '127.0.0.1', onSelectPerson
   ];
 
   let stepIndex = 0;
-  const badgeEl = el('span', { className: 'pill success' });
-  const ipTagEl = el('span', { className: 'pill' }, `เข้าชมครั้งแรกจาก IP: ${clientIp}`);
-  const titleEl = el('h3', { className: 'tutorial-title mt-8' });
-  const subEl = el('p', { className: 'muted tutorial-subtitle' });
+  const badgeEl = el('span', { className: 'tutorial-step-badge' });
+  const ipTagEl = el('span', { className: 'tutorial-ip-badge' }, `เข้าชมครั้งแรกจาก IP: ${clientIp}`);
+  const titleEl = el('h3', { className: 'tutorial-title' });
+  const subEl = el('p', { className: 'tutorial-subtitle' });
   const listEl = el('ul', { className: 'tutorial-points-list' });
   const dotsHost = el('div', { className: 'tutorial-dots-row' });
   const quickStartBox = el('div', { className: 'tutorial-quickstart-box hide' });
@@ -353,9 +353,9 @@ export function openInteractiveTutorial({ clientIp = '127.0.0.1', onSelectPerson
   const skipBtn = el('button', {
     type: 'button',
     id: 'tutorialSkipBtn',
-    className: 'ghost btn-sm',
+    className: 'tutorial-skip-btn',
     onclick: closeTutorial
-  }, 'ข้ามคู่มือ');
+  }, 'ข้ามคู่มือ ✕');
 
   const renderSlide = () => {
     const s = slides[stepIndex];
@@ -377,18 +377,23 @@ export function openInteractiveTutorial({ clientIp = '127.0.0.1', onSelectPerson
   renderSlide();
 
   const cardNode = el('div', { className: 'passport-card tutorial-modal-card' },
-    el('div', { className: 'passport-header tutorial-modal-header' },
-      el('div', { className: 'row between' },
-        el('div', { className: 'pill-list-row' }, badgeEl, ipTagEl),
+    el('div', { className: 'tutorial-modal-header' },
+      el('div', { className: 'tutorial-header-top' },
+        el('div', { className: 'tutorial-badges-wrap' }, badgeEl, ipTagEl),
         skipBtn
       ),
-      titleEl,
-      subEl
+      el('div', { className: 'tutorial-heading-row' },
+        el('div', { className: 'tutorial-brand-icon' }, icon('sprout', 26)),
+        el('div', { className: 'tutorial-heading-text' },
+          titleEl,
+          subEl
+        )
+      )
     ),
-    el('div', { className: 'passport-body' },
+    el('div', { className: 'passport-body tutorial-modal-body' },
       listEl,
       quickStartBox,
-      el('div', { className: 'row between mt-16' },
+      el('div', { className: 'tutorial-footer-bar' },
         dotsHost,
         el('div', { className: 'row' }, prevBtn, nextBtn)
       )

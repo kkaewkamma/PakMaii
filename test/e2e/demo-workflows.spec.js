@@ -97,11 +97,27 @@ test.describe('PakMaii Critical Workflows (Demo-First & LIFF Compatibility)', ()
   });
 
   test('ICS Login, Risks Dashboard, and Audit Assistant', async ({ page, isMobile }) => {
-    // 1. Visit landing page and verify IP First-Visit Tutorial Modal
+    // 1. Visit landing page and verify IP First-Visit Tutorial Modal & High-Contrast Typography
     await page.goto('/?tutorial=1');
     const tutorialModal = page.locator('.tutorial-modal-overlay');
     await expect(tutorialModal).toBeVisible();
     await expect(tutorialModal).toContainText('เข้าชมครั้งแรกจาก IP:');
+    const headerContrast = await page.evaluate(() => {
+      const header = document.querySelector('.tutorial-modal-header');
+      const title = document.querySelector('.tutorial-title');
+      const subtitle = document.querySelector('.tutorial-subtitle');
+      const skipBtn = document.querySelector('#tutorialSkipBtn');
+      return {
+        headerBg: getComputedStyle(header).backgroundColor,
+        titleColor: getComputedStyle(title).color,
+        subtitleColor: getComputedStyle(subtitle).color,
+        skipColor: getComputedStyle(skipBtn).color,
+        skipBg: getComputedStyle(skipBtn).backgroundColor
+      };
+    });
+    expect(headerContrast.headerBg).not.toBe(headerContrast.titleColor);
+    expect(headerContrast.headerBg).not.toBe(headerContrast.subtitleColor);
+    expect(headerContrast.skipBg).not.toBe(headerContrast.skipColor);
     await page.locator('#tutorialSkipBtn').click();
     await expect(tutorialModal).not.toBeVisible();
 
