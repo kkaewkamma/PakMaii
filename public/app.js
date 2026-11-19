@@ -412,16 +412,19 @@ async function start(forceLogin = false) {
       }, 'ผู้ตรวจประเมิน ICS (ICS-STG-001)')
     ) : null;
 
+    const avatarIcon = me.role === 'farmer' ? 'farmerAvatar' : roleIconName;
+    const codeLabelPrefix = me.role === 'farmer' ? 'รหัสเกษตรกร : ' : 'รหัสเจ้าหน้าที่ : ';
+
     $('#identity').replaceChildren(
       el('div', { className: 'identity-bar' },
         el('div', { className: 'identity-info' },
-          el('div', { className: 'user-avatar' }, icon(roleIconName, 18)),
+          el('div', { className: `user-avatar avatar-${me.role}` }, icon(avatarIcon, 28)),
           el('div', { className: 'identity-meta' },
             el('div', { className: 'user-code' },
               demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
-              me.agency_code || me.name
+              me.name || me.agency_code
             ),
-            el('div', { className: 'user-role-text' }, `${roleLabels[me.role] || me.role} • ${statusLabels[me.status] || me.status}`)
+            el('div', { className: 'user-role-text' }, `${codeLabelPrefix}${me.agency_code || me.name} • ${roleLabels[me.role] || me.role} (${statusLabels[me.status] || me.status})`)
           )
         ),
         el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
@@ -439,8 +442,8 @@ async function start(forceLogin = false) {
   }
 }
 
-import { openEvidenceViewer, createPhotoUploader } from './js/core/photo.js';
-import { buildFarmerHomeView, buildFarmerActivityWizard, buildFarmerReviewsView } from './js/views/farmer.js';
+import { openEvidenceViewer, openPhotoPreviewModal, createPhotoUploader } from './js/core/photo.js';
+import { buildFarmerHomeView, buildFarmerActivityWizard, buildFarmerApprovalView, buildFarmerReviewsView } from './js/views/farmer.js';
 import { showStoryPassport } from './js/views/passport.js';
 
 function sharePlotRiskToLine(w) {
@@ -1375,11 +1378,39 @@ async function loadTab() {
             if (url.protocol === 'https:') {
               box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูลิงก์ภาพภายนอก'));
             } else if (item.photo_url.startsWith('data:')) {
-              box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)'));
+              box.append(
+                el('div', { className: 'activity-photo-row mt-8' },
+                  el('img', {
+                    src: item.photo_url,
+                    className: 'activity-photo-thumb',
+                    alt: `ภาพกิจกรรม ${item.kind || ''}`.trim(),
+                    onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+                  }),
+                  el('button', {
+                    type: 'button',
+                    className: 'link-btn',
+                    onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+                  }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)')
+                )
+              );
             }
           } catch {
             if (item.photo_url.startsWith('data:')) {
-              box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)'));
+              box.append(
+                el('div', { className: 'activity-photo-row mt-8' },
+                  el('img', {
+                    src: item.photo_url,
+                    className: 'activity-photo-thumb',
+                    alt: `ภาพกิจกรรม ${item.kind || ''}`.trim(),
+                    onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+                  }),
+                  el('button', {
+                    type: 'button',
+                    className: 'link-btn',
+                    onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+                  }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)')
+                )
+              );
             }
           }
         }
@@ -1388,48 +1419,14 @@ async function loadTab() {
     } else if (tab === 'approval') {
       const rows = await api('/approvals');
       if (me.role === 'farmer') {
-        if (plots.length) {
-          const inputNameField = el('input', { name: 'input_name', type: 'text', required: true, placeholder: 'เช่น ปุ๋ยหมักอินทรีย์ (ทำเอง), สารสกัดสะเดา' });
-          const detailsField = el('textarea', { name: 'details', required: true, placeholder: 'ระบุแหล่งที่มา ส่วนประกอบ และวัตถุประสงค์การใช้เพื่อความโปร่งใส' });
-
-          const presetFormulas = [
-            {
-              label: 'สูตรน้ำหมักสะเดาไล่แมลง (ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน)',
-              name: 'น้ำหมักสมุนไพรไล่แมลง (ทำเอง)',
-              details: 'สูตร: ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน ใช้ป้องกันหนอนเจาะฝักและเพลี้ยไฟ ตามเกณฑ์มาตรฐานเกษตรอินทรีย์ PGS'
-            },
-            {
-              label: 'สูตรปุ๋ยหมักอินทรีย์บำรุงดิน (มูลวัวนมอินทรีย์ + แกลบดำ + จุลินทรีย์หน่อกล้วย)',
-              name: 'ปุ๋ยหมักอินทรีย์บำรุงดิน (ทำเอง)',
-              details: 'สูตร: มูลวัวในฟาร์มอินทรีย์ + แกลบดำ + รำอ่อน + จุลินทรีย์หน่อกล้วย หมักกลับกองครบ 30 วัน'
-            }
-          ];
-
-          const formulaBtns = el('div', { className: 'formula-presets-box' },
-            el('small', { className: 'muted helper-label' }, 'เลือกสูตรที่ได้รับการรับรองเบื้องต้นของกลุ่มวิสาหกิจชุมชน:'),
-            ...presetFormulas.map(f =>
-              el('button', {
-                type: 'button',
-                className: 'chip-btn chip-amber',
-                onclick: () => {
-                  inputNameField.value = f.name;
-                  detailsField.value = f.details;
-                  notify(`เลือกสูตร: ${f.name}`);
-                }
-              }, f.label)
-            )
-          );
-
-          nodes.push(dataForm('approvalForm', [
-            el('h3', {}, icon('clipboard', 16), ' ส่งคำขออนุมัติปัจจัยการผลิตก่อนใช้จริง'),
-            formulaBtns,
-            plotSelect(),
-            el('label', {}, 'ชื่อปัจจัยการผลิต', inputNameField),
-            el('label', {}, 'ส่วนประกอบ สูตรการผลิต และวิธีใช้', detailsField),
-          ], 'ยื่นคำขอให้ ICS ตรวจสอบ', '/approvals'));
-        } else {
-          nodes.push(empty('กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถส่งคำขออนุมัติปัจจัยการผลิตได้', 'ไปหน้าแปลงปลูก', async () => { tab = 'plots'; renderTabs(); await loadTab(); }));
-        }
+        nodes.push(...buildFarmerApprovalView({
+          plots,
+          rows,
+          me,
+          plotSelect,
+          reloadTab: () => loadTab(),
+          navigateTab: async (targetTab) => { tab = targetTab; renderTabs(); await loadTab(); }
+        }));
       }
 
       const pendingCount = rows.filter(r => r.status === 'pending').length;
