@@ -1,7 +1,8 @@
 import { migration001 } from './migrations/001_auth_identity_and_rbac.js';
 import { migration002 } from './migrations/002_admin_password_credentials.js';
+import { migration003 } from './migrations/003_photo_evidence.js';
 
-export const migrations = [migration001, migration002];
+export const migrations = [migration001, migration002, migration003];
 
 export function ensureMigrationTable(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations(

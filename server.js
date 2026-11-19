@@ -9,6 +9,13 @@ import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import { agencyCodeDigests, invitationTokenHash, loadAgencyKeyRing } from './lib/agency-code.js';
 import { verifyPassword } from './lib/password.js';
+import {
+  MAX_EVIDENCE_BYTES,
+  detectImageContentType,
+  extensionForContentType,
+  buildEvidenceObjectKey,
+  createLocalEvidenceStorage,
+} from './lib/evidence-storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -25,7 +32,12 @@ CREATE TABLE IF NOT EXISTS activities(id INTEGER PRIMARY KEY, plot_id INTEGER NO
 CREATE TABLE IF NOT EXISTS approvals(id INTEGER PRIMARY KEY, plot_id INTEGER NOT NULL REFERENCES plots(id), user_id INTEGER NOT NULL REFERENCES users(id), input_name TEXT NOT NULL, details TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')), reviewer_id INTEGER REFERENCES users(id), reviewed_at TEXT, comment TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS lots(id INTEGER PRIMARY KEY, plot_id INTEGER NOT NULL REFERENCES plots(id), code TEXT NOT NULL UNIQUE, crop TEXT NOT NULL, harvest_date TEXT NOT NULL, quantity REAL NOT NULL CHECK(quantity >= 0), created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, plot_id INTEGER NOT NULL REFERENCES plots(id), reviewer_id INTEGER NOT NULL REFERENCES users(id), result TEXT NOT NULL, note TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires_at INTEGER NOT NULL);`);
+CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS photo_evidence(id INTEGER PRIMARY KEY,owner_user_id INTEGER NOT NULL REFERENCES users(id),uploaded_by INTEGER NOT NULL REFERENCES users(id),plot_id INTEGER NOT NULL REFERENCES plots(id),entity_type TEXT NOT NULL CHECK(entity_type IN ('activity','review')),entity_id INTEGER,object_key TEXT NOT NULL UNIQUE,content_type TEXT NOT NULL CHECK(content_type IN ('image/jpeg','image/png','image/webp')),size_bytes INTEGER NOT NULL CHECK(size_bytes > 0 AND size_bytes <= 5242880),sha256_hex TEXT NOT NULL,storage_backend TEXT NOT NULL DEFAULT 'local' CHECK(storage_backend IN ('r2','local')),created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS idx_photo_evidence_plot ON photo_evidence(plot_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_photo_evidence_entity ON photo_evidence(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_photo_evidence_owner ON photo_evidence(owner_user_id);`);
+const evidenceStorage = createLocalEvidenceStorage(process.env.EVIDENCE_DIR || path.join(__dirname, 'data', 'evidence'));
 if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get() || !db.prepare('SELECT 1 FROM schema_migrations WHERE version=2').get()) {
   db.close();
   throw new Error('Database migration version 2 is required. Run npm run migrate before starting the server.');
@@ -40,6 +52,7 @@ app.use(helmet({
       defaultSrc: ["'none'"],
       scriptSrc: ["'self'", 'https://static.line-scdn.net'],
       styleSrc: ["'self'"],
+      fontSrc: ["'self'", 'data:'],
       imgSrc: ["'self'", 'data:', 'https:'],
       connectSrc: ["'self'", 'https://*.line.me', 'https://*.line-scdn.net'],
       frameSrc: ['https://*.line.me'],
@@ -112,6 +125,25 @@ function ownPlot(req, rawId) {
   if (req.user.role === 'ics' && db.prepare('SELECT 1 FROM farmer_assignments WHERE ics_user_id=? AND farmer_user_id=? AND ends_at IS NULL').get(req.user.id, plot.owner_id)) return plot;
   throw new HttpError(403, 'ไม่มีสิทธิ์เข้าถึงแปลง');
 }
+function authorizeEvidenceAccess(req, evidence) {
+  if (req.user.role === 'admin') return;
+  if (req.user.role === 'farmer' && evidence.owner_user_id === req.user.id) return;
+  if (req.user.role === 'ics' && db.prepare('SELECT 1 FROM farmer_assignments WHERE ics_user_id=? AND farmer_user_id=? AND ends_at IS NULL').get(req.user.id, evidence.owner_user_id)) return;
+  throw new HttpError(403, 'ไม่มีสิทธิ์เข้าถึงภาพหลักฐานนี้');
+}
+
+function validatePendingEvidenceForEntity(req, rawEvidenceId, plotId, entityType) {
+  if (rawEvidenceId === undefined || rawEvidenceId === null || String(rawEvidenceId).trim() === '') return null;
+  const evidenceId = positiveId(rawEvidenceId, 'รหัสภาพหลักฐาน');
+  const evidence = db.prepare('SELECT * FROM photo_evidence WHERE id=?').get(evidenceId);
+  if (!evidence) throw new HttpError(404, 'ไม่พบภาพหลักฐานที่ระบุ');
+  if (evidence.uploaded_by !== req.user.id || evidence.plot_id !== plotId || evidence.entity_type !== entityType) {
+    throw new HttpError(403, 'ไม่มีสิทธิ์ใช้ภาพหลักฐานนี้กับรายการดังกล่าว');
+  }
+  if (evidence.entity_id !== null) throw new HttpError(400, 'ภาพหลักฐานนี้ถูกใช้งานกับรายการอื่นแล้ว');
+  return evidenceId;
+}
+
 const isLoopback = req => {
   const cameThroughProxy = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.headers.forwarded;
   return !cameThroughProxy && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
@@ -341,12 +373,108 @@ app.patch('/api/plots/:id', auth, wrap((req, res) => {
   res.json(db.prepare('SELECT * FROM plots WHERE id=?').get(plot.id));
 }));
 app.get('/api/activities', auth, wrap((req, res) => {
-  const base = 'SELECT a.*,p.name plot_name,u.name farmer FROM activities a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=a.user_id';
+  const base = "SELECT a.*,p.name plot_name,u.name farmer,(SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='activity' AND pe.entity_id=a.id ORDER BY pe.id DESC LIMIT 1) evidence_id FROM activities a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=a.user_id";
   if (req.user.role === 'admin') return res.json(db.prepare(`${base} ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`).all());
   if (req.user.role === 'ics') return res.json(db.prepare(`${base} JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`).all(req.user.id));
   res.json(db.prepare(`${base} WHERE p.owner_id=? ORDER BY a.activity_date DESC,a.id DESC LIMIT 300`).all(req.user.id));
 }));
-app.post('/api/activities', auth, wrap((req, res) => { if (req.user.role !== 'farmer') throw new HttpError(403, 'เฉพาะเกษตรกร'); const plot = ownPlot(req, req.body.plot_id), kind = text(req.body.kind, 'กิจกรรม', 100), details = text(req.body.details, 'รายละเอียด', 2000), activityDate = isoDate(req.body.activity_date, 'วันที่ทำกิจกรรม'), url = photoUrl(req.body.photo_url); const result = db.prepare('INSERT INTO activities(plot_id,user_id,kind,details,activity_date,photo_url) VALUES(?,?,?,?,?,?)').run(plot.id, req.user.id, kind, details, activityDate, url); res.status(201).json({ id: result.lastInsertRowid }); }));
+app.post('/api/activities', auth, wrap((req, res) => {
+  if (req.user.role !== 'farmer') throw new HttpError(403, 'เฉพาะเกษตรกร');
+  const plot = ownPlot(req, req.body.plot_id), kind = text(req.body.kind, 'กิจกรรม', 100), details = text(req.body.details, 'รายละเอียด', 2000), activityDate = isoDate(req.body.activity_date, 'วันที่ทำกิจกรรม'), url = photoUrl(req.body.photo_url);
+  const evidenceId = validatePendingEvidenceForEntity(req, req.body.evidence_id, plot.id, 'activity');
+  const id = db.transaction(() => {
+    const result = db.prepare('INSERT INTO activities(plot_id,user_id,kind,details,activity_date,photo_url) VALUES(?,?,?,?,?,?)').run(plot.id, req.user.id, kind, details, activityDate, url);
+    const activityId = result.lastInsertRowid;
+    if (evidenceId !== null) {
+      const attached = db.prepare("UPDATE photo_evidence SET entity_id=? WHERE id=? AND uploaded_by=? AND plot_id=? AND entity_type='activity' AND entity_id IS NULL").run(activityId, evidenceId, req.user.id, plot.id);
+      if (attached.changes !== 1) throw new HttpError(400, 'ไม่สามารถผูกภาพหลักฐานนี้ได้');
+    }
+    return activityId;
+  }).immediate();
+  res.status(201).json({ id, ...(evidenceId !== null ? { evidence_id: evidenceId } : {}) });
+}));
+app.post('/api/evidence', auth, express.raw({ type: () => true, limit: '5mb' }), wrap(async (req, res) => {
+  const plotId = positiveId(req.query.plot_id, 'รหัสแปลง');
+  const entityType = String(req.query.entity_type || 'activity');
+  if (!['activity', 'review'].includes(entityType)) throw new HttpError(400, 'ประเภทหลักฐานไม่ถูกต้อง');
+  if (entityType === 'activity' && req.user.role !== 'farmer') throw new HttpError(403, 'เฉพาะเกษตรกร');
+  if (entityType === 'review' && req.user.role !== 'ics') throw new HttpError(403, 'เฉพาะเจ้าหน้าที่ ICS');
+  const plot = ownPlot(req, plotId);
+  const rawEntityId = req.query.entity_id;
+  const entityId = rawEntityId !== undefined && rawEntityId !== '' ? positiveId(rawEntityId, 'รหัสรายการ') : null;
+  if (entityId !== null) {
+    const targetRecord = entityType === 'activity'
+      ? db.prepare('SELECT * FROM activities WHERE id=?').get(entityId)
+      : db.prepare('SELECT * FROM reviews WHERE id=?').get(entityId);
+    if (!targetRecord) throw new HttpError(404, 'ไม่พบรายการอ้างอิง');
+    if (targetRecord.plot_id !== plot.id) throw new HttpError(403, 'ไม่มีสิทธิ์แนบภาพหลักฐานข้ามแปลง');
+  }
+  const bytes = Buffer.isBuffer(req.body) ? new Uint8Array(req.body) : new Uint8Array(0);
+  if (!bytes.byteLength) throw new HttpError(400, 'ไม่พบข้อมูลไฟล์ภาพ');
+  if (bytes.byteLength > MAX_EVIDENCE_BYTES) throw new HttpError(413, 'ไฟล์ภาพมีขนาดใหญ่เกิน 5 MB');
+  const detectedType = detectImageContentType(bytes);
+  if (!detectedType) throw new HttpError(415, 'รองรับเฉพาะไฟล์ภาพ JPEG, PNG หรือ WebP เท่านั้น');
+  const fileHash = crypto.createHash('sha256').update(bytes).digest('hex');
+  const objectKey = buildEvidenceObjectKey(entityType, plot.id, detectedType, crypto.randomBytes(16).toString('hex'));
+  await evidenceStorage.put(objectKey, bytes, detectedType);
+  let createdId;
+  try {
+    createdId = db.transaction(() => {
+      const result = db.prepare(`INSERT INTO photo_evidence(owner_user_id,uploaded_by,plot_id,entity_type,entity_id,object_key,content_type,size_bytes,sha256_hex,storage_backend)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(plot.owner_id, req.user.id, plot.id, entityType, entityId, objectKey, detectedType, bytes.byteLength, fileHash, evidenceStorage.backend);
+      writeAudit('evidence.uploaded', req.user.id, 'evidence', result.lastInsertRowid, { plotId: plot.id, entityType, entityId, contentType: detectedType, sizeBytes: bytes.byteLength });
+      return result.lastInsertRowid;
+    }).immediate();
+  } catch (err) {
+    await evidenceStorage.delete(objectKey).catch(() => {});
+    throw err;
+  }
+  res.set('Cache-Control', 'no-store').status(201).json({
+    id: createdId,
+    plot_id: plot.id,
+    entity_type: entityType,
+    entity_id: entityId,
+    content_type: detectedType,
+    size_bytes: bytes.byteLength,
+    sha256_hex: fileHash,
+    storage_backend: evidenceStorage.backend,
+    content_url: `/api/evidence/${createdId}/content`,
+  });
+}));
+app.get('/api/evidence/:id', auth, wrap((req, res) => {
+  const id = positiveId(req.params.id, 'รหัสภาพหลักฐาน');
+  const evidence = db.prepare('SELECT * FROM photo_evidence WHERE id=?').get(id);
+  if (!evidence) throw new HttpError(404, 'ไม่พบภาพหลักฐาน');
+  authorizeEvidenceAccess(req, evidence);
+  res.set('Cache-Control', 'private, no-store').json({
+    id: evidence.id,
+    plot_id: evidence.plot_id,
+    entity_type: evidence.entity_type,
+    entity_id: evidence.entity_id,
+    content_type: evidence.content_type,
+    size_bytes: evidence.size_bytes,
+    sha256_hex: evidence.sha256_hex,
+    storage_backend: evidence.storage_backend,
+    created_at: evidence.created_at,
+    content_url: `/api/evidence/${evidence.id}/content`,
+  });
+}));
+app.get('/api/evidence/:id/content', auth, wrap(async (req, res) => {
+  const id = positiveId(req.params.id, 'รหัสภาพหลักฐาน');
+  const evidence = db.prepare('SELECT * FROM photo_evidence WHERE id=?').get(id);
+  if (!evidence) throw new HttpError(404, 'ไม่พบภาพหลักฐาน');
+  authorizeEvidenceAccess(req, evidence);
+  const obj = await evidenceStorage.get(evidence.object_key);
+  if (!obj) throw new HttpError(404, 'ไม่พบไฟล์ภาพหลักฐานในคลังจัดเก็บ');
+  res.set({
+    'Content-Type': evidence.content_type,
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+    'Content-Disposition': `inline; filename="evidence-${evidence.id}.${extensionForContentType(evidence.content_type)}"`,
+    'Cache-Control': 'private, no-store',
+    'Referrer-Policy': 'no-referrer',
+  }).send(obj.body);
+}));
 app.get('/api/approvals', auth, wrap((req, res) => {
   const base = 'SELECT a.*,p.name plot_name,u.name farmer FROM approvals a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=a.user_id';
   if (req.user.role === 'admin') return res.json(db.prepare(`${base} ORDER BY a.id DESC`).all());
@@ -363,10 +491,24 @@ app.get('/api/lots', auth, wrap((req, res) => {
 }));
 app.post('/api/lots', auth, wrap((req, res) => { if (req.user.role !== 'farmer') throw new HttpError(403, 'เฉพาะเกษตรกร'); const plot = ownPlot(req, req.body.plot_id), code = text(req.body.code, 'รหัสล็อต', 100), crop = text(req.body.crop, 'ชนิดผลผลิต', 100), harvestDate = isoDate(req.body.harvest_date, 'วันที่เก็บเกี่ยว'), quantity = Number(req.body.quantity); if (!Number.isFinite(quantity) || quantity < 0) throw new HttpError(400, 'ปริมาณไม่ถูกต้อง'); const result = db.prepare('INSERT INTO lots(plot_id,code,crop,harvest_date,quantity) VALUES(?,?,?,?,?)').run(plot.id, code, crop, harvestDate, quantity); res.status(201).json({ id: result.lastInsertRowid }); }));
 app.get('/api/risks', auth, ics, wrap((req, res) => { const pending = db.prepare("SELECT a.id,a.input_name,p.name plot_name,'pending' type FROM approvals a JOIN plots p ON p.id=a.plot_id JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL WHERE a.status='pending'").all(req.user.id); const inactive = db.prepare("SELECT p.id,p.name plot_name,'inactive' type FROM plots p JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL WHERE NOT EXISTS (SELECT 1 FROM activities a WHERE a.plot_id=p.id AND a.activity_date>=date('now','-14 days'))").all(req.user.id); res.json([...pending, ...inactive]); }));
-app.get('/api/reviews', auth, ics, wrap((req, res) => res.json(db.prepare('SELECT r.*,p.name plot_name FROM reviews r JOIN plots p ON p.id=r.plot_id JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC').all(req.user.id))));
-app.post('/api/reviews', auth, ics, wrap((req, res) => { const plot = ownPlot(req, req.body.plot_id), resultText = text(req.body.result, 'ผลตรวจ', 100), note = text(req.body.note, 'บันทึกผลตรวจ', 2000); const id = db.transaction(() => { const result = db.prepare('INSERT INTO reviews(plot_id,reviewer_id,result,note) VALUES(?,?,?,?)').run(plot.id, req.user.id, resultText, note); writeAudit('review.created', req.user.id, 'review', result.lastInsertRowid, { plotId: plot.id, result: resultText }); return result.lastInsertRowid; }).immediate(); res.status(201).json({ id }); }));
+app.get('/api/reviews', auth, ics, wrap((req, res) => res.json(db.prepare("SELECT r.*,p.name plot_name,(SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id FROM reviews r JOIN plots p ON p.id=r.plot_id JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC").all(req.user.id))));
+app.post('/api/reviews', auth, ics, wrap((req, res) => {
+  const plot = ownPlot(req, req.body.plot_id), resultText = text(req.body.result, 'ผลตรวจ', 100), note = text(req.body.note, 'บันทึกผลตรวจ', 2000);
+  const evidenceId = validatePendingEvidenceForEntity(req, req.body.evidence_id, plot.id, 'review');
+  const id = db.transaction(() => {
+    const result = db.prepare('INSERT INTO reviews(plot_id,reviewer_id,result,note) VALUES(?,?,?,?)').run(plot.id, req.user.id, resultText, note);
+    const reviewId = result.lastInsertRowid;
+    if (evidenceId !== null) {
+      const attached = db.prepare("UPDATE photo_evidence SET entity_id=? WHERE id=? AND uploaded_by=? AND plot_id=? AND entity_type='review' AND entity_id IS NULL").run(reviewId, evidenceId, req.user.id, plot.id);
+      if (attached.changes !== 1) throw new HttpError(400, 'ไม่สามารถผูกภาพหลักฐานนี้ได้');
+    }
+    writeAudit('review.created', req.user.id, 'review', reviewId, { plotId: plot.id, result: resultText });
+    return reviewId;
+  }).immediate();
+  res.status(201).json({ id, ...(evidenceId !== null ? { evidence_id: evidenceId } : {}) });
+}));
 app.get('/api/health', (req, res) => res.json({ ok: true, service: 'ready-to-grow' }));
-app.get('/api/config', (req, res) => res.json({ liffId: process.env.LIFF_ID || '', development: devAuthEnabled && isLoopback(req) }));
+app.get('/api/config', (req, res) => res.json({ liffId: process.env.LIFF_ID || '', development: devAuthEnabled && isLoopback(req), evidenceUploadEnabled: evidenceStorage.configured }));
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'ไม่พบ API' }));
 app.use((error, req, res, next) => {

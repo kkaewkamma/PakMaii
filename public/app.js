@@ -826,6 +826,15 @@ function createVoiceInput(textarea) {
   return el('div', { className: 'voice-mic-bar' }, voiceBtn);
 }
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function compressImage(file, maxDimension = 1200, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -859,47 +868,194 @@ function compressImage(file, maxDimension = 1200, quality = 0.8) {
   });
 }
 
-function createPhotoUploader(photoUrlInput) {
-  if (!demoUser) {
-    return el('div', { className: 'photo-preview-wrap hide' });
-  }
-  const fileInput = el('input', { type: 'file', accept: 'image/*', className: 'hide' });
-  const previewImg = el('img', { className: 'photo-preview-img hide', alt: 'ตัวอย่างหลักฐานภาพถ่าย' });
-  const previewWrap = el('div', { className: 'photo-preview-wrap' });
+async function compressImageToBlob(file, maxDimension = 1200, quality = 0.8) {
+  const dataUrl = await compressImage(file, maxDimension, quality);
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return { blob, dataUrl, contentType: blob.type || 'image/jpeg', size: blob.size };
+}
 
-  const uploadBtn = el('button', {
+function uploadEvidenceWithProgress(blob, { plotId, entityType = 'activity', onProgress } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!plotId) {
+      reject(new Error('กรุณาเลือกแปลงปลูกก่อนอัปโหลดภาพหลักฐาน'));
+      return;
+    }
+    const xhr = new XMLHttpRequest();
+    const qs = `plot_id=${encodeURIComponent(String(plotId))}&entity_type=${encodeURIComponent(String(entityType))}`;
+    xhr.open('POST', `/api/evidence?${qs}`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.setRequestHeader('Content-Type', blob.type || 'image/jpeg');
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && typeof onProgress === 'function') {
+        onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+      }
+    };
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText || '{}'); } catch { data = {}; }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else reject(new Error(data.error || `อัปโหลดภาพไม่สำเร็จ (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง'));
+    xhr.send(blob);
+  });
+}
+
+async function openEvidenceViewer(evidenceId) {
+  const overlay = el('div', { className: 'passport-overlay' });
+  const bodyHost = el('div', { className: 'passport-body' },
+    el('p', { className: 'muted' }, 'กำลังโหลดภาพหลักฐานอย่างปลอดภัย...')
+  );
+  const cardNode = el('div', { className: 'passport-card' },
+    el('div', { className: 'passport-header' },
+      el('span', { className: 'pill success' }, icon('shield', 12), ' หลักฐานภาพถ่ายที่อัปโหลดแล้ว'),
+      el('h3', { className: 'passport-title mt-8' }, `ภาพหลักฐาน #${evidenceId}`),
+      el('small', { className: 'passport-subtitle' }, 'เข้าถึงได้เฉพาะเจ้าของแปลง เจ้าหน้าที่ ICS ที่รับผิดชอบ และผู้ดูแลระบบ')
+    ),
+    bodyHost,
+    el('div', { className: 'passport-actions row between mt-12' },
+      el('button', { type: 'button', className: 'passport-close-btn', onclick: () => overlay.remove() }, 'ปิดหน้าต่าง')
+    )
+  );
+  overlay.append(cardNode);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+
+  try {
+    const response = await fetch(`/api/evidence/${encodeURIComponent(String(evidenceId))}/content`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store'
+    });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'ไม่สามารถเปิดดูภาพหลักฐานได้');
+    }
+    const blob = await response.blob();
+    const dataUrl = await blobToDataUrl(blob);
+    bodyHost.replaceChildren(
+      el('img', { src: dataUrl, className: 'evidence-viewer-img', alt: `ภาพหลักฐาน #${evidenceId}` }),
+      el('small', { className: 'muted mt-8' }, 'ภาพหลักฐานที่จัดเก็บอย่างปลอดภัยในระบบ')
+    );
+  } catch (err) {
+    bodyHost.replaceChildren(
+      el('small', { className: 'field-error' }, err.message || 'ไม่สามารถโหลดภาพหลักฐานได้')
+    );
+  }
+}
+
+function createPhotoUploader(photoUrlInput, options = {}) {
+  const entityType = options.entityType || 'activity';
+  const getPlotId = typeof options.getPlotId === 'function' ? options.getPlotId : () => null;
+  const evidenceIdInput = options.evidenceIdInput || null;
+
+  const isDemoPreview = Boolean(demoUser);
+  const realUploadReady = !isDemoPreview && Boolean(config?.evidenceUploadEnabled);
+
+  if (!isDemoPreview && !realUploadReady) {
+    return el('div', { className: 'photo-preview-wrap' },
+      el('small', { className: 'muted' }, 'ระบบอัปโหลดภาพขึ้น R2 ยังไม่เปิดใช้งานในสภาพแวดล้อมนี้ (สามารถแนบลิงก์ HTTPS ด้านบนได้หากมี)')
+    );
+  }
+
+  const galleryInput = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/*', className: 'hide' });
+  const cameraInput = el('input', { type: 'file', accept: 'image/*', capture: 'environment', className: 'hide' });
+  const previewImg = el('img', { className: 'photo-preview-img hide', alt: 'ตัวอย่างหลักฐานภาพถ่าย' });
+  const statusLine = el('small', { className: 'photo-upload-status muted hide' });
+  const errorLine = el('small', { className: 'field-error hide' });
+  const clearBtn = el('button', {
+    type: 'button',
+    className: 'ghost btn-sm hide',
+    onclick: () => {
+      previewImg.classList.add('hide');
+      previewImg.removeAttribute('src');
+      statusLine.classList.add('hide');
+      errorLine.classList.add('hide');
+      clearBtn.classList.add('hide');
+      if (photoUrlInput && !photoUrlInput.value.startsWith('https://')) photoUrlInput.value = '';
+      if (evidenceIdInput) evidenceIdInput.value = '';
+      galleryInput.value = '';
+      cameraInput.value = '';
+    }
+  }, 'ลบภาพ');
+
+  const cameraBtn = el('button', {
     type: 'button',
     className: 'secondary btn-sm',
-    onclick: () => fileInput.click()
-  }, icon('camera', 13), ' อัปโหลดหลักฐานภาพถ่าย');
+    onclick: () => cameraInput.click()
+  }, icon('camera', 13), ' ถ่ายภาพด้วยกล้อง');
 
-  fileInput.onchange = async () => {
-    const file = fileInput.files?.[0];
+  const galleryBtn = el('button', {
+    type: 'button',
+    className: 'secondary btn-sm',
+    onclick: () => galleryInput.click()
+  }, icon('plus', 13), ' เลือกจากคลังภาพ');
+
+  const handleSelectedFile = async (file) => {
     if (!file) return;
+    errorLine.classList.add('hide');
+    statusLine.classList.remove('hide');
+    statusLine.textContent = 'กำลังบีบอัดภาพ...';
+
     try {
-      const compressedDataUrl = await compressImage(file, 1200, 0.8);
-      previewImg.src = compressedDataUrl;
-      previewImg.classList.remove('hide');
-      if (photoUrlInput) photoUrlInput.value = compressedDataUrl;
-      notify('โหลดรูปภาพหลักฐานในเครื่องเรียบร้อย');
-    } catch {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target.result;
-        previewImg.src = dataUrl;
+      const compressed = await compressImageToBlob(file, 1200, 0.8);
+      if (isDemoPreview) {
+        previewImg.src = compressed.dataUrl;
         previewImg.classList.remove('hide');
-        if (photoUrlInput) photoUrlInput.value = dataUrl;
-        notify('โหลดรูปภาพหลักฐานเรียบร้อย');
-      };
-      reader.readAsDataURL(file);
+        clearBtn.classList.remove('hide');
+        if (photoUrlInput) photoUrlInput.value = compressed.dataUrl;
+        statusLine.textContent = 'ตัวอย่างภาพในโหมดทดลอง (เก็บเฉพาะในเครื่องนี้ ไม่ได้อัปโหลดขึ้นเซิร์ฟเวอร์)';
+        notify('โหลดภาพตัวอย่างในโหมดทดลองเรียบร้อย');
+        return;
+      }
+
+      if (compressed.size > 5 * 1024 * 1024) {
+        throw new Error('ไฟล์ภาพหลังบีบอัดยังมีขนาดเกิน 5 MB กรุณาเลือกภาพที่เล็กลง');
+      }
+
+      const plotId = getPlotId();
+      cameraBtn.disabled = true;
+      galleryBtn.disabled = true;
+      statusLine.textContent = 'กำลังอัปโหลด... 0%';
+
+      const uploaded = await uploadEvidenceWithProgress(compressed.blob, {
+        plotId,
+        entityType,
+        onProgress: (pct) => { statusLine.textContent = `กำลังอัปโหลด... ${pct}%`; },
+      });
+
+      if (evidenceIdInput) evidenceIdInput.value = String(uploaded.id);
+      previewImg.src = compressed.dataUrl;
+      previewImg.classList.remove('hide');
+      clearBtn.classList.remove('hide');
+      const sizeKb = Math.max(1, Math.round((uploaded.size_bytes || compressed.size) / 1024));
+      statusLine.textContent = `อัปโหลดขึ้นระบบแล้ว (หลักฐาน #${uploaded.id} • ${sizeKb} KB)`;
+      notify('อัปโหลดภาพหลักฐานสำเร็จ');
+    } catch (err) {
+      statusLine.classList.add('hide');
+      errorLine.textContent = err?.message || 'ไม่สามารถอัปโหลดภาพได้ กรุณาลองใหม่';
+      errorLine.classList.remove('hide');
+    } finally {
+      cameraBtn.disabled = false;
+      galleryBtn.disabled = false;
     }
   };
 
-  previewWrap.append(
-    uploadBtn,
-    fileInput,
+  galleryInput.onchange = () => handleSelectedFile(galleryInput.files?.[0]);
+  cameraInput.onchange = () => handleSelectedFile(cameraInput.files?.[0]);
+
+  const previewWrap = el('div', { className: 'photo-preview-wrap' },
+    el('div', { className: 'photo-upload-actions' }, cameraBtn, galleryBtn, clearBtn),
+    cameraInput,
+    galleryInput,
     previewImg,
-    el('small', { className: 'muted demo-note' }, 'รูปภาพจะจัดเก็บเฉพาะในเครื่องนี้ (โหมดทดลอง)')
+    statusLine,
+    errorLine,
+    el('small', { className: isDemoPreview ? 'muted demo-note' : 'muted' },
+      isDemoPreview
+        ? 'โหมดทดลอง: ตัวอย่างภาพเก็บเฉพาะในเครื่องนี้ (ไม่ได้อัปโหลดขึ้นเซิร์ฟเวอร์)'
+        : 'รองรับ JPEG/PNG/WebP ระบบจะย่อขนาดอัตโนมัติก่อนอัปโหลดขึ้นเซิร์ฟเวอร์อย่างปลอดภัย (สูงสุด 5 MB)'
+    )
   );
   return previewWrap;
 }
@@ -2271,6 +2427,7 @@ async function loadTab() {
           const detailsArea = el('textarea', { name: 'details', required: true, placeholder: 'ระบุการปฏิบัติงาน สภาพแปลง หรือสิ่งที่สังเกตเห็น' });
           const detailsError = el('small', { className: 'field-error hide' }, 'กรุณาระบุรายละเอียดกิจกรรมอย่างน้อยสั้น ๆ เพื่อให้ตรวจสอบย้อนกลับได้');
           const photoInput = el('input', { name: 'photo_url', type: 'url', placeholder: 'https://...' });
+          const evidenceIdInput = el('input', { name: 'evidence_id', type: 'hidden', value: '' });
 
           const quickPresets = [
             { kindTag: 'ปลูก', label: 'ปลูกข้าวหอมมะลิ 105', kind: 'ปลูก', inputUsed: 'เมล็ดพันธุ์ข้าวหอมมะลิ 105 อินทรีย์', details: 'ปลูกข้าวหอมมะลิ 105 อินทรีย์ ตามมาตรฐานกลุ่มวิสาหกิจชุมชนผักไหม' },
@@ -2339,9 +2496,14 @@ async function loadTab() {
               createVoiceInput(detailsArea)
             ),
             el('label', {},
-              'ลิงก์รูปภาพหลักฐาน (ถ้ามี)',
+              'ภาพหลักฐาน / ลิงก์รูปภาพ (ถ้ามี)',
               photoInput,
-              createPhotoUploader(photoInput)
+              evidenceIdInput,
+              createPhotoUploader(photoInput, {
+                entityType: 'activity',
+                getPlotId: () => plotSel.querySelector('select[name="plot_id"]')?.value,
+                evidenceIdInput,
+              })
             ),
             el('div', { className: 'row between mt-12' },
               el('button', { type: 'button', className: 'secondary', onclick: () => setWizardStep(1) }, 'ย้อนกลับ'),
@@ -2380,7 +2542,12 @@ async function loadTab() {
               el('div', { className: 'passport-row' }, el('b', {}, 'ประเภทกิจกรรม:'), el('span', {}, kindSelectEl?.value || '-')),
               el('div', { className: 'passport-row' }, el('b', {}, 'วันที่ทำกิจกรรม:'), el('span', {}, dateInputEl?.value || '-')),
               inputText ? el('div', { className: 'passport-row' }, el('b', {}, 'ปัจจัยและปริมาณ:'), el('span', {}, inputText)) : null,
-              el('div', { className: 'passport-row' }, el('b', {}, 'รายละเอียด:'), el('span', {}, detailsArea.value.trim() || '-'))
+              el('div', { className: 'passport-row' }, el('b', {}, 'รายละเอียด:'), el('span', {}, detailsArea.value.trim() || '-')),
+              evidenceIdInput.value
+                ? el('div', { className: 'passport-row' }, el('b', {}, 'ภาพหลักฐาน:'), el('span', { className: 'pill success' }, `อัปโหลดแล้ว (#${evidenceIdInput.value})`))
+                : (photoInput.value.startsWith('data:')
+                    ? el('div', { className: 'passport-row' }, el('b', {}, 'ภาพตัวอย่าง (Demo):'), el('span', { className: 'pill warn' }, 'เก็บในเครื่องนี้'))
+                    : null)
             );
           };
 
@@ -2422,7 +2589,8 @@ async function loadTab() {
                 kind: formData.get('kind'),
                 activity_date: formData.get('activity_date'),
                 details: finalDetails,
-                photo_url: formData.get('photo_url') || ''
+                photo_url: formData.get('photo_url') || '',
+                evidence_id: formData.get('evidence_id') || ''
               });
               notify('บันทึกกิจกรรมสำเร็จ');
               await loadTab();
@@ -2453,15 +2621,24 @@ async function loadTab() {
           el('p', {}, `${item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
           el('p', { className: 'muted' }, item.details)
         );
+        if (item.evidence_id) {
+          box.append(el('button', {
+            type: 'button',
+            className: 'link-btn',
+            onclick: () => openEvidenceViewer(item.evidence_id)
+          }, icon('camera', 13), ' ดูภาพหลักฐานที่อัปโหลด'));
+        }
         if (item.photo_url) {
           try {
             const url = new URL(item.photo_url);
-            if (url.protocol === 'https:' || item.photo_url.startsWith('data:')) {
-              box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูภาพหลักฐาน'));
+            if (url.protocol === 'https:') {
+              box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูลิงก์ภาพภายนอก'));
+            } else if (item.photo_url.startsWith('data:')) {
+              box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)'));
             }
           } catch {
             if (item.photo_url.startsWith('data:')) {
-              box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูภาพหลักฐาน'));
+              box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)'));
             }
           }
         }
@@ -2816,9 +2993,11 @@ async function loadTab() {
             )
           );
 
+          const reviewPlotSel = plotSelect();
+          const reviewEvidenceInput = el('input', { name: 'evidence_id', type: 'hidden', value: '' });
           nodes.push(dataForm('reviewForm', [
             el('h3', {}, icon('shield', 16), ' บันทึกผลการตรวจประเมินแปลง (ICS Inspection)'),
-            plotSelect(),
+            reviewPlotSel,
             selectField('result', 'ผลการตรวจประเมิน', [
               { value: 'ผ่าน', label: 'ผ่านเกณฑ์มาตรฐานเกษตรอินทรีย์' },
               { value: 'ต้องแก้ไข', label: 'ต้องแก้ไขปรับปรุง' },
@@ -2826,6 +3005,15 @@ async function loadTab() {
             ]),
             checklistBox,
             el('label', {}, 'บันทึกผลตรวจและข้อเสนอแนะ', noteArea),
+            el('div', { className: 'form-group' },
+              el('label', {}, 'แนบภาพหลักฐานการตรวจแปลง (ถ้ามี)'),
+              reviewEvidenceInput,
+              createPhotoUploader(null, {
+                entityType: 'review',
+                getPlotId: () => reviewPlotSel.querySelector('select[name="plot_id"]')?.value,
+                evidenceIdInput: reviewEvidenceInput,
+              })
+            ),
           ], 'บันทึกผลการตรวจรับรองแปลง', '/reviews'));
         } else {
           nodes.push(el('div', { className: 'notice' }, 'ไม่พบแปลงปลูกที่สามารถตรวจได้'));
@@ -2890,6 +3078,11 @@ async function loadTab() {
                 ),
                 item.farmer_name ? el('p', { className: 'muted' }, `เกษตรกร: ${item.farmer_name}`) : null,
                 el('p', { className: 'pre-line-text' }, item.note),
+                item.evidence_id ? el('button', {
+                  type: 'button',
+                  className: 'link-btn',
+                  onclick: () => openEvidenceViewer(item.evidence_id)
+                }, icon('camera', 13), ' ดูภาพหลักฐานที่อัปโหลด') : null,
                 el('small', { className: 'muted' }, `ผู้ตรวจ: ${item.reviewer_name || 'เจ้าหน้าที่ ICS'} • ${dated(item.created_at)}`)
               );
             }));

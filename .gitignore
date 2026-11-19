@@ -20,3 +20,4 @@ staging-identities*.json
 !staging-identities.example.json
 .DS_Store
 Thumbs.db
+data/evidence/
