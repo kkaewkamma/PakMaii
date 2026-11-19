@@ -25,6 +25,16 @@ function json(value, status = 200, extraHeaders = {}) {
   });
 }
 
+const seenTutorialIps = new Set();
+
+function resolveClientIp(request) {
+  const cfIp = request.headers.get('cf-connecting-ip');
+  if (cfIp) return cfIp.trim();
+  const xff = request.headers.get('x-forwarded-for');
+  if (xff) return xff.split(',')[0].trim();
+  return '127.0.0.1';
+}
+
 export async function handleDemoApi(request, env) {
   const url = new URL(request.url);
   const { pathname } = url;
@@ -39,6 +49,19 @@ export async function handleDemoApi(request, env) {
       development: false,
       demoOnly: true,
     });
+  }
+
+  if (pathname === '/api/tutorial') {
+    const clientIp = resolveClientIp(request);
+    if (request.method === 'GET') {
+      return json({ ok: true, clientIp, seen: seenTutorialIps.has(clientIp) }, 200, { 'Cache-Control': 'no-store' });
+    }
+    if (request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      if (body?.reset) seenTutorialIps.delete(clientIp);
+      else seenTutorialIps.add(clientIp);
+      return json({ ok: true, clientIp, seen: seenTutorialIps.has(clientIp) }, 200, { 'Cache-Control': 'no-store' });
+    }
   }
 
   // All other /api/* routes are explicitly blocked in Public Demo

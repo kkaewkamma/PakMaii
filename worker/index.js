@@ -141,6 +141,8 @@ async function validatePendingEvidenceForEntity(repository, user, rawEvidenceId,
   return evidenceId;
 }
 
+const seenWorkerTutorialIps = new Set();
+
 export async function handleApi(request, env) {
   const url = new URL(request.url);
   const { pathname } = url;
@@ -148,6 +150,18 @@ export async function handleApi(request, env) {
   if (request.method === 'GET' && pathname === '/api/health') return json({ ok: true, service: 'ready-to-grow' });
   if (request.method === 'GET' && pathname === '/api/config') {
     return json({ liffId: env.LIFF_ID || '', development: false, evidenceUploadEnabled: Boolean(env.EVIDENCE_BUCKET) });
+  }
+  if (pathname === '/api/tutorial') {
+    const clientIp = trustedClientAddress(request);
+    if (request.method === 'GET') {
+      return json({ ok: true, clientIp, seen: seenWorkerTutorialIps.has(clientIp) }, 200, { 'Cache-Control': 'no-store' });
+    }
+    if (request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      if (body?.reset) seenWorkerTutorialIps.delete(clientIp);
+      else seenWorkerTutorialIps.add(clientIp);
+      return json({ ok: true, clientIp, seen: seenWorkerTutorialIps.has(clientIp) }, 200, { 'Cache-Control': 'no-store' });
+    }
   }
 
   const repository = new D1Repository(env.DB);
