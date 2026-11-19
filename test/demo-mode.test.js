@@ -8,8 +8,27 @@ const { handleApi } = await import('../worker/index.js');
 
 const identities = JSON.parse(fs.readFileSync(new URL('../staging-identities.example.json', import.meta.url), 'utf8'));
 const demoSource = fs.readFileSync(new URL('../public/demo.js', import.meta.url), 'utf8');
-const appSource = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+
+function loadFrontendScripts() {
+  const appPath = new URL('../public/app.js', import.meta.url);
+  const jsDir = new URL('../public/js/', import.meta.url);
+  const files = [fs.readFileSync(appPath, 'utf8')];
+  function scan(dir) {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) {
+        scan(full);
+      } else if (entry.name.endsWith('.js')) {
+        files.push(fs.readFileSync(full, 'utf8'));
+      }
+    }
+  }
+  scan(jsDir);
+  return files.join('\n');
+}
+const appSource = loadFrontendScripts();
 
 const fixedNow = () => new Date('2026-10-15T00:00:00Z');
 function setup() {
@@ -134,7 +153,7 @@ test('demo store is isolated: no network, no tokens, separate storage key', () =
   assert.doesNotMatch(demoSource, /\bfetch\s*\(|XMLHttpRequest|Authorization|sendBeacon|WebSocket/);
   assert.doesNotMatch(demoSource, /\.innerHTML\b|insertAdjacentHTML|document\.write|\beval\s*\(|new Function/);
   assert.match(Demo.STORAGE_KEY, /^rtg-demo-/);
-  assert.match(html, /<script defer src="\/demo\.js"><\/script>\s*<script defer src="\/app\.js"><\/script>/);
+  assert.match(html, /<script defer src="\/demo\.js"><\/script>\s*<script (?:type="module"|defer) src="\/app\.js"><\/script>/);
 });
 
 test('login UI is demo-first with Farmer/ICS choice, Demo button and small Admin Login', () => {

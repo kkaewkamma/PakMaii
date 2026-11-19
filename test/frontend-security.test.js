@@ -3,13 +3,32 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
-const script = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const headers = fs.readFileSync(new URL('../public/_headers', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../public/app.css', import.meta.url), 'utf8');
 
+function loadFrontendScripts() {
+  const appPath = new URL('../public/app.js', import.meta.url);
+  const jsDir = new URL('../public/js/', import.meta.url);
+  const files = [fs.readFileSync(appPath, 'utf8')];
+  function scan(dir) {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) {
+        scan(full);
+      } else if (entry.name.endsWith('.js')) {
+        files.push(fs.readFileSync(full, 'utf8'));
+      }
+    }
+  }
+  scan(jsDir);
+  return files.join('\n');
+}
+const script = loadFrontendScripts();
+
 test('frontend has external assets only and CSP allows no inline script or style', () => {
   assert.match(html, /<link rel="stylesheet" href="\/app\.css">/);
-  assert.match(html, /<script defer src="\/app\.js"><\/script>/);
+  assert.match(html, /<script (?:type="module"|defer) src="\/app\.js"><\/script>/);
   assert.doesNotMatch(html, /<script(?:\s[^>]*)?\>\s*[^<]/i);
   assert.doesNotMatch(html, /<style|\son[a-z]+=|\sstyle\s*=/i);
   assert.doesNotMatch(headers, /unsafe-inline|unsafe-eval/i);
