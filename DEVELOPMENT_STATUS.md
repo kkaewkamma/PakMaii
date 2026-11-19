@@ -46,8 +46,8 @@
    - ชุดรายการตรวจเริ่มต้นของ `PGS`, `EU_ORGANIC` และ `FAIRTRADE` ถูกทำเครื่องหมายเป็น `draft_unvalidated` ("รอการยืนยันเกณฑ์") จนกว่าผู้ดูแลระบบ/คณะกรรมการมาตรฐานจะตรวจสอบและกดยืนยันเกณฑ์
 3. **การจัดเก็บข้อมูลในโหมด Demo (Standalone Client Storage):**
    - โหมด Demo ยังเก็บข้อมูลและภาพตัวอย่างเฉพาะในเบราว์เซอร์ (`localStorage`) ตามหลักการแยก Sandbox ออกจากระบบจริง
-4. **งานที่เหลือใน Phase 4–7:**
-   - Real QR Traceability (`GET /api/public/lots/:code` + SVG QR), Smart Farm Log + Production Cost Tracking, LINE Messaging API Notification, และ Staging/Production Readiness Audit (รวมรัน SQLite suite บน Node 20/22 LTS)
+4. **งานที่เหลือใน Phase 6–7 (ตัดระบบ QR Traceability และ Phase 5 ออกตามขอบเขตโปรเจกต์):**
+   - LINE Messaging API Notification และ Staging/Production Readiness Audit (รวมรัน SQLite suite บน Node 20/22 LTS)
 
 ---
 

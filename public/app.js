@@ -725,7 +725,7 @@ function createPhotoUploader(photoUrlInput, options = {}) {
   return previewWrap;
 }
 
-import { showStoryPassport, showPublicTraceabilityProposal } from './js/views/passport.js';
+import { showStoryPassport } from './js/views/passport.js';
 
 function sharePlotRiskToLine(w) {
   const text = `[แจ้งเตือนมาตรฐานเกษตรอินทรีย์ ผักไหม (PGS/ICS)]\n` +

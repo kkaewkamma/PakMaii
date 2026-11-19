@@ -15,7 +15,7 @@
    09. Watch-list & Tabular Layout
    10. Buttons & Interactive Controls (44px Minimum Accessible Touch Target)
    11. Forms & Inputs (44px Height & High Contrast)
-   12. Traceability Certificate / Passport Modal & Public QR Proposal
+   12. Traceability Certificate / Lot Passport Modal
    13. Login Experience (Demo-First & Enterprise Auth Form)
    14. Skeleton Loading State
    15. Responsive Visibility Helpers (Desktop vs Mobile)
@@ -2963,33 +2963,6 @@ body.is-login .hero {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-/* Phase 5: Public Traceability Proposal (QR) */
-.qr-proposal-box {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px;
-  margin-top: 10px;
-  border-radius: var(--radius-md);
-  background: var(--sage-50);
-  border: 1px dashed var(--sage-300);
-}
-
-.qr-proposal-svg {
-  flex-shrink: 0;
-  fill: var(--green-900);
-  background: var(--surface);
-  padding: 6px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--card-border);
-}
-
-.qr-proposal-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 /* ==========================================================================
