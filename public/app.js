@@ -147,6 +147,11 @@ const ICONS = {
     { type: 'line', x1: '16', y1: '13', x2: '8', y2: '13' },
     { type: 'line', x1: '16', y1: '17', x2: '8', y2: '17' },
     { type: 'line', x1: '10', y1: '9', x2: '8', y2: '9' }
+  ],
+  moreHorizontal: [
+    { type: 'circle', cx: '12', cy: '12', r: '1.5' },
+    { type: 'circle', cx: '19', cy: '12', r: '1.5' },
+    { type: 'circle', cx: '5', cy: '12', r: '1.5' }
   ]
 };
 
@@ -567,7 +572,7 @@ function showLogin(development) {
   );
 
   const quickPersonas = el('div', { className: 'quick-persona-box' },
-    el('div', { className: 'quick-persona-title' }, 'เลือกบัญชีจำลองตามกรณีศึกษา (Demo Personas)'),
+    el('div', { className: 'quick-persona-title' }, 'ทดลองใช้งานด่วนตามบทบาท'),
     el('div', { className: 'quick-persona-grid' },
       el('button', {
         type: 'button',
@@ -576,7 +581,7 @@ function showLogin(development) {
       },
         el('div', { className: 'persona-badge risk' }, 'แปลง A-03 • ขาดบันทึก 14 วัน'),
         el('b', {}, 'เกษตรกร 01 (F-STG-001)'),
-        el('small', {}, 'ทดสอบการบันทึกกิจกรรมเพื่อแก้ไขความเสี่ยงของแปลง')
+        el('small', {}, 'บันทึกกิจกรรมเพื่อแก้ความเสี่ยงของแปลง')
       ),
       el('button', {
         type: 'button',
@@ -585,25 +590,28 @@ function showLogin(development) {
       },
         el('div', { className: 'persona-badge warn' }, 'แปลง B-01 • รออนุมัติปัจจัย'),
         el('b', {}, 'เกษตรกร 02 (F-STG-002)'),
-        el('small', {}, 'ยื่นคำขอสูตรปุ๋ยหมักอินทรีย์ทำเองก่อนใช้งานจริง')
+        el('small', {}, 'ยื่นคำขอใช้ปุ๋ยหมักอินทรีย์ก่อนใช้งานจริง')
       ),
       el('button', {
         type: 'button',
         className: 'persona-card-btn persona-ics',
         onclick: () => acceptDemoLogin('ics', 'ICS-STG-001')
       },
-        el('div', { className: 'persona-badge ics' }, 'ผู้ตรวจรับรอง ICS'),
+        el('div', { className: 'persona-badge ics' }, 'ผู้ตรวจประเมิน ICS'),
         el('b', {}, 'เจ้าหน้าที่ ICS (ICS-STG-001)'),
-        el('small', {}, 'ตรวจสอบ Priority Watch-list อนุมัติปัจจัย และประเมินแปลง')
+        el('small', {}, 'ตรวจรายการแปลงต้องติดตาม อนุมัติปัจจัย และบันทึกผลตรวจ')
       )
     )
   );
 
   $('#identity').replaceChildren(el('div', { className: 'login-card' },
-    quickPersonas,
-    el('div', { className: 'login-divider' }, el('span', {}, 'หรือเลือกรหัสประจำตัวด้วยตนเอง')),
-    el('p', { className: 'muted login-lead' }, 'เลือกบทบาท แล้วแตะรหัสตัวอย่างเพื่อทดลองระบบ'),
+    el('div', { className: 'login-card-header' },
+      el('span', { className: 'pill success' }, icon('shield', 12), ' สมุดบันทึกแปลงที่ตรวจสอบได้'),
+      el('p', { className: 'muted login-lead' }, 'เลือกบทบาท แล้วแตะรหัสตัวอย่าง หรือเลือกบัญชีทดลองด้านล่าง')
+    ),
     form,
+    el('div', { className: 'login-divider' }, el('span', {}, 'หรือเข้าใช้งานทันทีด้วยบัญชีตัวอย่าง')),
+    quickPersonas,
     el('p', { className: 'login-note' }, icon('shield', 14), ' ข้อมูลทดลองเก็บในเบราว์เซอร์นี้เท่านั้น แยกจากข้อมูลจริงทั้งหมด'),
     footer
   ));
@@ -1021,6 +1029,71 @@ function renderTabs() {
   renderMobileDock();
 }
 
+function openMoreSheet(secondaryItems) {
+  $('.more-sheet-overlay')?.remove();
+  const closeSheet = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown);
+  };
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') closeSheet();
+  };
+  document.addEventListener('keydown', onKeyDown);
+
+  const navList = el('div', { className: 'more-sheet-nav' },
+    ...secondaryItems.map(([id, label, iconName]) =>
+      el('button', {
+        type: 'button',
+        className: `more-sheet-item ${tab === id ? 'active' : ''}`,
+        onclick: async () => {
+          closeSheet();
+          if (tab !== id) {
+            tab = id;
+            renderTabs();
+            await loadTab();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }
+      },
+        icon(iconName || 'sprout', 18),
+        el('span', {}, label)
+      )
+    )
+  );
+
+  const accountActions = el('div', { className: 'more-sheet-footer' },
+    el('div', { className: 'more-sheet-account' },
+      el('b', {}, me?.name || '-'),
+      el('small', { className: 'muted' }, `${roleLabels[me?.role] || me?.role} • ${me?.agency_code || '-'}`)
+    ),
+    el('button', {
+      type: 'button',
+      className: 'secondary',
+      onclick: () => { closeSheet(); logout(); }
+    }, icon('logOut', 16), demoUser ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ')
+  );
+
+  const sheet = el('div', {
+    className: 'more-sheet',
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-label': 'เมนูเพิ่มเติม'
+  },
+    el('div', { className: 'more-sheet-header' },
+      el('b', {}, 'เมนูเพิ่มเติม'),
+      el('button', { type: 'button', className: 'ghost btn-sm', onclick: closeSheet, 'aria-label': 'ปิดเมนูเพิ่มเติม' }, 'ปิด')
+    ),
+    secondaryItems.length ? navList : null,
+    accountActions
+  );
+
+  const overlay = el('div', {
+    className: 'more-sheet-overlay',
+    onclick: (e) => { if (e.target === overlay) closeSheet(); }
+  }, sheet);
+  document.body.append(overlay);
+}
+
 function renderMobileDock() {
   const dock = $('#mobile-dock');
   if (!dock) return;
@@ -1030,47 +1103,64 @@ function renderMobileDock() {
     return;
   }
 
-  const items = me.role === 'farmer'
-    ? [
-        { id: 'home', label: 'ภาพรวม', icon: 'sprout' },
-        { id: 'plots', label: 'แปลงปลูก', icon: 'mapPin' },
-        { id: 'record', label: 'บันทึกด่วน', icon: 'calendar', highlight: true },
-        { id: 'approval', label: 'ขอปัจจัย', icon: 'clipboard' },
-        { id: 'reviews', label: 'ตรวจแปลง', icon: 'shield' },
-        { id: 'lots', label: 'ล็อต', icon: 'package' }
-      ]
+  const permitted = currentTabs();
+  const primaryIds = me.role === 'farmer'
+    ? ['home', 'plots', 'record', 'approval']
     : me.role === 'ics'
-    ? [
-        { id: 'home', label: 'ภาพรวม', icon: 'sprout' },
-        { id: 'plots', label: 'แปลงเกษตร', icon: 'mapPin' },
-        { id: 'risks', label: 'เฝ้าระวังเสี่ยง', icon: 'alert', highlight: true },
-        { id: 'approval', label: 'คำขอ', icon: 'clipboard' },
-        { id: 'reviews', label: 'ตรวจแปลง', icon: 'shield' },
-        { id: 'lots', label: 'ล็อต', icon: 'package' }
-      ]
-    : [
-        { id: 'invites', label: 'คำเชิญ', icon: 'user' },
-        { id: 'users', label: 'สมาชิก', icon: 'users' },
-        { id: 'assignments', label: 'มอบหมาย', icon: 'clipboard' }
-      ];
+    ? ['home', 'risks', 'approval', 'plots']
+    : ['invites', 'users', 'assignments'];
 
-  dock.replaceChildren(...items.map(item =>
-    el('button', {
+  const shortLabels = {
+    home: 'ภาพรวม',
+    plots: me.role === 'ics' ? 'แปลง' : 'แปลงปลูก',
+    record: 'บันทึก',
+    approval: me.role === 'ics' ? 'คำขอ' : 'ขอปัจจัย',
+    risks: 'จุดเสี่ยง',
+    invites: 'คำเชิญ',
+    users: 'สมาชิก',
+    assignments: 'มอบหมาย'
+  };
+
+  const primaryTabs = primaryIds
+    .map(id => permitted.find(([tId]) => tId === id))
+    .filter(Boolean)
+    .slice(0, 4);
+  const primarySet = new Set(primaryTabs.map(([id]) => id));
+  const secondaryTabs = permitted.filter(([id]) => !primarySet.has(id));
+  const isSecondaryActive = secondaryTabs.some(([id]) => id === tab);
+
+  const dockButtons = primaryTabs.map(([id, label, iconName]) => {
+    const isHighlight = (me.role === 'farmer' && id === 'record') || (me.role === 'ics' && id === 'risks');
+    return el('button', {
       type: 'button',
-      className: `dock-btn ${tab === item.id ? 'active' : ''} ${item.highlight ? 'dock-highlight' : ''}`,
+      className: `dock-btn ${tab === id ? 'active' : ''} ${isHighlight ? 'dock-highlight' : ''}`,
       onclick: async () => {
-        if (tab !== item.id) {
-          tab = item.id;
+        if (tab !== id) {
+          tab = id;
           renderTabs();
           await loadTab();
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }
     },
-      icon(item.icon, 18),
-      el('span', { className: 'dock-label' }, item.label)
+      icon(iconName || 'sprout', 18),
+      el('span', { className: 'dock-label' }, shortLabels[id] || label)
+    );
+  });
+
+  dockButtons.push(
+    el('button', {
+      type: 'button',
+      className: `dock-btn ${isSecondaryActive ? 'active' : ''}`,
+      'aria-haspopup': 'dialog',
+      onclick: () => openMoreSheet(secondaryTabs)
+    },
+      icon('moreHorizontal', 18),
+      el('span', { className: 'dock-label' }, 'เพิ่มเติม')
     )
-  ));
+  );
+
+  dock.replaceChildren(...dockButtons);
   dock.classList.remove('hide');
 }
 

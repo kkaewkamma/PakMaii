@@ -144,3 +144,22 @@ test('Phase 1 design system: IBM Plex Sans Thai, color tokens, and 14-day rhythm
   assert.match(css, /\.ics-rhythm-summary\s*\{/);
   assert.match(css, /\.ghost\s*\{/);
 });
+
+test('Phase 2 shell & navigation: 3-tier responsive shell, 4+More mobile dock, and role-scoped nav', () => {
+  // Desktop >=1024px sidebar and max-width 1200px
+  assert.match(css, /@media\s*\(min-width:\s*1024px\)/);
+  assert.match(css, /max-width:\s*1200px/);
+  assert.match(css, /grid-template-columns:\s*240px\s+minmax\(0,\s*1fr\)/);
+
+  // Mobile dock caps primary items at 4 + "เพิ่มเติม" opening openMoreSheet
+  assert.match(script, /\.slice\(0,\s*4\)/);
+  assert.match(script, /function openMoreSheet\(secondaryItems\)/);
+  assert.match(script, /เพิ่มเติม/);
+  assert.match(script, /['"]aria-modal['"]:\s*['"]true['"]/);
+  assert.match(css, /\.more-sheet-overlay\s*\{/);
+  assert.match(css, /\.more-sheet\s*\{/);
+
+  // Role-scoped navigation preserved
+  assert.match(script, /function currentTabs\(\)/);
+  assert.match(script, /me\.role === 'admin' \? tabsAdmin : me\.role === 'ics'/);
+});

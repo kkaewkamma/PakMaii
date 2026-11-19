@@ -480,13 +480,18 @@ nav#tabs button.active svg {
 
 @media (min-width: 1024px) {
   .wrap {
-    max-width: 1240px;
+    max-width: 1200px;
     padding: 0 24px;
+  }
+
+  body.is-login .hero {
+    max-width: 600px;
+    margin: 0 auto 16px;
   }
 
   body:not(.is-login) main.wrap {
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 240px minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     gap: 20px 28px;
     align-items: start;
@@ -501,13 +506,13 @@ nav#tabs button.active svg {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    background: var(--surface-white);
+    background: var(--surface);
     border: 1px solid var(--card-border);
     border-radius: var(--radius-lg);
     padding: 12px;
     position: sticky;
     top: 20px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;
     overflow: visible;
   }
 
@@ -2236,10 +2241,18 @@ body.is-login .hero {
   color: var(--slate-400);
 }
 
+.login-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
 .login-lead {
-  font-size: 12.5px;
-  color: var(--slate-500);
-  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+  margin: 0;
 }
 
 .role-switch {
@@ -2653,6 +2666,77 @@ body.is-login .hero {
 .dock-label {
   line-height: 1.1;
   white-space: nowrap;
+}
+
+/* Mobile "More" Bottom Sheet (Secondary Role Navigation & Account) */
+.more-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 61, 44, 0.45);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.more-sheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--surface);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
+  border-bottom: none;
+  padding: 16px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.more-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.more-sheet-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.more-sheet-item {
+  width: 100%;
+  justify-content: flex-start !important;
+  background: var(--sage-50) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--card-border) !important;
+  min-height: 48px !important;
+}
+
+.more-sheet-item.active {
+  background: var(--green-700) !important;
+  color: var(--white) !important;
+  border-color: var(--green-900) !important;
+}
+
+.more-sheet-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border);
+}
+
+.more-sheet-account {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* ==========================================================================
