@@ -175,6 +175,23 @@ function icon(name, size = 16, className = 'ui-icon') {
   return svg;
 }
 
+function parseLocalIsoDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  const match = typeof value === 'string' && value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  return null;
+}
+
+function formatLocalIsoDate(date) {
+  return date.getFullYear() + '-' +
+    String(date.getMonth() + 1).padStart(2, '0') + '-' +
+    String(date.getDate()).padStart(2, '0');
+}
+
 // 14-Day Rhythm Track — "สมุดบันทึกแปลงที่ตรวจสอบได้" (Audit-ready Farm Ledger)
 // Pure DOM, 100% CSP safe, no inline styles or innerHTML
 function create14DayRhythmTrack(plotId, activities = [], options = {}) {
@@ -182,16 +199,18 @@ function create14DayRhythmTrack(plotId, activities = [], options = {}) {
     ? (plotId ? activities.filter(a => a.plot_id === plotId) : activities)
     : [];
 
-  const days = [];
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayIso = formatLocalIsoDate(today);
+  const customEnd = options.endDate ? parseLocalIsoDate(options.endDate) : null;
+  const anchorDay = customEnd || today;
+  const windowLabel = customEnd ? '14 วันก่อนเก็บเกี่ยว' : '14 วันล่าสุด';
 
+  const days = [];
   for (let i = 13; i >= 0; i--) {
-    const d = new Date(today);
+    const d = new Date(anchorDay);
     d.setDate(d.getDate() - i);
-    const iso = d.getFullYear() + '-' +
-      String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
+    const iso = formatLocalIsoDate(d);
 
     const matching = plotActivities.filter(a => {
       const actDate = typeof a.activity_date === 'string' ? a.activity_date.slice(0, 10) : '';
@@ -202,7 +221,7 @@ function create14DayRhythmTrack(plotId, activities = [], options = {}) {
       iso,
       dayNum: d.getDate(),
       monthNum: d.getMonth() + 1,
-      isToday: i === 0,
+      isToday: iso === todayIso,
       daysAgo: i,
       count: matching.length,
       hasActivity: matching.length > 0,
@@ -213,21 +232,24 @@ function create14DayRhythmTrack(plotId, activities = [], options = {}) {
   const activeDaysCount = days.filter(d => d.hasActivity).length;
   const recentDay = [...days].reverse().find(d => d.hasActivity);
 
-  let continuityText = 'ขาดการบันทึกเกิน 14 วัน';
+  let continuityText = customEnd ? 'ไม่พบบันทึกช่วง 14 วันก่อนเก็บเกี่ยว' : 'ขาดการบันทึกเกิน 14 วัน';
   let continuityClass = 'status-danger';
+  let continuityIcon = 'alert';
 
   if (activeDaysCount >= 5) {
     continuityText = 'บันทึกต่อเนื่องสม่ำเสมอ';
     continuityClass = 'status-good';
+    continuityIcon = 'checkCircle';
   } else if (activeDaysCount >= 1) {
     continuityText = `บันทึกแล้ว ${activeDaysCount} วัน`;
     continuityClass = 'status-warn';
+    continuityIcon = 'clock';
   }
 
   const wrap = el('div', {
     className: 'rhythm-track-wrap ' + (options.compact ? 'compact' : ''),
     role: 'region',
-    'aria-label': `แถบจังหวะบันทึก 14 วันล่าสุด: ${continuityText}`
+    'aria-label': `แถบจังหวะบันทึก ${windowLabel}: ${continuityText}`
   });
 
   if (!options.compact) {
@@ -235,16 +257,21 @@ function create14DayRhythmTrack(plotId, activities = [], options = {}) {
       el('div', { className: 'rhythm-track-header' },
         el('span', { className: 'rhythm-track-title' },
           icon('calendar', 14),
-          options.title || 'แถบจังหวะบันทึก 14 วันล่าสุด (PGS Rhythm)'
+          options.title || `แถบจังหวะบันทึก ${windowLabel}`
         ),
-        el('span', { className: `rhythm-track-status ${continuityClass}` }, continuityText)
+        el('span', { className: `rhythm-track-status ${continuityClass}` },
+          icon(continuityIcon, 12),
+          ' ',
+          continuityText
+        )
       )
     );
   }
 
   const cells = days.map(d => {
+    const activityNames = d.activities.map(a => a.kind || a.activity_type || 'กิจกรรม').join(', ');
     const titleText = d.hasActivity
-      ? `${d.dayNum}/${d.monthNum}: บันทึก ${d.count} กิจกรรม (${d.activities.map(a => a.activity_type || 'กิจกรรม').join(', ')})`
+      ? `${d.dayNum}/${d.monthNum}: บันทึก ${d.count} กิจกรรม (${activityNames})`
       : `${d.dayNum}/${d.monthNum}: ไม่มีการบันทึก`;
 
     const cellClass = `rhythm-cell ${d.hasActivity ? 'active' : 'empty'} ${d.isToday ? 'is-today' : ''}`;
@@ -260,7 +287,7 @@ function create14DayRhythmTrack(plotId, activities = [], options = {}) {
   if (!options.hideFooter) {
     const footerText = options.compact
       ? `บันทึก ${activeDaysCount}/14 วัน`
-      : `บันทึก ${activeDaysCount} จาก 14 วัน${recentDay ? ` • ล่าสุด: ${recentDay.dayNum}/${recentDay.monthNum}` : ' • ยังไม่มีบันทึกในรอบ 14 วัน'}`;
+      : `บันทึก ${activeDaysCount} จาก 14 วัน${recentDay ? ` • ล่าสุด: ${recentDay.dayNum}/${recentDay.monthNum}` : ` • ยังไม่มีบันทึกในรอบ ${windowLabel}`}`;
 
     wrap.append(
       el('div', { className: 'rhythm-track-footer' },
@@ -273,130 +300,11 @@ function create14DayRhythmTrack(plotId, activities = [], options = {}) {
   return wrap;
 }
 
-// Pure DOM SVG Circular Progress Gauge — 100% CSP safe
-function createCircularGauge(percent, size = 100, strokeWidth = 9, colorClass = 'gauge-green') {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const validPercent = percent !== null && Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
-  const offset = circumference * (1 - validPercent / 100);
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-  svg.setAttribute('width', String(size));
-  svg.setAttribute('height', String(size));
-  svg.setAttribute('class', `circular-gauge-svg ${colorClass}`);
-
-  const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  bgCircle.setAttribute('cx', String(size / 2));
-  bgCircle.setAttribute('cy', String(size / 2));
-  bgCircle.setAttribute('r', String(radius));
-  bgCircle.setAttribute('class', 'gauge-bg-circle');
-  bgCircle.setAttribute('stroke-width', String(strokeWidth));
-
-  const progressCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  progressCircle.setAttribute('cx', String(size / 2));
-  progressCircle.setAttribute('cy', String(size / 2));
-  progressCircle.setAttribute('r', String(radius));
-  progressCircle.setAttribute('class', 'gauge-progress-circle');
-  progressCircle.setAttribute('stroke-width', String(strokeWidth));
-  progressCircle.setAttribute('stroke-dasharray', circumference.toFixed(2));
-  progressCircle.setAttribute('stroke-dashoffset', offset.toFixed(2));
-
-  svg.append(bgCircle, progressCircle);
-  return svg;
-}
-
-// Pure DOM SVG Horizontal Distribution Bar — 100% CSP safe
-function createDistributionBar(total, normal, pending, risk) {
-  const safeTotal = total > 0 ? total : 1;
-  const normalW = Math.max(0, (normal / safeTotal) * 100);
-  const pendingW = Math.max(0, (pending / safeTotal) * 100);
-  const riskW = Math.max(0, (risk / safeTotal) * 100);
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 100 12');
-  svg.setAttribute('class', 'dist-bar-svg');
-  svg.setAttribute('preserveAspectRatio', 'none');
-
-  let curX = 0;
-  if (normalW > 0) {
-    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    r.setAttribute('x', curX.toFixed(2));
-    r.setAttribute('y', '0');
-    r.setAttribute('width', normalW.toFixed(2));
-    r.setAttribute('height', '12');
-    r.setAttribute('rx', '4');
-    r.setAttribute('class', 'dist-rect dist-green');
-    svg.append(r);
-    curX += normalW;
-  }
-  if (pendingW > 0) {
-    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    r.setAttribute('x', curX.toFixed(2));
-    r.setAttribute('y', '0');
-    r.setAttribute('width', pendingW.toFixed(2));
-    r.setAttribute('height', '12');
-    r.setAttribute('rx', '4');
-    r.setAttribute('class', 'dist-rect dist-amber');
-    svg.append(r);
-    curX += pendingW;
-  }
-  if (riskW > 0) {
-    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    r.setAttribute('x', curX.toFixed(2));
-    r.setAttribute('y', '0');
-    r.setAttribute('width', riskW.toFixed(2));
-    r.setAttribute('height', '12');
-    r.setAttribute('rx', '4');
-    r.setAttribute('class', 'dist-rect dist-rose');
-    svg.append(r);
-  }
-  if (total === 0) {
-    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    r.setAttribute('x', '0');
-    r.setAttribute('y', '0');
-    r.setAttribute('width', '100');
-    r.setAttribute('height', '12');
-    r.setAttribute('rx', '4');
-    r.setAttribute('class', 'dist-rect dist-empty');
-    svg.append(r);
-  }
-  return svg;
-}
-
-// Pure DOM Visual Milestone Roadmap Graphic — 100% CSP safe
-function createMilestoneGraphic(activeStepIndex = 1) {
-  const steps = [
-    { title: 'เตรียมแปลง', desc: 'ไถกลบ/ไม่เผาฟาง', iconName: 'leaf' },
-    { title: 'บันทึกแปลง', desc: 'บันทึกกิจกรรมต่อเนื่อง', iconName: 'calendar' },
-    { title: 'ปัจจัยอินทรีย์', desc: 'ผ่านอนุมัติ 100%', iconName: 'clipboard' },
-    { title: 'รับรอง PGS', desc: 'มาตรฐานอินทรีย์สมบูรณ์', iconName: 'shield' }
-  ];
-
-  const container = el('div', { className: 'milestone-graphic-box' },
-    el('div', { className: 'milestone-track-row' },
-      ...steps.flatMap((step, idx) => {
-        const isDone = idx < activeStepIndex;
-        const isCurrent = idx === activeStepIndex;
-        const statusClass = isDone ? 'step-done' : isCurrent ? 'step-current' : 'step-pending';
-        const node = el('div', { className: `milestone-step-node ${statusClass}` },
-          el('div', { className: 'milestone-circle' },
-            isDone ? icon('check', 14) : icon(step.iconName, 14)
-          ),
-          el('div', { className: 'milestone-text' },
-            el('b', { className: 'milestone-title' }, step.title),
-            el('span', { className: 'milestone-desc' }, step.desc)
-          )
-        );
-        if (idx < steps.length - 1) {
-          const line = el('div', { className: `milestone-connector ${idx < activeStepIndex ? 'line-done' : 'line-pending'}` });
-          return [node, line];
-        }
-        return [node];
-      })
-    )
-  );
-  return container;
+// Accessible Status Badge (always icon + text, never color alone)
+function statusBadge(tier, text, customIcon) {
+  const normalized = tier === 'risk' ? 'risk' : tier === 'warn' || tier === 'warning' ? 'warning' : 'normal';
+  const iconName = customIcon || (normalized === 'risk' ? 'alert' : normalized === 'warning' ? 'clock' : 'checkCircle');
+  return el('span', { className: `badge-${normalized}` }, icon(iconName, 12), ' ', text);
 }
 
 const tabsFarmer = [
@@ -544,10 +452,13 @@ function selectField(name, label, choices) {
 }
 
 function card(...children) { return el('div', { className: 'card' }, children); }
-function empty(message = 'ยังไม่มีข้อมูล') {
+function empty(message = 'ยังไม่มีข้อมูล', actionLabel = '', onAction = null) {
   return card(el('div', { className: 'empty-box' },
     el('div', { className: 'empty-icon-wrap' }, icon('leaf', 24)),
-    el('p', { className: 'empty-text' }, message)
+    el('p', { className: 'empty-text' }, message),
+    actionLabel && typeof onAction === 'function'
+      ? el('button', { type: 'button', className: 'secondary btn-sm', onclick: onAction }, actionLabel)
+      : null
   ));
 }
 
@@ -986,14 +897,19 @@ function createPhotoUploader(photoUrlInput) {
 
 async function showStoryPassport(lot) {
   const overlay = el('div', { className: 'passport-overlay' });
+  const hasHarvestDate = Boolean(parseLocalIsoDate(lot.harvest_date));
   const rhythmContainer = el('div', { className: 'passport-rhythm-section mt-12' },
-    el('div', { className: 'passport-section-label' }, 'ความต่อเนื่องการบันทึกแปลงต้นทางก่อนเก็บเกี่ยว (14 วันล่าสุด):')
+    el('div', { className: 'passport-section-label' },
+      hasHarvestDate
+        ? 'ความต่อเนื่องการบันทึกแปลงต้นทาง (14 วันก่อนเก็บเกี่ยว):'
+        : 'ความต่อเนื่องการบันทึกแปลงต้นทาง (14 วันล่าสุด):'
+    )
   );
 
   const card = el('div', { className: 'passport-card' },
     el('div', { className: 'passport-header' },
-      el('span', { className: 'passport-badge' }, 'การตรวจสอบย้อนกลับล็อตผลผลิต (Traceability Certificate)'),
-      el('h3', { className: 'passport-title' }, 'ล็อตผลผลิต ' + (lot.code || '-')),
+      el('span', { className: 'passport-badge' }, 'ข้อมูลย้อนกลับล็อตผลผลิต'),
+      el('h3', { className: 'passport-title' }, 'ล็อตผลผลิต ' + (lot.code || lot.lot_code || '-')),
       el('small', { className: 'passport-subtitle' }, 'วิสาหกิจชุมชนเกษตรอินทรีย์ตำบลผักไหม จ.ศรีสะเกษ')
     ),
     el('div', { className: 'passport-body' },
@@ -1046,7 +962,8 @@ async function showStoryPassport(lot) {
   try {
     const activities = await api('/activities').catch(() => []);
     const track = create14DayRhythmTrack(lot.plot_id, activities, {
-      title: `จังหวะบันทึกแปลง ${lot.plot_name || ''}`,
+      title: `จังหวะบันทึกแปลง ${lot.plot_name || ''}`.trim(),
+      endDate: lot.harvest_date || undefined,
       compact: false
     });
     rhythmContainer.append(track);
@@ -1518,14 +1435,12 @@ async function loadTab() {
               ),
               el('tbody', {},
                 ...watchRows.map(w => {
-                  const badgeClass = w.severity === 'risk' ? 'badge-risk' : w.severity === 'warning' ? 'badge-warning' : 'badge-normal';
-                  const badgePrefix = '● ';
                   return el('tr', {},
                     el('td', {}, el('b', { className: 'plot-code-tag' }, w.code)),
                     el('td', {}, w.farmer),
                     el('td', {}, `${w.crop}${w.conversion ? ` (${w.conversion})` : ''}`),
                     el('td', { className: 'rhythm-col' }, create14DayRhythmTrack(w.plot_id, activities, { compact: true })),
-                    el('td', {}, el('span', { className: badgeClass }, badgePrefix + w.status)),
+                    el('td', {}, statusBadge(w.severity, w.status)),
                     el('td', {}, buildWatchlistActionButtons(w))
                   );
                 })
@@ -1536,12 +1451,10 @@ async function loadTab() {
           // 2. Mobile Card View (visible on <= 640px, NO horizontal scrolling!)
           const mobileCards = el('div', { className: 'watchlist-cards mobile-only' },
             ...watchRows.map(w => {
-              const badgeClass = w.severity === 'risk' ? 'badge-risk' : w.severity === 'warning' ? 'badge-warning' : 'badge-normal';
-              const badgePrefix = '● ';
               return el('div', { className: `watchlist-card-item severity-${w.severity}` },
                 el('div', { className: 'watchlist-card-top' },
                   el('b', { className: 'plot-code-tag' }, w.code),
-                  el('span', { className: badgeClass }, badgePrefix + w.status)
+                  statusBadge(w.severity, w.status)
                 ),
                 el('div', { className: 'watchlist-card-body' },
                   el('div', { className: 'watchlist-meta-item' },
@@ -1567,13 +1480,18 @@ async function loadTab() {
         }
 
         const normalPlotsCount = Math.max(0, totalPlots - riskAlerts - pendingInput);
+        const since14Iso = formatLocalIsoDate(new Date(Date.now() - 14 * 86_400_000));
+        const activePlots14 = plots.filter(p =>
+          activities.some(a => a.plot_id === p.id && String(a.activity_date || '').slice(0, 10) >= since14Iso)
+        ).length;
+        const inactivePlots14 = Math.max(0, plots.length - activePlots14);
 
         const icsHeroCard = el('div', { className: 'card ics-hero-graphic-card' },
           el('div', { className: 'ics-hero-content' },
             el('div', { className: 'gauge-panel' },
               el('div', { className: 'gauge-meta' },
                 el('div', { className: 'row between' },
-                  el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'PGS Group Readiness' : 'เกณฑ์ควบคุมภายใน ICS'),
+                  el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'ตัวอย่างความพร้อมกลุ่ม (Demo)' : 'เกณฑ์ควบคุมภายใน ICS'),
                   el('span', { className: 'stat-pill' }, readinessStatText)
                 ),
                 el('h3', { className: 'gauge-title' }, 'ความพร้อมรับรองมาตรฐานกลุ่ม (PGS / ICS)'),
@@ -1598,7 +1516,17 @@ async function loadTab() {
               )
             ),
             el('div', { className: 'ics-hero-rhythm' },
-              create14DayRhythmTrack(null, activities, { title: 'ความต่อเนื่องการบันทึกกิจกรรมทั้งตำบล (14 วันล่าสุด)' })
+              el('div', { className: 'ics-rhythm-summary' },
+                el('div', { className: 'rhythm-track-header' },
+                  el('span', { className: 'rhythm-track-title' }, icon('calendar', 14), 'ความต่อเนื่องรายแปลง (14 วันล่าสุด)'),
+                  statusBadge(inactivePlots14 > 0 ? 'warn' : 'normal', inactivePlots14 > 0 ? `ขาดบันทึก ${inactivePlots14} แปลง` : 'บันทึกครบทุกแปลง')
+                ),
+                el('div', { className: 'ics-rhythm-count' },
+                  el('b', {}, `${activePlots14}`),
+                  el('span', { className: 'muted' }, ` / ${plots.length} แปลงในความดูแลมีบันทึกในรอบ 14 วัน`)
+                ),
+                el('small', { className: 'muted' }, 'ดูแถบจังหวะบันทึก 14 วันแบบรายแปลงได้ในรายการแปลงด้านล่าง')
+              )
             )
           )
         );
@@ -1647,7 +1575,7 @@ async function loadTab() {
           kpiGrid,
           el('div', { className: 'card watchlist-card' },
             el('div', { className: 'row between' },
-              el('h3', {}, icon('alert', 16), ' Priority Watch-list: การเฝ้าระวังและบริหารความเสี่ยงรายแปลง'),
+              el('h3', {}, icon('alert', 16), ' รายการแปลงที่ต้องติดตาม'),
               el('div', { className: 'row' },
                 el('button', {
                   type: 'button',
@@ -1679,8 +1607,8 @@ async function loadTab() {
 
         let statusTier = 'normal';
         let statusBadgeText = daysSince !== null
-          ? `● บันทึกล่าสุด ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`}`
-          : '● แปลงใหม่ รอเริ่มบันทึก';
+          ? `บันทึกล่าสุด ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`}`
+          : 'แปลงใหม่ รอเริ่มบันทึก';
         let statusTitle = myPlot ? `แปลง ${myPlot.name}` : 'ภาพรวมแปลงปลูก';
         let statusDesc = daysSince !== null
           ? `บันทึกกิจกรรมล่าสุดเมื่อ ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`} • งานถัดไป: ตรวจสอบและบันทึกกิจกรรมการดูแลแปลงรอบถัดไป`
@@ -1689,30 +1617,36 @@ async function loadTab() {
 
         if (isOverdue) {
           statusTier = 'risk';
-          statusBadgeText = `● ขาดบันทึกเกิน 14 วัน (${daysSince !== null ? `${daysSince} วันก่อน` : 'ยังไม่มีประวัติ'})`;
+          statusBadgeText = `ขาดบันทึกเกิน 14 วัน (${daysSince !== null ? `${daysSince} วันก่อน` : 'ยังไม่มีประวัติ'})`;
           statusTitle = `แจ้งเตือน: แปลง ${myPlot?.name || ''} ขาดการบันทึกกิจกรรม`;
           statusDesc = `บันทึกกิจกรรมล่าสุดเกิน 14 วัน • งานถัดไป: แตะ "บันทึกกิจกรรมแปลงด่วน" เพื่ออัปเดตการทำงานในแปลง`;
           alertAdvice = 'คำแนะนำ: บันทึกกิจกรรมเพื่อรักษาความต่อเนื่องของข้อมูลและแจ้งความคืบหน้าให้เจ้าหน้าที่ ICS ทราบ';
         } else if (isWarning) {
           statusTier = 'warn';
-          statusBadgeText = `● บันทึกล่าสุด ${daysSince} วันก่อน`;
+          statusBadgeText = `บันทึกล่าสุด ${daysSince} วันก่อน`;
           statusTitle = `เตือนล่วงหน้า: แปลง ${myPlot?.name || ''} ใกล้ครบ 14 วัน`;
           statusDesc = `บันทึกกิจกรรมล่าสุด ${daysSince} วันก่อน • งานถัดไป: บันทึกกิจกรรมการดูแลแปลงก่อนครบกำหนด 14 วัน`;
           alertAdvice = 'คำแนะนำ: บันทึกกิจกรรมการให้น้ำ ใส่ปุ๋ย หรือตรวจแปลงเพื่ออัปเดตข้อมูล';
         } else if (hasPendingApp) {
           statusTier = 'warn';
-          statusBadgeText = `● รอผลพิจารณาคำขอ (${pendingCount} รายการ)`;
+          statusBadgeText = `รอผลพิจารณาคำขอ (${pendingCount} รายการ)`;
           statusTitle = `สถานะแปลง ${myPlot?.name || ''}: มีคำขอรอพิจารณา`;
           statusDesc = `มีคำขอปัจจัยการผลิตรอการพิจารณาจากเจ้าหน้าที่ ICS ${pendingCount} รายการ • งานถัดไป: รอการอนุมัติก่อนนำปัจจัยไปใช้ในแปลงจริง`;
         }
 
-        const statusBadgeClass = `badge-${statusTier}`;
+        const farmerRhythmSection = plots.length === 0
+          ? empty('ยังไม่มีแปลงปลูกในระบบ', 'เพิ่มแปลงปลูกแรกของคุณ', async () => { tab = 'plots'; renderTabs(); await loadTab(); })
+          : plots.length === 1
+          ? create14DayRhythmTrack(plots[0].id, activities, { title: `ความต่อเนื่องการบันทึกแปลง ${plots[0].name} (14 วันล่าสุด)` })
+          : el('div', { className: 'farmer-rhythm-list' },
+              ...plots.map(p => create14DayRhythmTrack(p.id, activities, { title: `จังหวะบันทึกแปลง ${p.name} (14 วันล่าสุด)` }))
+            );
 
         const farmerHeroCard = el('div', { className: `farmer-hero-graphic-card ${statusTier}` },
           el('div', { className: 'farmer-hero-top' },
             el('div', { className: 'farmer-hero-info' },
               el('div', { className: 'status-badge-row' },
-                el('span', { className: `pill ${statusBadgeClass}` }, statusBadgeText),
+                statusBadge(statusTier, statusBadgeText),
                 myPlot?.conversion_year ? el('span', { className: 'pill' }, myPlot.conversion_year) : null,
                 myPlot?.plot_code ? el('span', { className: 'pill' }, `รหัสแปลง: ${myPlot.plot_code}`) : null
               ),
@@ -1720,7 +1654,7 @@ async function loadTab() {
               el('p', { className: 'farmer-status-desc' }, statusDesc)
             )
           ),
-          create14DayRhythmTrack(myPlot?.id, activities, { title: 'ความต่อเนื่องการบันทึกแปลงของคุณ (14 วันล่าสุด)' }),
+          farmerRhythmSection,
           alertAdvice ? el('div', { className: `farmer-advice-box advice-${statusTier} mt-12` },
             icon('alert', 15),
             el('span', {}, alertAdvice)
@@ -1806,7 +1740,7 @@ async function loadTab() {
           el('b', {}, icon('info', 15), ' ปลูกของดี — ระบบบริหารมาตรฐานสินค้าเกษตรอินทรีย์ วิสาหกิจชุมชนผักไหม'),
           me.role === 'farmer'
             ? 'สำหรับเกษตรกร: บันทึกกิจกรรมการเกษตรสะดวกรวดเร็ว ลดภาระงานเอกสารซ้ำซ้อน พร้อมระบบยื่นขออนุมัติปัจจัยการผลิตก่อนใช้จริง'
-            : 'สำหรับเจ้าหน้าที่ ICS: ควบคุมมาตรฐานและคัดกรองความเสี่ยงรายแปลงแบบ Real-time เพื่อป้องกันไม่ให้ข้อผิดพลาดของสมาชิกส่งผลกระทบต่อการรับรองของกลุ่ม'
+            : 'สำหรับเจ้าหน้าที่ ICS: ควบคุมมาตรฐานและคัดกรองความเสี่ยงรายแปลงได้ทันที เพื่อป้องกันไม่ให้ข้อผิดพลาดของสมาชิกส่งผลกระทบต่อการรับรองของกลุ่ม'
         ));
       }
     } else if (tab === 'farmers') {
@@ -2258,7 +2192,7 @@ async function loadTab() {
         if (plots.length) {
           const todayIso = new Date().toISOString().slice(0, 10);
           nodes.push(dataForm('lotForm', [
-            el('h3', {}, icon('package', 16), ' เพิ่มล็อตผลผลิตใหม่ (Lot Traceability)'),
+            el('h3', {}, icon('package', 16), ' เพิ่มล็อตผลผลิตใหม่'),
             plotSelect(),
             inputField('code', 'รหัสล็อต (เช่น L-12, LOT-2026-001)'),
             inputField('crop', 'ชนิดผลผลิต (เช่น ข้าวหอมมะลิ 105, ถั่วเหลืองอินทรีย์)'),
@@ -2271,18 +2205,21 @@ async function loadTab() {
       }
 
       nodes.push(el('div', { className: 'notice' },
-        el('b', {}, icon('package', 15), ' การตรวจสอบย้อนกลับระดับแปลงสู่ล็อตผลผลิต (Lot Traceability)'),
-        el('p', { className: 'muted' }, 'เชื่อมโยงข้อมูลตั้งแต่แปลงปลูก ➔ ประวัติกิจกรรม ➔ ปัจจัยการผลิตที่อนุมัติ ➔ การรับรองโดยเจ้าหน้าที่ ICS'),
+        el('b', {}, icon('package', 15), ' การตรวจสอบย้อนกลับระดับแปลงสู่ล็อตผลผลิต'),
+        el('p', { className: 'muted' }, 'เชื่อมโยงข้อมูลตั้งแต่แปลงปลูก → ประวัติกิจกรรม → ปัจจัยการผลิตที่อนุมัติ → ข้อมูลผลตรวจแปลง'),
         el('small', { className: 'muted' }, `รวมทั้งหมด ${rows.length} ล็อตผลผลิต`)
       ));
 
       if (!rows.length) nodes.push(empty('ยังไม่มีข้อมูลล็อตผลผลิต'));
 
       for (const item of rows) {
+        const lotStatusBadge = item.ics_review_status === 'approved'
+          ? statusBadge('normal', 'ผ่านการตรวจ ICS (ตัวอย่าง)')
+          : statusBadge('warn', 'รอเชื่อมผลตรวจ');
         const box = card(
           el('div', { className: 'row between' },
             el('b', { className: 'lot-title-text' }, `ล็อต ${item.code || item.lot_code}`),
-            el('span', { className: 'badge-normal' }, icon('checkCircle', 11), ' ผ่านการตรวจรับรอง ICS')
+            lotStatusBadge
           ),
           el('p', {}, `ชนิดผลผลิต: ${item.crop}`),
           el('p', {}, `แปลงต้นทาง: ${item.linked_plots ? item.linked_plots : item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
@@ -2292,7 +2229,7 @@ async function loadTab() {
               type: 'button',
               className: 'btn-sm passport-trigger-btn',
               onclick: () => showStoryPassport(item)
-            }, 'เปิดดูใบรับรอง Traceability Certificate')
+            }, 'เปิดดูใบรับรองข้อมูลย้อนกลับ')
           )
         );
         nodes.push(box);

@@ -123,8 +123,24 @@ test('Phase 1 design system: IBM Plex Sans Thai, color tokens, and 14-day rhythm
   assert.match(script, /rhythm-track-row/);
   assert.match(script, /rhythm-cell/);
 
-  // Rhythm track integrated into farmer home, watchlist, and traceability certificate
-  assert.match(script, /create14DayRhythmTrack\(myPlot\?\.id,\s*activities/);
+  // Rhythm track integrated into farmer home (per-plot), watchlist, and lot passport
+  assert.match(script, /create14DayRhythmTrack\(plots\[0\]\.id,\s*activities/);
+  assert.match(script, /plots\.map\(p\s*=>\s*create14DayRhythmTrack\(p\.id,\s*activities/);
   assert.match(script, /create14DayRhythmTrack\(w\.plot_id,\s*activities,\s*\{\s*compact:\s*true\s*\}\)/);
   assert.match(script, /create14DayRhythmTrack\(lot\.plot_id,\s*activities/);
+  assert.match(script, /endDate:\s*lot\.harvest_date/);
+  assert.match(script, /a\.kind\s*\|\|\s*a\.activity_type/);
+
+  // Dead synthetic graphics and hardcoded lot certification removed
+  assert.doesNotMatch(script, /function createCircularGauge/);
+  assert.doesNotMatch(script, /function createDistributionBar/);
+  assert.doesNotMatch(script, /function createMilestoneGraphic/);
+  assert.doesNotMatch(script, /ผ่านการตรวจรับรอง ICS/);
+
+  // Mobile button rule must not break dock-btn or clip wrapped text
+  assert.doesNotMatch(css, /(?:^|[\s;{])height:\s*48px\s*!important/);
+  assert.match(css, /button:not\(\.dock-btn\)/);
+  assert.match(css, /\.stat-pill\s*\{/);
+  assert.match(css, /\.ics-rhythm-summary\s*\{/);
+  assert.match(css, /\.ghost\s*\{/);
 });
