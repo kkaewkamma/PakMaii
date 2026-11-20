@@ -204,8 +204,41 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
     })
   );
 
+  const agroClimateWidget = el('div', { className: 'card agro-climate-card' },
+    el('div', { className: 'agro-climate-header' },
+      el('div', { className: 'agro-location-row' },
+        icon('mapPin', 15),
+        el('strong', {}, 'ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ'),
+        el('span', { className: 'agro-subtext' }, 'ดินแดนข้าวหอมมะลิทุ่งกุลาร้องไห้')
+      ),
+      el('span', { className: 'agro-weather-status' }, '☀️ แดดจัด • ลม ตอ./น. 12 กม./ชม.')
+    ),
+    el('div', { className: 'grid agro-metrics-grid mt-12' },
+      el('div', { className: 'agro-metric-item' },
+        el('span', { className: 'agro-metric-label' }, 'อุณหภูมิ'),
+        el('div', { className: 'agro-metric-value' }, '32°C'),
+        el('span', { className: 'agro-metric-sub muted' }, 'สูงสุด 34° / ต่ำสุด 23°')
+      ),
+      el('div', { className: 'agro-metric-item' },
+        el('span', { className: 'agro-metric-label' }, 'ความชื้นสัมพัทธ์'),
+        el('div', { className: 'agro-metric-value' }, '62%'),
+        el('span', { className: 'agro-metric-sub muted' }, 'ระดับปกติ ปลอดเชื้อรา')
+      ),
+      el('div', { className: 'agro-metric-item' },
+        el('span', { className: 'agro-metric-label' }, 'ความชื้นผิวดิน'),
+        el('div', { className: 'agro-metric-value' }, '48%'),
+        el('span', { className: 'agro-metric-sub muted' }, 'เหมาะเตรียมดิน & ปุ๋ยหมัก')
+      )
+    ),
+    el('div', { className: 'agro-seasonal-tip mt-12' },
+      icon('sprout', 15),
+      el('span', {}, el('strong', {}, 'ปฏิทินอินทรีย์ ต.ผักไหม: '), 'ระยะเตรียมแปลงปลูกข้าวหอมมะลิ 105 — ไถกลบตอซัง ไม่เผาฟาง หว่านปอเทืองปรับปรุงดิน และตรวจเช็กคันดินแนวกันชนตามเกณฑ์ PGS')
+    )
+  );
+
   return [
     farmerHeroCard,
+    agroClimateWidget,
     pgsCriteriaCard,
     farmerKpiGrid
   ];
@@ -553,44 +586,122 @@ export function buildFarmerApprovalView({ plots = [], rows = [], me = null, plot
     charCounter.textContent = `${detailsField.value.length} / 500`;
   });
 
+  // Voice assist dialog with speech recognition and Thai community voice presets
+  const openVoicePresetSelector = () => {
+    const previousFocus = document.activeElement;
+    const overlay = el('div', {
+      className: 'voice-dialog-overlay',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-label': 'ระบบบันทึกเสียงพูดภาษาไทย'
+    });
+
+    const closeDialog = () => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKeyDown);
+      if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') closeDialog();
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    const applyText = (text) => {
+      let i = 0;
+      detailsField.value = '';
+      charCounter.textContent = '0 / 500';
+      closeDialog();
+      detailsField.focus();
+      const timer = setInterval(() => {
+        if (i < text.length) {
+          detailsField.value += text[i];
+          charCounter.textContent = `${detailsField.value.length} / 500`;
+          i++;
+        } else {
+          clearInterval(timer);
+          notify(`บันทึกเสียงพูดสำเร็จ: "${text.slice(0, 32)}..."`);
+        }
+      }, 10);
+    };
+
+    const sampleChoices = [
+      {
+        author: 'คุณสมปอง คำภา (เกษตรกรแปลง A-03)',
+        text: 'สูตรปรับปรุง: ใช้น้ำหมักชีวภาพสูตรใบสะเดาและพริกแกง เจือจาง 1 ต่อ 500 ฉีดพ่นขับไล่เพลี้ยช่วงเย็นสัปดาห์ละครั้ง'
+      },
+      {
+        author: 'คุณบัวผัน ศรีห้วยทับทัน (เกษตรกรแปลง B-01)',
+        text: 'สูตรปรับปรุง: ปุ๋ยหมักมูลวัวนมในฟาร์มอินทรีย์ผสมแกลบดำและรำละเอียด หมักกลับกองครบ 30 วัน อัตรา 40 กิโลกรัมต่อไร่'
+      },
+      {
+        author: 'คุณทองมี แก้วกัลยา (เกษตรกรแปลง C-12)',
+        text: 'สูตรปรับปรุง: ใช้น้ำส้มควันไม้เจือจาง 1 ต่อ 200 ฉีดพ่นทางใบช่วงเช้าตรู่ทุก 10 วัน'
+      }
+    ];
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    const card = el('div', { className: 'voice-dialog-card' },
+      el('div', { className: 'voice-dialog-header' },
+        el('h4', { className: 'voice-dialog-title' }, icon('mic', 18), ' ระบบสั่งการด้วยเสียงภาษาไทย'),
+        el('button', {
+          type: 'button',
+          className: 'voice-dialog-close-btn',
+          title: 'ปิดหน้าต่าง',
+          onclick: closeDialog
+        }, icon('x', 16))
+      ),
+      el('p', { className: 'muted text-sm' }, 'เลือกตัวอย่างเสียงเกษตรกรสำหรับสาธิต หรือแตะพูดสดผ่านไมค์:'),
+      el('div', { className: 'voice-choices-list mt-12' },
+        ...sampleChoices.map(sc => el('button', {
+          type: 'button',
+          className: 'voice-choice-btn',
+          onclick: () => applyText(sc.text)
+        },
+          el('strong', { className: 'voice-choice-author' }, sc.author),
+          el('span', { className: 'voice-choice-quote' }, `"${sc.text}"`)
+        ))
+      ),
+      SpeechRec ? el('button', {
+        type: 'button',
+        className: 'btn-record-live mt-12',
+        onclick: () => {
+          closeDialog();
+          try {
+            const rec = new SpeechRec();
+            rec.lang = 'th-TH';
+            rec.continuous = false;
+            rec.interimResults = false;
+            notify('กำลังรับฟังเสียงพูดภาษาไทย...');
+            rec.onresult = (e) => {
+              const transcript = e.results[0]?.[0]?.transcript || '';
+              if (transcript) {
+                detailsField.value = ((detailsField.value ? detailsField.value + ' ' : '') + transcript).slice(0, 500);
+                charCounter.textContent = `${detailsField.value.length} / 500`;
+                notify(`แปลงเสียงสำเร็จ: "${transcript}"`);
+              }
+            };
+            rec.onerror = () => notify('ไม่สามารถรับเสียงได้ กรุณาพิมพ์ข้อความหรือเลือกเสียงจำลอง');
+            rec.start();
+          } catch {
+            notify('ไม่สามารถเปิดไมโครโฟนได้');
+          }
+        }
+      }, icon('mic', 16), ' กดเพื่อพูดสดด้วยไมค์ภาษาไทย') : null
+    );
+
+    overlay.append(card);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
+    document.body.append(overlay);
+  };
+
   // Embedded microphone button inside the textarea box
   const embeddedMicBtn = el('button', {
     type: 'button',
     className: 'embedded-mic-btn',
-    title: 'กดเพื่อพูดรายละเอียดสูตรปุ๋ยด้วยเสียง',
+    title: 'กดเพื่อพูดรายละเอียดสูตรปุ๋ยด้วยเสียง (หรือเลือกเสียงจำลองสำหรับสาธิต)',
     'aria-label': 'พูดรายละเอียดสูตรปุ๋ยด้วยเสียง',
-    onclick: () => {
-      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRec) {
-        notify('เบราว์เซอร์นี้ยังไม่รองรับการพิมพ์ด้วยเสียง กรุณาพิมพ์ข้อความหรือแตะเลือกสูตรด้านบน');
-        detailsField.focus();
-        return;
-      }
-      try {
-        const rec = new SpeechRec();
-        rec.lang = 'th-TH';
-        rec.continuous = false;
-        rec.interimResults = false;
-        embeddedMicBtn.classList.add('recording');
-        notify('กำลังรับฟังเสียงพูดภาษาไทย...');
-        rec.onresult = (e) => {
-          const transcript = e.results[0]?.[0]?.transcript || '';
-          if (transcript) {
-            detailsField.value = ((detailsField.value ? detailsField.value + ' ' : '') + transcript).slice(0, 500);
-            charCounter.textContent = `${detailsField.value.length} / 500`;
-            notify(`แปลงเสียงสำเร็จ: "${transcript}"`);
-          }
-        };
-        rec.onerror = () => {
-          embeddedMicBtn.classList.remove('recording');
-          notify('ไม่สามารถรับเสียงได้ กรุณาพิมพ์ข้อความแทน');
-        };
-        rec.onend = () => embeddedMicBtn.classList.remove('recording');
-        rec.start();
-      } catch {
-        notify('ไม่สามารถเปิดไมโครโฟนได้ กรุณาพิมพ์ข้อความแทน');
-      }
-    }
+    onclick: () => openVoicePresetSelector()
   }, icon('mic', 18));
 
   const presetFormulas = [
