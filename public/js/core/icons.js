@@ -166,6 +166,12 @@ export const ICONS = {
   ],
   chevronRight: [
     { type: 'polyline', points: '9 18 15 12 9 6' }
+  ],
+  chevronLeft: [
+    { type: 'polyline', points: '15 18 9 12 15 6' }
+  ],
+  play: [
+    { type: 'polygon', points: '5 3 19 12 5 21 5 3' }
   ]
 };
 

@@ -452,6 +452,7 @@ import { openEvidenceViewer, openPhotoPreviewModal, createPhotoUploader } from '
 import { buildFarmerHomeView, buildFarmerActivityWizard, buildFarmerApprovalView, buildFarmerReviewsView } from './js/views/farmer.js';
 import { showStoryPassport } from './js/views/passport.js';
 import { buildIcsAnalyticsChartsPanel, openInteractiveTutorial, checkAndShowIpTutorial } from './js/views/tutorial.js';
+import { openPitchGuide } from './js/views/pitchGuide.js';
 
 function sharePlotRiskToLine(w) {
   const text = `[แจ้งเตือนมาตรฐานเกษตรอินทรีย์ ผักไหม (PGS/ICS)]\n` +
@@ -493,6 +494,22 @@ function initFontScaleToggle() {
   const btn = $('#fontScaleToggle');
   if (btn) {
     btn.onclick = () => toggleLargeText();
+  }
+  const pitchBtn = $('#pitchGuideBtn');
+  if (pitchBtn) {
+    pitchBtn.onclick = () => openPitchGuide({
+      onSelectPersona: (role, code) => acceptDemoLogin(role, code),
+      onSwitchTab: async (tabId) => {
+        tab = tabId;
+        renderTabs();
+        await loadTab();
+      },
+      onOpenPassport: (sampleLot) => showStoryPassport(sampleLot)
+    });
+  }
+  const offlineBadge = $('#offlineStatusBadge');
+  if (offlineBadge) {
+    offlineBadge.onclick = () => notify('ระบบพร้อมใช้งานออฟไลน์: ข้อมูลกิจกรรมแปลงและคำขอถูกเก็บในเครื่อง และจะเชื่อมโยงข้อมูลอัตโนมัติเมื่อพบสัญญาณ');
   }
   const tutBtn = $('#tutorialHelpBtn');
   if (tutBtn) {
