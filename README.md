@@ -127,11 +127,12 @@ pakmaii-app/
 │   ├── demo-worker.js     # Public Demo Worker สำหรับโฮสต์แอปพลิเคชันตัวอย่าง
 │   ├── index.js           # Cloudflare Worker API Gateway
 │   └── storage.js         # Cloudflare R2 Storage Abstraction
-├── CHANGELOG.md           # ประวัติการปรับปรุงเวอร์ชันทั้งหมด
 ├── package.json           # ข้อมูลโปรเจกต์และ Scripts
 ├── playwright.config.js   # การตั้งค่า Playwright Test Runner
 ├── README.md              # หน้าแรกของคลังโค้ด (เอกสารนี้)
 ├── server.js              # Express Local Development Server
+├── staging-identities.example.json # ตัวอย่างบัญชีทดสอบ Staging
+├── wrangler.demo.jsonc    # การตั้งค่า Public Demo Cloudflare Worker
 └── wrangler.jsonc         # การตั้งค่า Cloudflare Workers & D1
 ```
 
@@ -220,7 +221,7 @@ npm run worker:dev
 | **คู่มือการส่งมอบระบบ** | ข้อมูลการตั้งค่าระบบ, ความปลอดภัย, และข้อพิจารณาในการนำขึ้นใช้งานจริง | [docs/HANDOVER.md](docs/HANDOVER.md) |
 | **Staging Checklist** | รายการตรวจสอบและขั้นตอนความปลอดภัยก่อน Deploy ขึ้น Staging จริง | [docs/STAGING_CHECKLIST.md](docs/STAGING_CHECKLIST.md) |
 | **UI/UX Audit Report** | รายงานการออกแบบหน้าจอ การคำนวณ Contrast WCAG AAA และการรองรับผู้สูงอายุ | [docs/UI_REDESIGN_AUDIT.md](docs/UI_REDESIGN_AUDIT.md) |
-| **ประวัติการปรับปรุง** | บันทึกประวัติการพัฒนาและ Pull Request ทั้งหมดของโครงการ | [CHANGELOG.md](CHANGELOG.md) |
+| **ประวัติการปรับปรุง** | บันทึกประวัติการพัฒนาและ Pull Request ทั้งหมดของโครงการ | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
 
 ---
 

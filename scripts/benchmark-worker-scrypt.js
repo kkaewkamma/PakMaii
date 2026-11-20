@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wrangler = path.join(projectRoot, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
 const port = 8792;
-const child = spawn(process.execPath, [wrangler, 'dev', '--local', '--config', 'wrangler.scrypt-benchmark.jsonc', '--port', String(port)], {
+const child = spawn(process.execPath, [wrangler, 'dev', '--local', '--config', 'scripts/wrangler.scrypt-benchmark.jsonc', '--port', String(port)], {
   cwd: projectRoot,
   stdio: ['ignore', 'ignore', 'inherit'],
   env: { ...process.env, CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false', WRANGLER_SEND_METRICS: 'false' },
