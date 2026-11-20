@@ -71,9 +71,9 @@ export function createVoiceInput(textarea) {
 
 function sortApprovalsNewest(list = []) {
   return [...list].sort((a, b) => {
-    const timeDiff = String(b.created_at || '').localeCompare(String(a.created_at || ''));
-    if (timeDiff !== 0) return timeDiff;
-    return Number(b.id || 0) - Number(a.id || 0);
+    const idDiff = Number(b.id || 0) - Number(a.id || 0);
+    if (idDiff !== 0) return idDiff;
+    return String(b.created_at || '').localeCompare(String(a.created_at || ''));
   });
 }
 
@@ -210,6 +210,12 @@ export function buildFarmerHomeView({ me = null, plots = [], activities = [], ap
     bannerTitle = `คำขอใช้ปัจจัยไม่ผ่าน ${rejectedApprovals.length} รายการ`;
     bannerSub = `${featuredApproval.input_name || 'แผนปัจจัยการผลิต'} • แตะดูเหตุผลและส่งคำขอใหม่`;
     bannerTarget = 'approval';
+  } else if (featuredApproval?.status === 'approved') {
+    bannerTone = 'success';
+    bannerIcon = 'checkCircle';
+    bannerTitle = 'คำขอใช้ปัจจัยผ่านการอนุมัติแล้ว';
+    bannerSub = `${featuredApproval.input_name || 'แผนปัจจัยการผลิต'} • พร้อมใช้งานในแปลง`;
+    bannerTarget = 'approval';
   } else if (featuredApproval?.status === 'pending' || effectivePending > 0) {
     bannerTone = 'warn';
     bannerIcon = 'clock';
@@ -217,12 +223,6 @@ export function buildFarmerHomeView({ me = null, plots = [], activities = [], ap
     bannerSub = featuredApproval?.input_name
       ? `${featuredApproval.input_name} • ติดตามสถานะคำขอของคุณได้ที่นี่`
       : 'ติดตามสถานะคำขอของคุณได้ที่นี่';
-    bannerTarget = 'approval';
-  } else if (featuredApproval?.status === 'approved') {
-    bannerTone = 'success';
-    bannerIcon = 'checkCircle';
-    bannerTitle = 'คำขอใช้ปัจจัยผ่านการอนุมัติแล้ว';
-    bannerSub = `${featuredApproval.input_name || 'แผนปัจจัยการผลิต'} • พร้อมใช้งานในแปลง`;
     bannerTarget = 'approval';
   } else if (isOverdue) {
     bannerTone = 'warn';
