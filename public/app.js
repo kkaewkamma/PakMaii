@@ -424,6 +424,7 @@ async function start(forceLogin = false) {
     if (me.role === 'farmer') {
       const timeGreeting = new Date().getHours() < 12 ? 'สวัสดีตอนเช้า' : (new Date().getHours() < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น');
       const totalRai = plots.reduce((acc, p) => acc + (parseFloat(p.area) || 0), 0) || (plots.length * 7);
+      const shortVillage = me.village ? (me.village.split(' ')[2] || me.village.split(' ')[0] || me.village).slice(0, 18) : '';
 
       const farmerCard = el('div', { className: 'farmer-identity-card' },
         el('div', { className: 'card-pattern-overlay' }, 'ผ'),
@@ -432,9 +433,19 @@ async function start(forceLogin = false) {
             el('span', { className: 'greeting-text' }, timeGreeting),
             el('h2', { className: 'farmer-name' }, displayFullName)
           ),
-          el('div', { className: 'organic-cert-pill' },
-            el('span', { className: 'cert-dot' }),
-            el('span', {}, 'อินทรีย์แท้')
+          el('div', { className: 'id-top-actions' },
+            el('div', { className: 'organic-cert-pill' },
+              el('span', { className: 'cert-dot' }),
+              el('span', {}, 'อินทรีย์แท้')
+            ),
+            el('button', {
+              type: 'button',
+              id: 'logoutButton',
+              className: 'farmer-logout-icon-btn',
+              title: demoUser ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ',
+              'aria-label': 'ออกจากระบบ',
+              onclick: logout
+            }, icon('logOut', 13))
           )
         ),
         el('div', { className: 'id-bottom-row' },
@@ -444,19 +455,13 @@ async function start(forceLogin = false) {
           ),
           el('div', { className: 'id-stat-box' },
             el('label', {}, 'รหัสสมาชิก'),
-            el('span', {}, `${me.agency_code || me.name} ${me.village ? `(${me.village})` : ''}`)
+            el('span', {}, `${me.agency_code || me.name} ${shortVillage ? `• ${shortVillage}` : ''}`)
           )
         )
       );
 
       $('#identity').replaceChildren(
         farmerCard,
-        el('div', { className: 'farmer-quick-actions-bar' },
-          el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
-            icon('logOut', 14),
-            demoUser ? ' ออกจากโหมดทดลอง' : ' ออกจากระบบ'
-          )
-        ),
         switcherBar
       );
     } else {

@@ -5052,6 +5052,31 @@ body.is-login .hero {
   gap: 5px;
 }
 
+.id-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.farmer-logout-icon-btn {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: var(--radius-full) !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer;
+}
+
+.farmer-logout-icon-btn:active {
+  transform: scale(0.92);
+}
+
 .cert-dot {
   width: 6px;
   height: 6px;
@@ -5171,18 +5196,191 @@ body.is-login .hero {
   line-height: 1.35;
 }
 
-/* Mobile Screen Cleanups */
+/* ==========================================================================
+   Mobile-First UX Optimization (Touch Ergonomics, Safe Area & Compact Shell)
+   ========================================================================== */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, .service-item, .dock-btn, .switcher-pill, .chip-btn, .plot-card, .activity-chip {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button:active:not(:disabled),
+.service-item:active,
+.dock-btn:active,
+.plot-card:active {
+  transform: scale(0.97);
+  transition: transform 0.08s ease;
+}
+
 @media (max-width: 768px) {
-  body:not(.is-login) .hero > h2#welcome {
-    font-size: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    position: absolute;
-    width: 1px;
-    clip: rect(0, 0, 0, 0);
+  /* 1. Ultra-Compact Mobile Header */
+  #main-header {
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    padding: 8px 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+
+  .header-wrap {
+    gap: 8px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .header-brand {
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .brand-logo {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+  }
+
+  .brand-logo svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .brand-name {
+    font-size: 15px;
+    line-height: 1.15;
+  }
+
+  .brand-badge {
+    font-size: 9.5px;
+    padding: 1px 6px;
+  }
+
+  .brand-org {
+    display: none;
+  }
+
+  .header-status {
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .font-scale-btn {
+    min-height: 32px;
+    padding: 4px 9px;
+    font-size: 11.5px;
+  }
+
+  .pitch-guide-btn {
+    display: none;
+  }
+
+  .offline-status-pill {
+    padding: 4px 8px;
+    font-size: 11px;
+    min-height: 32px;
+  }
+
+  /* 2. Compact Swipeable Switcher Ribbon on Mobile */
+  .role-switcher-bar {
+    display: flex;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px !important;
+    margin: 8px 0 0 !important;
+    padding: 6px 4px !important;
+    background: transparent !important;
+    border: none !important;
+    scrollbar-width: none;
+  }
+
+  .role-switcher-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .switcher-label {
+    display: none;
+  }
+
+  .switcher-pill {
+    white-space: nowrap !important;
+    font-size: 12px !important;
+    padding: 5px 12px !important;
+    min-height: 32px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* 3. Farmer Identity Card on Mobile */
+  .farmer-identity-card {
+    padding: 16px;
+    margin-bottom: 10px;
+    border-radius: var(--radius-md);
+  }
+
+  .farmer-name {
+    font-size: 18px;
+  }
+
+  .id-bottom-row {
+    padding-top: 10px;
+    margin-top: 6px;
+    gap: 8px;
+  }
+
+  .farmer-quick-actions-bar {
+    margin-bottom: 6px;
+  }
+
+  /* 4. Primary Hero Task Card on Mobile */
+  .primary-action-card {
+    padding: 14px 14px 16px;
+    margin-bottom: 12px;
+    border-radius: var(--radius-md);
+  }
+
+  .task-title {
+    font-size: 16px;
+  }
+
+  .task-desc {
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  /* 5. Service Grid on Mobile (Thumb-Zone First) */
+  .service-grid {
+    gap: 8px;
+    padding: 12px 8px;
+  }
+
+  .service-icon-box {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    margin-bottom: 6px;
+  }
+
+  .service-label {
+    font-size: 11.5px;
+  }
+
+  /* 6. Safe Area & Bottom Dock Padding */
+  body:not(.is-login) {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 12px));
+  }
+
+  #mobile-dock {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 12px));
+    min-height: calc(56px + env(safe-area-inset-bottom, 12px));
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
   }
 }
+
 
 
