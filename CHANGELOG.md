@@ -24,7 +24,7 @@
 ## [v0.3.0] — 2026-11-20 — Production Readiness Sprint (Phases 1–3)
 
 ### PR #1 — Phase 1: End-to-End Workflow Reliability & Audit Logs (`70744bb`)
-- เพิ่ม [`RULE.md`](RULE.md) กำหนดกฎถาวรของโปรเจกต์ (Dual-Runtime parity, RBAC, strict CSP, Versioned migrations, Non-fabrication)
+- เพิ่ม [`docs/RULE.md`](docs/RULE.md) กำหนดกฎถาวรของโปรเจกต์ (Dual-Runtime parity, RBAC, strict CSP, Versioned migrations, Non-fabrication)
 - บังคับกรอกเหตุผล (`comment`) เมื่อไม่อนุมัติคำขอปัจจัยการผลิต (`PATCH /api/approvals/:id` -> `400`) ทั้งใน `worker/index.js` และ `server.js`
 - บันทึกเหตุการณ์ `approval.reviewed` และ `review.created` ลงตาราง `audit_logs` ใน `worker/repository/d1.js` (`guardedBatch` / `batch`) และ `server.js` (`db.transaction`)
 - เพิ่มสถานะ loading skeleton และปุ่ม retry (`ลองใหม่อีกครั้ง`) ใน `loadTab()` ของ `public/app.js`

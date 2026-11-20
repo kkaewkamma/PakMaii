@@ -1,6 +1,6 @@
 # PakMaii (Ready to Grow) — Project Rules
 
-1. **Read project documentation before coding:** Always inspect `README.md`, `HANDOVER.md`, `DEVELOPMENT_STATUS.md`, `STAGING_CHECKLIST.md`, `docs/`, and the actual source code before making changes.
+1. **Read project documentation before coding:** Always inspect `README.md`, `docs/HANDOVER.md`, `docs/DEVELOPMENT_STATUS.md`, `docs/STAGING_CHECKLIST.md`, `docs/`, and the actual source code before making changes.
 2. **Preserve dual-runtime compatibility:** Keep Express + SQLite (`server.js`, `lib/`, `db/`) and Cloudflare Workers + D1 (`worker/`, `d1/migrations/`) aligned and compatible.
 3. **Preserve verified LINE authentication and server-side RBAC:** Never bypass verified LINE ID token authentication, session hashing, HMAC agency code verification, or server-side role/assignment checks.
 4. **Never weaken security for convenience:** Maintain strict CSP (`public/_headers` and `helmet` in `server.js`), avoid `innerHTML`/inline styles/inline scripts, and never log or store secrets/tokens in plaintext.
