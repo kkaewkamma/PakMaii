@@ -62,7 +62,7 @@ const FARMER_SCREEN_TITLES = {
   home: 'หน้าหลัก',
   plots: 'แปลงปลูก',
   record: 'บันทึกกิจกรรม',
-  approval: 'ขอใช้ปัจจัยการผลิต',
+  approval: 'ขอใช้ปัจจัย',
   reviews: 'ผลการตรวจ',
   lots: 'ล็อตผลผลิต'
 };
@@ -262,7 +262,13 @@ function showLogin(development) {
     const btn = form.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
     try { await acceptDemoLogin(loginRole, codeInput.value); }
-    catch (error) { notify(error.message); codeInput.focus(); }
+    catch (error) {
+      const msg = (error?.code === 'ADMIN_DEMO_FORBIDDEN' && config?.demoOnly)
+        ? 'โหมด Demo รองรับเฉพาะบทบาทเกษตรกร (Farmer) และเจ้าหน้าที่ ICS (บัญชี Admin ใช้งานเฉพาะระบบจริง/Staging)'
+        : error.message;
+      notify(msg);
+      codeInput.focus();
+    }
     finally { if (btn) btn.disabled = !demoBackend; }
   });
 

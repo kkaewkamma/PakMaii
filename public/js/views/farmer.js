@@ -69,6 +69,18 @@ export function createVoiceInput(textarea) {
   return el('div', { className: 'voice-mic-bar' }, voiceBtn);
 }
 
+function sortApprovalsNewest(list = []) {
+  return [...list].sort((a, b) => {
+    const timeDiff = String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    if (timeDiff !== 0) return timeDiff;
+    return Number(b.id || 0) - Number(a.id || 0);
+  });
+}
+
+function getLatestApproval(list = []) {
+  return sortApprovalsNewest(list)[0] || null;
+}
+
 export function buildFarmerHomeView({ me = null, plots = [], activities = [], approvals = [], lots = [], pendingCount = 0, navigateTab }) {
   const myPlot = plots[0] || null;
   const sortedActs = [...activities].sort((a, b) => String(b.activity_date || '').localeCompare(String(a.activity_date || '')));
@@ -88,7 +100,7 @@ export function buildFarmerHomeView({ me = null, plots = [], activities = [], ap
   const rejectedApprovals = approvals.filter(a => a.status === 'rejected');
   const pendingApprovals = approvals.filter(a => a.status === 'pending');
   const effectivePending = pendingApprovals.length || pendingCount;
-  const featuredApproval = rejectedApprovals[0] || pendingApprovals[0] || approvals[0] || null;
+  const featuredApproval = getLatestApproval(approvals);
 
   const hour = new Date().getHours();
   const timeGreeting = hour < 12 ? 'สวัสดีตอนเช้า' : (hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น');
@@ -192,17 +204,25 @@ export function buildFarmerHomeView({ me = null, plots = [], activities = [], ap
     : 'พร้อมบันทึกกิจกรรมหรือสร้างล็อตผลผลิต';
   let bannerTarget = 'approval';
 
-  if (rejectedApprovals.length > 0) {
+  if (featuredApproval?.status === 'rejected') {
     bannerTone = 'danger';
     bannerIcon = 'xCircle';
     bannerTitle = `คำขอใช้ปัจจัยไม่ผ่าน ${rejectedApprovals.length} รายการ`;
-    bannerSub = `${featuredApproval?.input_name || 'แผนปัจจัยการผลิต'} • แตะดูเหตุผลและส่งคำขอใหม่`;
+    bannerSub = `${featuredApproval.input_name || 'แผนปัจจัยการผลิต'} • แตะดูเหตุผลและส่งคำขอใหม่`;
     bannerTarget = 'approval';
-  } else if (effectivePending > 0) {
+  } else if (featuredApproval?.status === 'pending' || effectivePending > 0) {
     bannerTone = 'warn';
     bannerIcon = 'clock';
-    bannerTitle = `มีคำขอรอพิจารณา ${effectivePending} รายการ`;
-    bannerSub = 'ติดตามสถานะคำขอของคุณได้ที่นี่';
+    bannerTitle = `มีคำขอรอพิจารณา ${effectivePending || 1} รายการ`;
+    bannerSub = featuredApproval?.input_name
+      ? `${featuredApproval.input_name} • ติดตามสถานะคำขอของคุณได้ที่นี่`
+      : 'ติดตามสถานะคำขอของคุณได้ที่นี่';
+    bannerTarget = 'approval';
+  } else if (featuredApproval?.status === 'approved') {
+    bannerTone = 'success';
+    bannerIcon = 'checkCircle';
+    bannerTitle = 'คำขอใช้ปัจจัยผ่านการอนุมัติแล้ว';
+    bannerSub = `${featuredApproval.input_name || 'แผนปัจจัยการผลิต'} • พร้อมใช้งานในแปลง`;
     bannerTarget = 'approval';
   } else if (isOverdue) {
     bannerTone = 'warn';
@@ -1090,7 +1110,8 @@ export function buildFarmerApprovalView({ plots = [], rows = [], me = null, plot
 
   const renderStatusView = () => {
     const viewChildren = [];
-    const featured = rows.find(r => r.status === 'rejected') || rows.find(r => r.status === 'pending') || rows[0] || null;
+    const sortedRows = sortApprovalsNewest(rows);
+    const featured = sortedRows[0] || null;
 
     const openFormBtn = el('button', {
       type: 'button',
@@ -1157,11 +1178,11 @@ export function buildFarmerApprovalView({ plots = [], rows = [], me = null, plot
           ),
           bulletItems.length > 1
             ? el('ul', { className: 'approval-reason-bullets' },
-                ...bulletItems.map(line => el('li', {}, line))
-              )
+              ...bulletItems.map(line => el('li', {}, line))
+            )
             : el('p', { className: 'approval-reason-text' },
-                bulletItems[0] || 'รอเจ้าหน้าที่ ICS ตรวจสอบความสอดคล้องตามมาตรฐานอินทรีย์'
-              )
+              bulletItems[0] || 'รอเจ้าหน้าที่ ICS ตรวจสอบความสอดคล้องตามมาตรฐานอินทรีย์'
+            )
         ),
         el('div', { className: 'approval-advice-box' },
           el('strong', { className: 'approval-advice-title' }, adviceTitle),
@@ -1187,8 +1208,8 @@ export function buildFarmerApprovalView({ plots = [], rows = [], me = null, plot
       viewChildren.push(emptyStatusCard);
     }
 
-    if (rows.length > 0) {
-      const historyItems = rows.map(item => {
+    if (sortedRows.length > 0) {
+      const historyItems = sortedRows.map(item => {
         const isPending = item.status === 'pending';
         const isApproved = item.status === 'approved';
         const pillClass = isPending ? 'pill warn' : isApproved ? 'pill success' : 'pill danger';

@@ -6605,7 +6605,7 @@ body {
   text-overflow: ellipsis;
 }
 
-.demo-tools-btn {
+.demo-tools-btn:not(.hide) {
   background: #FEF3C7 !important;
   color: #92400E !important;
   border: 1px solid #F59E0B !important;
@@ -6766,17 +6766,17 @@ body.role-farmer #mobile-dock:not(.hide) {
   }
 }
 
-/* Phone Header Safeguards (320px - 479px) */
+/* Phone Header Safeguards (320px - 479px across all roles) */
 @media (max-width: 479px) {
-  body.role-farmer #main-header .wrap {
+  #main-header .wrap {
     padding: 0 12px;
   }
 
-  body.role-farmer #main-header .brand-badge {
+  #main-header .brand-badge {
     display: none !important;
   }
 
-  body.role-farmer #main-header .brand-name {
+  #main-header .brand-name {
     font-size: 15px;
   }
 
@@ -6790,8 +6790,8 @@ body.role-farmer #mobile-dock:not(.hide) {
     font-size: 14.5px;
   }
 
-  body.role-farmer #main-header #fontScaleToggle,
-  body.role-farmer #main-header #demoToolsBtn {
+  #main-header #fontScaleToggle,
+  #main-header #demoToolsBtn {
     padding: 4px 9px !important;
     font-size: 11.5px !important;
     min-height: 34px !important;
@@ -6799,16 +6799,16 @@ body.role-farmer #mobile-dock:not(.hide) {
 }
 
 @media (max-width: 359px) {
-  body.role-farmer #main-header .wrap {
+  #main-header .wrap {
     padding: 0 10px;
   }
 
-  body.role-farmer #main-header .brand-name {
+  #main-header .brand-name {
     font-size: 14px;
   }
 
-  body.role-farmer #main-header #fontScaleToggle,
-  body.role-farmer #main-header #demoToolsBtn {
+  #main-header #fontScaleToggle,
+  #main-header #demoToolsBtn {
     padding: 4px 8px !important;
     font-size: 11px !important;
   }
