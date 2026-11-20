@@ -8,7 +8,7 @@
 - **Frontend UI & Demo (`public/`):**
 - **Automated Tests & Docs:**
 
-## ตรวจสอบมาตรฐานตาม `RULE.md`
+## ตรวจสอบมาตรฐานตาม `docs/RULE.md`
 - [ ] **Dual-Runtime Parity:** Express + SQLite และ Cloudflare Workers + D1 ทำงาน/validate ตรงกัน
 - [ ] **Auth, RBAC & Data Isolation:** คง verified LINE ID Token, session hashing, และการแยกสิทธิ์ Farmer / ICS (เฉพาะ active assignment) / Admin
 - [ ] **Strict CSP & Security:** ไม่มี `innerHTML`, inline script/style, `localStorage` สำหรับ session/secret และคง Security Headers ครบถ้วน

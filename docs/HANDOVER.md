@@ -17,7 +17,7 @@ Ready to Grow มี runtime สองชุดที่ต้องรักษ
 2. รัน `npm.cmd ci` และ `npm.cmd test`.
 3. Local Express: ใช้ `.env.example` เป็นรายการชื่อค่าเท่านั้น; ห้ามส่งต่อ `.env` จริง.
 4. Local Worker: `npm.cmd run worker:db:migrate` แล้ว `npm.cmd run worker:dev`.
-5. Private staging: อ่าน [Phase 5A.1 runbook](docs/phase-5a1-private-staging-preparation.md) และ [staging checklist](STAGING_CHECKLIST.md). ต้องมีอนุมัติก่อนสร้าง Cloud resource.
+5. Private staging: อ่าน [Phase 5A.1 runbook](phase-5a1-private-staging-preparation.md) และ [staging checklist](STAGING_CHECKLIST.md). ต้องมีอนุมัติก่อนสร้าง Cloud resource.
 
 ## Security invariants
 
