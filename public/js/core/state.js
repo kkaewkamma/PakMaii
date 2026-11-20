@@ -3,7 +3,11 @@
 export const $ = selector => document.querySelector(selector);
 export const $$ = selector => Array.from(document.querySelectorAll(selector));
 
-export const roleLabels = { farmer: 'Farmer', ics: 'ICS Officer', admin: 'System Admin' };
+export const roleLabels = {
+  farmer: 'เกษตรกร (Farmer)',
+  ics: 'เจ้าหน้าที่ตรวจประเมินภายใน (ICS)',
+  admin: 'ผู้ดูแลระบบ (System Admin)'
+};
 export const statusLabels = { active: 'เปิดใช้งาน', unlinked: 'รอผูก LINE', disabled: 'ระงับ', used: 'ใช้แล้ว', expired: 'หมดอายุ', revoked: 'เพิกถอนแล้ว' };
 
 // Demo store is client-side only (public/demo.js); it never issues server sessions.
@@ -59,18 +63,16 @@ export const tabsFarmer = [
 
 export const tabsIcs = [
   ['home', 'ภาพรวม', 'sprout'],
+  ['farmers', 'เกษตรกรในดูแล', 'users'],
   ['plots', 'แปลงเกษตรกร', 'mapPin'],
-  ['record', 'กิจกรรม', 'calendar'],
+  ['record', 'กิจกรรมสมาชิก', 'calendar'],
   ['approval', 'พิจารณาคำขอ', 'clipboard'],
   ['risks', 'ความเสี่ยง', 'alert'],
-  ['lots', 'ล็อตผลผลิต', 'package'],
-  ['reviews', 'ผลตรวจ', 'shield']
+  ['reviews', 'ผลตรวจแปลง', 'shield'],
+  ['lots', 'ล็อตผลผลิต', 'package']
 ];
 
-export const tabsIcsDemo = [
-  ['farmers', 'เกษตรกรในดูแล', 'users'],
-  ...tabsIcs
-];
+export const tabsIcsDemo = tabsIcs;
 
 export const tabsAdmin = [
   ['overview', 'ภาพรวมระบบ', 'sprout'],
