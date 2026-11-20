@@ -16,20 +16,32 @@
     <div class="wrap header-wrap">
       <div class="header-brand">
         <div class="brand-logo" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="M9 12l2 2 4-4"/>
+          <svg width="26" height="26" viewBox="0 0 36 36" fill="none">
+            <path d="M6 28C6 16 14 6 24 4C24 16 16 26 6 28Z" fill="#15803D"/>
+            <path d="M8 26C12 21 16 15 20 8" stroke="#DCFCE7" stroke-width="2" stroke-linecap="round"/>
+            <path d="M17 28C17 18 23 10 32 8C32 18 26 26 17 28Z" fill="#22C55E"/>
+            <path d="M19 26C22 22 25 17 29 12" stroke="#DCFCE7" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
         </div>
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-name">Ready to Grow</span>
-            <span class="brand-badge">PakMaii ICS & PGS</span>
+            <span class="brand-badge">PakMaii</span>
           </div>
           <div class="brand-org">ระบบบริหารมาตรฐานเกษตรอินทรีย์ • วิสาหกิจชุมชนตำบลผักไหม</div>
         </div>
       </div>
+      <div id="farmerSubNav" class="header-sub-nav hide">
+        <button type="button" id="farmerBackBtn" class="header-back-btn" aria-label="กลับหน้าหลัก">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span>หน้าหลัก</span>
+        </button>
+        <span id="farmerScreenTitle" class="header-sub-title"></span>
+      </div>
       <div class="header-status">
+        <button type="button" id="demoToolsBtn" class="demo-tools-btn hide" aria-haspopup="dialog" aria-label="เปิดเครื่องมือทดสอบระบบ Demo">Demo</button>
         <button type="button" id="pitchGuideBtn" class="font-scale-btn pitch-guide-btn" aria-label="เปิดบทสาธิตระบบ 3 นาทีสำหรับนำเสนอ">🎯 บทสาธิต 3 นาที</button>
         <button type="button" id="tutorialHelpBtn" class="font-scale-btn" aria-label="เปิดคู่มือแนะนำการใช้งานระบบ">คู่มือแนะนำ</button>
         <button type="button" id="fontScaleToggle" class="font-scale-btn" aria-pressed="false" aria-label="สลับขนาดตัวอักษรใหญ่สำหรับผู้สูงอายุ">ก+ ตัวอักษรใหญ่</button>

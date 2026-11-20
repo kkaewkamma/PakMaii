@@ -3,6 +3,7 @@
 import { api } from '../core/api.js';
 import { el, card, empty, inputField, selectField, statusBadge, dated, notify, formatLocalIsoDate } from '../core/dom.js';
 import { icon } from '../core/icons.js';
+import { createFarmerAvatarSvg } from '../core/graphics.js';
 import { createPhotoUploader, openEvidenceViewer, openPhotoPreviewModal } from '../core/photo.js';
 import { create14DayRhythmTrack } from '../core/rhythm.js';
 import { AUDIT_STANDARD_LABELS } from './admin.js';
@@ -68,10 +69,11 @@ export function createVoiceInput(textarea) {
   return el('div', { className: 'voice-mic-bar' }, voiceBtn);
 }
 
-export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pendingCount = 0, navigateTab }) {
-  const myPlot = plots[0];
+export function buildFarmerHomeView({ me = null, plots = [], activities = [], approvals = [], lots = [], pendingCount = 0, navigateTab }) {
+  const myPlot = plots[0] || null;
   const sortedActs = [...activities].sort((a, b) => String(b.activity_date || '').localeCompare(String(a.activity_date || '')));
-  const latestAct = sortedActs[0];
+  const latestAct = sortedActs[0] || null;
+
   let daysSince = null;
   if (latestAct?.activity_date) {
     const actTime = new Date(latestAct.activity_date).getTime();
@@ -80,244 +82,164 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
     }
   }
 
-  const isOverdue = daysSince === null || daysSince > 14;
-  const isWarning = !isOverdue && daysSince >= 7;
-  const hasPendingApp = pendingCount > 0;
+  const isOverdue = plots.length > 0 && (daysSince === null || daysSince > 14);
+  const isWarning = plots.length > 0 && !isOverdue && daysSince >= 7;
 
+  const rejectedApprovals = approvals.filter(a => a.status === 'rejected');
+  const pendingApprovals = approvals.filter(a => a.status === 'pending');
+  const effectivePending = pendingApprovals.length || pendingCount;
+  const featuredApproval = rejectedApprovals[0] || pendingApprovals[0] || approvals[0] || null;
+
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? 'สวัสดีตอนเช้า' : (hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น');
+  const farmerDisplayName = me?.thai_name || me?.name || 'เกษตรกร';
+  const heroIdentityMeta = plots.length > 0
+    ? `เกษตรกร • ${plots.length} แปลงปลูก`
+    : 'เกษตรกร • ยังไม่มีแปลงปลูก';
+
+  // 1. User Greeting & Identity (deep forest green banking-app hero banner)
+  const greetingSection = el('section', {
+    className: 'farmer-home-greeting farmer-home-hero-banner',
+    'aria-label': 'ข้อมูลเกษตรกร'
+  },
+    el('div', { className: 'farmer-greeting-avatar' }, createFarmerAvatarSvg(50)),
+    el('div', { className: 'farmer-greeting-body' },
+      el('span', { className: 'farmer-greeting-time' }, timeGreeting),
+      el('h2', { className: 'farmer-greeting-name' }, farmerDisplayName),
+      el('p', { className: 'farmer-greeting-meta' }, heroIdentityMeta)
+    )
+  );
+
+  // 2. One Recommended Primary Task Card
   let statusTier = 'normal';
-  let statusBadgeText = daysSince !== null
-    ? `บันทึกล่าสุด ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`}`
-    : 'แปลงใหม่ รอเริ่มบันทึก';
-  let statusTitle = myPlot ? `แปลง ${myPlot.name}` : 'ภาพรวมแปลงปลูก';
-  let statusDesc = daysSince !== null
-    ? `บันทึกกิจกรรมล่าสุดเมื่อ ${daysSince === 0 ? 'วันนี้' : `${daysSince} วันก่อน`} • งานถัดไป: ตรวจสอบและบันทึกกิจกรรมการดูแลแปลงรอบถัดไป`
-    : 'ยังไม่มีประวัติกิจกรรม • งานถัดไป: แตะ "บันทึกกิจกรรมแปลง" เพื่อเริ่มต้นบันทึกข้อมูล';
-  let alertAdvice = null;
+  let statusBadgeText = 'พร้อมบันทึก';
+  let taskTitle = 'บันทึกกิจกรรมแปลงวันนี้';
+  let taskDesc = 'ช่วยให้ประวัติการดูแลแปลงครบถ้วน';
 
-  if (isOverdue) {
+  if (plots.length === 0) {
+    statusTier = 'warn';
+    statusBadgeText = 'ยังไม่มีแปลง';
+    taskTitle = 'เพิ่มแปลงปลูกแรกของคุณ';
+    taskDesc = 'สร้างข้อมูลแปลงก่อนเริ่มบันทึกกิจกรรม';
+  } else if (isOverdue) {
     statusTier = 'risk';
-    statusBadgeText = `ขาดบันทึกเกิน 14 วัน (${daysSince !== null ? `${daysSince} วันก่อน` : 'ยังไม่มีประวัติ'})`;
-    statusTitle = `แจ้งเตือน: แปลง ${myPlot?.name || ''} ขาดการบันทึกกิจกรรม`;
-    statusDesc = `บันทึกกิจกรรมล่าสุดเกิน 14 วัน • งานถัดไป: แตะ "บันทึกกิจกรรมแปลงด่วน" เพื่ออัปเดตการทำงานในแปลง`;
-    alertAdvice = 'คำแนะนำ: บันทึกกิจกรรมเพื่อรักษาความต่อเนื่องของข้อมูลและแจ้งความคืบหน้าให้เจ้าหน้าที่ ICS ทราบ';
+    statusBadgeText = daysSince !== null ? `ขาดบันทึก ${daysSince} วัน` : 'ยังไม่เคยบันทึก';
+    taskTitle = 'บันทึกกิจกรรมแปลงด่วน';
+    taskDesc = daysSince !== null
+      ? `${myPlot.name} • บันทึกล่าสุด ${daysSince} วันก่อน`
+      : 'ยังไม่มีบันทึกในรอบ 14 วัน';
   } else if (isWarning) {
     statusTier = 'warn';
-    statusBadgeText = `บันทึกล่าสุด ${daysSince} วันก่อน`;
-    statusTitle = `เตือนล่วงหน้า: แปลง ${myPlot?.name || ''} ใกล้ครบ 14 วัน`;
-    statusDesc = `บันทึกกิจกรรมล่าสุด ${daysSince} วันก่อน • งานถัดไป: บันทึกกิจกรรมการดูแลแปลงก่อนครบกำหนด 14 วัน`;
-    alertAdvice = 'คำแนะนำ: บันทึกกิจกรรมการให้น้ำ ใส่ปุ๋ย หรือตรวจแปลงเพื่ออัปเดตข้อมูล';
-  } else if (hasPendingApp) {
-    statusTier = 'warn';
-    statusBadgeText = `รอผลพิจารณาคำขอ (${pendingCount} รายการ)`;
-    statusTitle = `สถานะแปลง ${myPlot?.name || ''}: มีคำขอรอพิจารณา`;
-    statusDesc = `มีคำขอปัจจัยการผลิตรอการพิจารณาจากเจ้าหน้าที่ ICS ${pendingCount} รายการ • งานถัดไป: รอการอนุมัติก่อนนำปัจจัยไปใช้ในแปลงจริง`;
+    statusBadgeText = `ล่าสุด ${daysSince} วันก่อน`;
+    taskTitle = 'บันทึกกิจกรรมประจำรอบ';
+    taskDesc = `${myPlot.name} • ใกล้ครบกำหนด 14 วัน`;
+  } else {
+    statusTier = 'normal';
+    statusBadgeText = daysSince === 0 ? 'บันทึกแล้ววันนี้' : `ล่าสุด ${daysSince} วันก่อน`;
+    taskTitle = daysSince === 0 ? 'บันทึกกิจกรรมต่อเนื่องแล้ว' : 'บันทึกกิจกรรมแปลงวันนี้';
+    taskDesc = 'ช่วยให้ประวัติการดูแลแปลงครบถ้วน';
   }
 
-  const farmerRhythmSection = plots.length === 0
-    ? empty('ยังไม่มีแปลงปลูกในระบบ', 'เพิ่มแปลงปลูกแรกของคุณ', () => navigateTab('plots'))
-    : plots.length === 1
-    ? create14DayRhythmTrack(plots[0].id, activities, { title: `ความต่อเนื่องการบันทึกแปลง ${plots[0].name} (14 วันล่าสุด)` })
-    : el('div', { className: 'farmer-rhythm-list' },
-        ...plots.map(p => create14DayRhythmTrack(p.id, activities, { title: `จังหวะบันทึกแปลง ${p.name} (14 วันล่าสุด)` }))
-      );
-
-  const serviceGrid = el('div', { className: 'service-grid-section mb-16' },
-    el('div', { className: 'section-title-row' },
-      el('span', { className: 'section-title-text' }, 'บริการสำหรับเกษตรกร'),
-      el('span', { className: 'section-sub-text' }, 'แตะเลือกรายการเพื่อเข้าใช้งานด่วน')
+  const primaryTaskCard = el('section', {
+    className: `farmer-primary-task-card tier-${statusTier}`,
+    'aria-label': 'งานสำคัญวันนี้'
+  },
+    el('div', { className: 'farmer-task-top' },
+      el('span', { className: 'farmer-task-eyebrow' }, 'สิ่งที่ต้องทำวันนี้'),
+      statusBadge(statusTier, statusBadgeText)
     ),
-    el('div', { className: 'service-grid' },
-      el('button', {
-        type: 'button',
-        className: 'service-item',
-        onclick: () => navigateTab('plots')
-      },
-        el('div', { className: 'service-icon-box icon-green' }, icon('sprout', 24)),
-        el('span', { className: 'service-label' }, 'แปลงของฉัน'),
-        el('span', { className: 'service-badge' }, `${plots.length} แปลง`)
-      ),
-      el('button', {
-        type: 'button',
-        className: 'service-item',
-        onclick: () => navigateTab('record')
-      },
-        el('div', { className: 'service-icon-box icon-orange' }, icon('calendar', 24)),
-        el('span', { className: 'service-label' }, 'บันทึกงาน'),
-        el('span', { className: 'service-badge' }, 'จดวันนี้')
-      ),
-      el('button', {
-        type: 'button',
-        className: 'service-item',
-        onclick: () => navigateTab('approval')
-      },
-        el('div', { className: 'service-icon-box icon-blue' }, icon('clipboard', 24)),
-        el('span', { className: 'service-label' }, 'ขออนุมัติ'),
-        el('span', { className: 'service-badge' }, pendingCount > 0 ? `รอตรวจ ${pendingCount}` : 'ยื่นสูตรปุ๋ย')
-      ),
-      el('button', {
-        type: 'button',
-        className: 'service-item',
-        onclick: () => navigateTab('inspections')
-      },
-        el('div', { className: 'service-icon-box icon-purple' }, icon('shield', 24)),
-        el('span', { className: 'service-label' }, 'ผลตรวจแปลง'),
-        el('span', { className: 'service-badge' }, 'มาตรฐาน PGS')
-      )
+    el('h3', { className: 'farmer-task-title' }, taskTitle),
+    el('p', { className: 'farmer-task-desc' }, taskDesc),
+    el('button', {
+      type: 'button',
+      id: 'farmerPrimaryRecordBtn',
+      className: 'farmer-primary-cta',
+      onclick: () => navigateTab(plots.length === 0 ? 'plots' : 'record')
+    },
+      icon(plots.length === 0 ? 'plus' : 'sprout', 20),
+      el('span', {}, plots.length === 0 ? 'เพิ่มแปลงปลูกแรก' : 'บันทึกกิจกรรมวันนี้')
     )
   );
 
-  const farmerHeroCard = el('div', { className: `primary-action-card farmer-hero-graphic-card ${statusTier}` },
-    el('div', { className: 'task-header' },
-      el('div', { className: 'task-tag-group' },
-        el('span', { className: 'task-tag' }, 'สิ่งที่ต้องทำวันนี้'),
-        statusBadge(statusTier, statusBadgeText)
-      ),
-      el('span', { className: 'task-time' }, formatLocalIsoDate(new Date()))
-    ),
-    el('h3', { className: 'task-title farmer-status-title' }, statusTitle),
-    el('p', { className: 'task-desc farmer-status-desc' }, statusDesc),
-    farmerRhythmSection,
-    alertAdvice ? el('div', { className: 'alert-banner mt-12' },
-      el('div', { className: 'alert-icon' }, '⚠️'),
-      el('div', { className: 'alert-content' },
-        el('div', { className: 'alert-title' }, 'คำแนะนำจากเจ้าหน้าที่ ICS'),
-        el('div', { className: 'alert-msg' }, alertAdvice)
-      )
-    ) : null,
-    el('div', { className: 'row farmer-actions-row mt-14' },
-      el('button', {
-        type: 'button',
-        id: 'farmerPrimaryRecordBtn',
-        className: 'btn-hero-primary',
-        onclick: () => navigateTab('record')
-      }, el('span', { className: 'btn-hero-icon' }, '✍️'), ' แตะเพื่อเริ่มบันทึกกิจกรรม'),
-      el('button', {
-        type: 'button',
-        className: 'secondary',
-        onclick: () => navigateTab('approval')
-      }, icon('clipboard', 16), ' ขออนุมัติปัจจัย')
-    )
-  );
+  // 3. Four Main Service Shortcuts in a clean 2x2 grid
+  const shortcutItems = [
+    { tabId: 'plots', label: 'แปลงปลูก', iconName: 'sprout' },
+    { tabId: 'approval', label: 'ขอใช้ปัจจัย', iconName: 'clipboard' },
+    { tabId: 'reviews', label: 'ผลการตรวจ', iconName: 'shield' },
+    { tabId: 'lots', label: 'ล็อตผลผลิต', iconName: 'package' }
+  ];
 
-  const recentMiniList = activities.length > 0 ? el('div', { className: 'card recent-activities-mini-card mb-16' },
-    el('div', { className: 'row between align-center mb-8' },
-      el('b', { className: 'recent-mini-title' }, icon('clock', 14), ' บันทึกล่าสุดในแปลง'),
-      el('button', {
+  const shortcutsSection = el('section', { className: 'farmer-shortcuts-section', 'aria-label': 'บริการของฉัน' },
+    el('h3', { className: 'farmer-section-heading' }, 'บริการของฉัน'),
+    el('div', { className: 'farmer-shortcuts-grid' },
+      ...shortcutItems.map(item => el('button', {
         type: 'button',
-        className: 'link-btn text-sm',
-        onclick: () => navigateTab('record')
-      }, `ดูทั้งหมด (${activities.length}) >`)
-    ),
-    el('div', { className: 'recent-mini-items-list' },
-      ...sortedActs.slice(0, 2).map(act => el('div', { className: 'recent-mini-row' },
-        el('div', { className: 'recent-mini-main' },
-          el('strong', {}, `${act.kind || act.activity_type || 'กิจกรรมแปลง'}`),
-          el('p', { className: 'muted text-xs' }, `${act.plot_name || myPlot?.name || 'แปลงปลูก'} • ${dated(act.activity_date)}`)
-        ),
-        el('span', { className: 'pill success' }, 'บันทึกแล้ว')
+        className: 'farmer-shortcut-btn',
+        onclick: () => navigateTab(item.tabId)
+      },
+        el('div', { className: 'farmer-shortcut-icon' }, icon(item.iconName, 20)),
+        el('span', { className: 'farmer-shortcut-label' }, item.label)
       ))
     )
-  ) : null;
-
-  const pgsCriteriaCard = el('div', { className: 'card pgs-criteria-card' },
-    el('div', { className: 'row between' },
-      el('h4', { className: 'milestone-header' }, icon('shield', 16), ' ข้อกำหนดมาตรฐานเกษตรอินทรีย์ PGS (วิสาหกิจชุมชนผักไหม)'),
-      el('span', { className: 'pill success' }, 'เกณฑ์รับรองกลุ่ม')
-    ),
-    el('p', { className: 'muted card-lead' }, 'แนวทางปฏิบัติ 4 ข้อสำคัญเพื่อรักษามาตรฐานอินทรีย์และเตรียมความพร้อมก่อนการตรวจประเมิน'),
-    el('div', { className: 'grid pgs-criteria-grid mt-12' },
-      el('div', { className: 'criteria-item' },
-        el('b', { className: 'criteria-title' }, icon('calendar', 14), ' 1. บันทึกแปลงต่อเนื่อง'),
-        el('p', { className: 'criteria-desc muted' }, 'บันทึกการดูแลแปลงอย่างน้อยทุก 14 วัน เพื่อให้ตรวจสอบย้อนกลับได้')
-      ),
-      el('div', { className: 'criteria-item' },
-        el('b', { className: 'criteria-title' }, icon('clipboard', 14), ' 2. ขออนุมัติปัจจัยการผลิต'),
-        el('p', { className: 'criteria-desc muted' }, 'ยื่นขออนุมัติปุ๋ยอินทรีย์และชีวภัณฑ์กับเจ้าหน้าที่ ICS ก่อนใช้ในแปลงจริง')
-      ),
-      el('div', { className: 'criteria-item' },
-        el('b', { className: 'criteria-title' }, icon('mapPin', 14), ' 3. แนวกันชนปลอดภัย'),
-        el('p', { className: 'criteria-desc muted' }, 'ดูแลแนวกันชนรอบแปลงเพื่อป้องกันสารเคมีจากภายนอกพัดพาเข้ามา')
-      ),
-      el('div', { className: 'criteria-item' },
-        el('b', { className: 'criteria-title' }, icon('shield', 14), ' 4. ตรวจประเมินแปลง'),
-        el('p', { className: 'criteria-desc muted' }, 'พร้อมรับการตรวจประเมินแปลงประจำฤดูกาลโดยคณะกรรมการกลุ่ม PGS')
-      )
-    )
   );
 
-  const farmerStatMeta = {
-    'แปลงปลูก': { icon: 'mapPin', color: 'kpi-emerald', unit: ' แปลง' },
-    'กิจกรรม': { icon: 'calendar', color: 'kpi-forest', unit: ' รายการ' },
-    'คำขอรอพิจารณา': { icon: 'clock', color: 'kpi-amber', unit: ' คำขอ' },
-    'ล็อตผลผลิต': { icon: 'package', color: 'kpi-forest', unit: ' ล็อต' }
-  };
+  // 4. One Compact Important Status Banner (no 14-day track on Home)
+  let bannerTone = 'success';
+  let bannerIcon = 'checkCircle';
+  let bannerTitle = 'สถานะแปลงและคำขอเรียบร้อยดี';
+  let bannerSub = lots.length > 0
+    ? `มีล็อตผลผลิต ${lots.length} ล็อต • แตะเพื่อจัดการคำขอ`
+    : 'พร้อมบันทึกกิจกรรมหรือสร้างล็อตผลผลิต';
+  let bannerTarget = 'approval';
 
-  const farmerKpiGrid = el('div', { className: 'grid kpi-grid' },
-    [['แปลงปลูก', plots.length],
-     ['กิจกรรม', activities.length],
-     ['คำขอรอพิจารณา', pendingCount],
-     ['ล็อตผลผลิต', lots.length]].map(([label, count]) => {
-      const meta = farmerStatMeta[label] || { icon: 'sprout', color: 'kpi-forest', unit: '' };
-      return el('div', { className: 'card kpi-card' },
-        el('div', { className: 'kpi-top' },
-          el('div', { className: `kpi-icon-badge ${meta.color}` }, icon(meta.icon, 16)),
-          el('span', { className: 'kpi-tag' }, label)
-        ),
-        el('div', { className: 'kpi-num' }, `${count}`, el('small', {}, meta.unit)),
-        el('div', { className: `kpi-bar ${meta.color.replace('kpi-', 'kpi-bar-')}` })
-      );
-    })
-  );
+  if (rejectedApprovals.length > 0) {
+    bannerTone = 'danger';
+    bannerIcon = 'xCircle';
+    bannerTitle = `คำขอใช้ปัจจัยไม่ผ่าน ${rejectedApprovals.length} รายการ`;
+    bannerSub = `${featuredApproval?.input_name || 'แผนปัจจัยการผลิต'} • แตะดูเหตุผลและส่งคำขอใหม่`;
+    bannerTarget = 'approval';
+  } else if (effectivePending > 0) {
+    bannerTone = 'warn';
+    bannerIcon = 'clock';
+    bannerTitle = `มีคำขอรอพิจารณา ${effectivePending} รายการ`;
+    bannerSub = 'ติดตามสถานะคำขอของคุณได้ที่นี่';
+    bannerTarget = 'approval';
+  } else if (isOverdue) {
+    bannerTone = 'warn';
+    bannerIcon = 'clock';
+    bannerTitle = 'ครบกำหนดบันทึกกิจกรรมแปลง';
+    bannerSub = daysSince !== null
+      ? `ขาดบันทึกมาแล้ว ${daysSince} วัน แตะเพื่อบันทึก`
+      : 'ยังไม่มีประวัติบันทึกในรอบ 14 วัน';
+    bannerTarget = 'record';
+  } else if (plots.length === 0) {
+    bannerTone = 'warn';
+    bannerIcon = 'mapPin';
+    bannerTitle = 'ยังไม่ได้ลงทะเบียนแปลงปลูก';
+    bannerSub = 'แตะเพื่อเพิ่มแปลงปลูกแรกของคุณ';
+    bannerTarget = 'plots';
+  }
 
-  const agroClimateWidget = el('div', { className: 'card agro-climate-card' },
-    el('div', { className: 'agro-climate-header' },
-      el('div', { className: 'agro-location-row' },
-        icon('mapPin', 15),
-        el('strong', {}, 'ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ'),
-        el('span', { className: 'agro-subtext' }, 'ดินแดนข้าวหอมมะลิทุ่งกุลาร้องไห้')
-      ),
-      el('span', { className: 'agro-weather-status' }, '☀️ แดดจัด • ลม ตอ./น. 12 กม./ชม.')
+  const statusBanner = el('button', {
+    type: 'button',
+    className: `farmer-status-banner farmer-status-summary-card tone-${bannerTone}`,
+    'aria-label': 'สถานะสำคัญ',
+    onclick: () => navigateTab(bannerTarget)
+  },
+    el('div', { className: `farmer-status-icon tone-${bannerTone}` }, icon(bannerIcon, 19)),
+    el('div', { className: 'farmer-status-texts' },
+      el('strong', {}, bannerTitle),
+      el('span', {}, bannerSub)
     ),
-    el('div', { className: 'grid agro-metrics-grid mt-12' },
-      el('div', { className: 'agro-metric-item' },
-        el('span', { className: 'agro-metric-label' }, 'อุณหภูมิ'),
-        el('div', { className: 'agro-metric-value' }, '32°C'),
-        el('span', { className: 'agro-metric-sub muted' }, 'สูงสุด 34° / ต่ำสุด 23°')
-      ),
-      el('div', { className: 'agro-metric-item' },
-        el('span', { className: 'agro-metric-label' }, 'ความชื้นสัมพัทธ์'),
-        el('div', { className: 'agro-metric-value' }, '62%'),
-        el('span', { className: 'agro-metric-sub muted' }, 'ระดับปกติ ปลอดเชื้อรา')
-      ),
-      el('div', { className: 'agro-metric-item' },
-        el('span', { className: 'agro-metric-label' }, 'ความชื้นผิวดิน'),
-        el('div', { className: 'agro-metric-value' }, '48%'),
-        el('span', { className: 'agro-metric-sub muted' }, 'เหมาะเตรียมดิน & ปุ๋ยหมัก')
-      )
-    ),
-    el('div', { className: 'agro-seasonal-tip mt-12' },
-      icon('sprout', 15),
-      el('span', {}, el('strong', {}, 'ปฏิทินอินทรีย์ ต.ผักไหม: '), 'ระยะเตรียมแปลงปลูกข้าวหอมมะลิ 105 — ไถกลบตอซัง ไม่เผาฟาง หว่านปอเทืองปรับปรุงดิน และตรวจเช็กคันดินแนวกันชนตามเกณฑ์ PGS')
-    )
-  );
-
-  const upcomingInspectionAlert = el('div', { className: 'alert-banner mb-16' },
-    el('div', { className: 'alert-icon' }, '📅'),
-    el('div', { className: 'alert-content' },
-      el('div', { className: 'alert-title' }, 'นัดหมายตรวจแปลงรอบที่ 2/2569'),
-      el('div', { className: 'alert-msg' }, 'สารวัตรเกษตร ICS จะเข้าสุ่มตรวจสารตกค้างในแปลงตามรอบมาตรฐาน PGS ผักไหม กรุณาเตรียมสมุดบันทึกแปลง')
-    )
+    icon('chevronRight', 18)
   );
 
   return [
-    farmerHeroCard,
-    serviceGrid,
-    recentMiniList,
-    upcomingInspectionAlert,
-    agroClimateWidget,
-    pgsCriteriaCard,
-    farmerKpiGrid
-  ].filter(Boolean);
+    greetingSection,
+    primaryTaskCard,
+    shortcutsSection,
+    statusBanner
+  ];
 }
 
 export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, navigateTab }) {
@@ -329,47 +251,42 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
   const plotSel = typeof plotSelect === 'function'
     ? plotSelect()
     : selectField('plot_id', 'แปลงปลูก', plots.map(p => ({ value: p.id, label: `${p.name} — ${p.crop}` })));
-  const kindSel = selectField('kind', 'ประเภทกิจกรรม', ['ปลูก', 'ให้น้ำ', 'ใส่ปุ๋ย', 'กำจัดวัชพืช', 'ป้องกันกำจัดศัตรูพืช', 'เก็บเกี่ยว', 'อื่นๆ'].map(value => ({ value, label: value })));
+  const kindInput = el('input', { name: 'kind', type: 'hidden', value: 'ปลูก' });
   const dateField = inputField('activity_date', 'วันที่ทำกิจกรรม', 'date', true, todayIso);
-  const inputUsedField = el('input', { name: 'input_used', type: 'text', maxlength: 120, placeholder: 'เช่น ปุ๋ยหมักอินทรีย์, แหนแดง, น้ำส้มควันไม้ (ถ้ามี)' });
+  const inputUsedField = el('input', { name: 'input_used', type: 'text', maxlength: 120, placeholder: 'เช่น ปุ๋ยหมักอินทรีย์, แหนแดง (ถ้ามี)' });
   const amountField = el('input', { name: 'amount_qty', type: 'text', maxlength: 60, placeholder: 'เช่น 20 กก., 5 ลิตร (ถ้ามี)' });
-  const detailsArea = el('textarea', { name: 'details', required: true, placeholder: 'ระบุการปฏิบัติงาน สภาพแปลง หรือสิ่งที่สังเกตเห็น' });
+  const detailsArea = el('textarea', { name: 'details', required: true, placeholder: 'ระบุสิ่งที่ทำในแปลงหรือสิ่งที่สังเกตเห็น' });
   const detailsError = el('small', { className: 'field-error hide' }, 'กรุณาระบุรายละเอียดกิจกรรมอย่างน้อยสั้น ๆ เพื่อให้ตรวจสอบย้อนกลับได้');
   const photoInput = el('input', { name: 'photo_url', type: 'url', placeholder: 'https://...' });
   const evidenceIdInput = el('input', { name: 'evidence_id', type: 'hidden', value: '' });
 
-  const quickPresets = [
-    { kindTag: 'ปลูก', label: 'ปลูกข้าวหอมมะลิ 105', kind: 'ปลูก', inputUsed: 'เมล็ดพันธุ์ข้าวหอมมะลิ 105 อินทรีย์', details: 'ปลูกข้าวหอมมะลิ 105 อินทรีย์ ตามมาตรฐานกลุ่มวิสาหกิจชุมชนผักไหม' },
-    { kindTag: 'ให้น้ำ', label: 'สูบน้ำเข้าแปลงนา', kind: 'ให้น้ำ', inputUsed: '', details: 'สูบน้ำเข้าแปลงนาอินทรีย์ ตรวจคันนาและแนวกันชนรอบแปลงเรียบร้อย' },
-    { kindTag: 'ใส่ปุ๋ย', label: 'ปล่อยแหนแดงบำรุงดิน', kind: 'ใส่ปุ๋ย', inputUsed: 'แหนแดงสด', details: 'ปล่อยแหนแดงในแปลงนาเพื่อบำรุงดินตามธรรมชาติ' },
-    { kindTag: 'ใส่ปุ๋ย', label: 'พ่นน้ำหมักชีวภาพ', kind: 'ใส่ปุ๋ย', inputUsed: 'น้ำหมักชีวภาพสูตรกลุ่ม', details: 'ฉีดพ่นปุ๋ยหมักอินทรีย์และจุลินทรีย์หน่อกล้วยตามสูตรที่ได้รับอนุมัติจาก ICS' },
-    { kindTag: 'ถอนหญ้า', label: 'ดายหญ้ารอบแปลง', kind: 'กำจัดวัชพืช', inputUsed: '', details: 'กำจัดวัชพืชด้วยแรงงานคนและตัดหญ้าแนวกันชนรอบแปลง ไม่ใช้สารเคมี' },
-    { kindTag: 'ป้องกันแมลง', label: 'พ่นน้ำส้มควันไม้', kind: 'ป้องกันกำจัดศัตรูพืช', inputUsed: 'น้ำส้มควันไม้', details: 'ฉีดพ่นน้ำส้มควันไม้เจือจางเพื่อไล่แมลงและเพลี้ย' },
-    { kindTag: 'บำรุงดิน', label: 'ไถกลบตอซังไม่เผาฟาง', kind: 'อื่นๆ', inputUsed: 'ปอเทืองบำรุงดิน', details: 'ไถกลบตอซังข้าวและหว่านปอเทืองบำรุงดิน ไม่เผาฟาง' },
-    { kindTag: 'เก็บเกี่ยว', label: 'เก็บเกี่ยวผลผลิต', kind: 'เก็บเกี่ยว', inputUsed: '', details: 'เก็บเกี่ยวผลผลิตอินทรีย์ ทำความสะอาดเครื่องมือก่อนเก็บเกี่ยว' }
+  const kindCategories = [
+    { kind: 'ปลูก', label: 'ปลูกพืช', iconName: 'sprout' },
+    { kind: 'ให้น้ำ', label: 'ให้น้ำ', iconName: 'twoLeaves' },
+    { kind: 'ใส่ปุ๋ย', label: 'ใส่ปุ๋ย', iconName: 'fertilizerBag' },
+    { kind: 'กำจัดวัชพืช', label: 'ดูแล / กำจัดวัชพืช', iconName: 'shield' },
+    { kind: 'เก็บเกี่ยว', label: 'เก็บเกี่ยว', iconName: 'package' },
+    { kind: 'อื่นๆ', label: 'อื่นๆ', iconName: 'moreHorizontal' }
   ];
 
-  const chipsGrid = el('div', { className: 'quick-chips-grid' });
-  quickPresets.forEach(preset => {
-    const btn = el('button', {
-      type: 'button',
-      className: 'chip-btn',
-      onclick: () => {
-        const kindSelect = kindSel.querySelector('select[name="kind"]');
-        if (kindSelect) kindSelect.value = preset.kind;
-        inputUsedField.value = preset.inputUsed;
-        detailsArea.value = preset.details;
-        detailsError.classList.add('hide');
-        chipsGrid.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        notify(`เลือกกิจกรรม: "${preset.label}"`);
-      }
-    },
-      el('span', { className: 'chip-tag' }, preset.kindTag),
-      el('span', { className: 'chip-text' }, preset.label)
-    );
-    chipsGrid.append(btn);
-  });
+  const kindChoiceGrid = el('div', { className: 'activity-kind-choice-grid' },
+    ...kindCategories.map(cat => {
+      const isInitial = cat.kind === 'ปลูก';
+      const cardBtn = el('button', {
+        type: 'button',
+        className: `kind-choice-card ${isInitial ? 'selected' : ''}`,
+        onclick: () => {
+          kindInput.value = cat.kind;
+          kindChoiceGrid.querySelectorAll('.kind-choice-card').forEach(c => c.classList.remove('selected'));
+          cardBtn.classList.add('selected');
+        }
+      },
+        icon(cat.iconName, 22),
+        el('span', { className: 'kind-choice-label' }, cat.label)
+      );
+      return cardBtn;
+    })
+  );
 
   let wizardStep = 1;
   const stepTabs = [
@@ -378,36 +295,29 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
     el('div', { className: 'wizard-step-pill' }, '3. ทบทวนแล้วบันทึก')
   ];
   const reviewBox = el('div', { className: 'wizard-review-box' });
-  const submitBtn = el('button', { type: 'submit', id: 'recordSubmitBtn' }, icon('checkCircle', 16), ' บันทึกกิจกรรม');
+  const submitBtn = el('button', { type: 'submit', id: 'recordSubmitBtn', className: 'approval-btn-primary' }, icon('checkCircle', 16), ' บันทึกกิจกรรม');
 
   const step1Panel = el('div', { className: 'wizard-panel' },
-    el('div', { className: 'senior-step-guide' },
-      icon('info', 15),
-      el('span', {}, 'ขั้นตอนที่ 1 จาก 3: เลือกแปลงปลูก แล้วแตะปุ่มลัดด้านล่างเพื่อเลือกงานที่ทำวันนี้ได้ทันทีโดยไม่ต้องพิมพ์เอง')
-    ),
     plotSel,
-    el('small', { className: 'muted helper-label' }, 'เลือกงานที่ใช้บ่อยจากปุ่มลัด หรือเลือกประเภทด้านล่าง:'),
-    chipsGrid,
-    kindSel,
+    el('label', { className: 'form-section-heading mt-10 mb-6' }, 'ประเภทกิจกรรม *'),
+    kindChoiceGrid,
+    kindInput,
     dateField,
-    el('div', { className: 'row mt-12' },
+    el('div', { className: 'wizard-actions-row mt-14' },
       el('button', {
         type: 'button',
         id: 'wizardNext1Btn',
+        className: 'approval-btn-primary',
         onclick: () => setWizardStep(2)
       }, 'ถัดไป: ระบุรายละเอียด')
     )
   );
 
   const step2Panel = el('div', { className: 'wizard-panel hide' },
-    el('div', { className: 'senior-step-guide' },
-      icon('info', 15),
-      el('span', {}, 'ขั้นตอนที่ 2 จาก 3: ตรวจสอบหรือพิมพ์รายละเอียดเพิ่มเติม (สามารถกดปุ่ม "บันทึกด้วยเสียง" เพื่อพูดแทนการพิมพ์) และถ่ายรูปแปลงหากมี')
-    ),
     el('label', {}, 'ปัจจัยที่ใช้ (ถ้ามี)', inputUsedField),
     el('label', {}, 'ปริมาณและหน่วย (ถ้ามี)', amountField),
     el('label', {},
-      'รายละเอียดกิจกรรม',
+      'รายละเอียดกิจกรรม *',
       detailsArea,
       detailsError,
       createVoiceInput(detailsArea)
@@ -422,11 +332,12 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
         evidenceIdInput,
       })
     ),
-    el('div', { className: 'row between mt-12' },
-      el('button', { type: 'button', className: 'secondary', onclick: () => setWizardStep(1) }, 'ย้อนกลับ'),
+    el('div', { className: 'wizard-actions-split mt-12' },
+      el('button', { type: 'button', className: 'secondary wizard-back-btn', onclick: () => setWizardStep(1) }, 'ย้อนกลับ'),
       el('button', {
         type: 'button',
         id: 'wizardNext2Btn',
+        className: 'approval-btn-primary',
         onclick: () => {
           if (!detailsArea.value.trim()) {
             detailsError.classList.remove('hide');
@@ -441,43 +352,38 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
   );
 
   const step3Panel = el('div', { className: 'wizard-panel hide' },
-    el('div', { className: 'senior-step-guide' },
-      icon('checkCircle', 15),
-      el('span', {}, 'ขั้นตอนสุดท้าย (3 จาก 3): ตรวจสอบข้อมูลในกรอบด้านล่าง หากถูกต้องแล้วให้กดปุ่มสีเขียว "บันทึกกิจกรรม"')
-    ),
     reviewBox,
-    el('div', { className: 'row between mt-12' },
-      el('button', { type: 'button', className: 'secondary', onclick: () => setWizardStep(2) }, 'แก้ไขข้อมูล'),
+    el('div', { className: 'wizard-actions-split mt-12' },
+      el('button', { type: 'button', className: 'secondary wizard-back-btn', onclick: () => setWizardStep(2) }, 'แก้ไขข้อมูล'),
       submitBtn
     )
   );
 
   const renderReviewBox = () => {
     const plotSelectEl = plotSel.querySelector('select[name="plot_id"]');
-    const kindSelectEl = kindSel.querySelector('select[name="kind"]');
     const dateInputEl = dateField.querySelector('input[name="activity_date"]');
     const plotLabel = plotSelectEl?.selectedOptions?.[0]?.textContent || '-';
     const inputText = [inputUsedField.value.trim(), amountField.value.trim()].filter(Boolean).join(' • ');
     const attachedPhoto = photoInput.dataset.uploadedDataUrl || photoInput.value.trim();
     reviewBox.replaceChildren(
       el('div', { className: 'passport-row' }, el('b', {}, 'แปลงปลูก:'), el('span', {}, plotLabel)),
-      el('div', { className: 'passport-row' }, el('b', {}, 'ประเภทกิจกรรม:'), el('span', {}, kindSelectEl?.value || '-')),
+      el('div', { className: 'passport-row' }, el('b', {}, 'ประเภทกิจกรรม:'), el('span', {}, kindInput.value || '-')),
       el('div', { className: 'passport-row' }, el('b', {}, 'วันที่ทำกิจกรรม:'), el('span', {}, dateInputEl?.value || '-')),
       inputText ? el('div', { className: 'passport-row' }, el('b', {}, 'ปัจจัยและปริมาณ:'), el('span', {}, inputText)) : null,
       el('div', { className: 'passport-row' }, el('b', {}, 'รายละเอียด:'), el('span', {}, detailsArea.value.trim() || '-')),
       evidenceIdInput.value
         ? el('div', { className: 'passport-row' }, el('b', {}, 'ภาพหลักฐาน:'), el('span', { className: 'pill success' }, `อัปโหลดแล้ว (#${evidenceIdInput.value})`))
         : (attachedPhoto.startsWith('data:')
-            ? el('div', { className: 'passport-row' },
-                el('b', {}, 'ภาพถ่ายแนบ:'),
-                el('img', {
-                  src: attachedPhoto,
-                  className: 'activity-photo-thumb',
-                  alt: 'ตัวอย่างภาพถ่ายที่แนบ',
-                  onclick: () => openPhotoPreviewModal(attachedPhoto, 'ตัวอย่างภาพถ่ายที่แนบ')
-                })
-              )
-            : null)
+          ? el('div', { className: 'passport-row' },
+            el('b', {}, 'ภาพถ่ายแนบ:'),
+            el('img', {
+              src: attachedPhoto,
+              className: 'activity-photo-thumb',
+              alt: 'ตัวอย่างภาพถ่ายที่แนบ',
+              onclick: () => openPhotoPreviewModal(attachedPhoto, 'ตัวอย่างภาพถ่ายที่แนบ')
+            })
+          )
+          : null)
     );
   };
 
@@ -493,8 +399,8 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
     if (wizardStep === 3) renderReviewBox();
   };
 
-  const recordForm = el('form', { id: 'recordForm', className: 'card', novalidate: true },
-    el('h3', {}, icon('calendar', 16), ' บันทึกกิจกรรมแปลง'),
+  const recordForm = el('form', { id: 'recordForm', className: 'card approval-form-card', novalidate: true },
+    el('h3', { className: 'approval-form-title' }, icon('calendar', 18), ' บันทึกกิจกรรมแปลง'),
     el('div', { className: 'wizard-steps' }, ...stepTabs),
     step1Panel,
     step2Panel,
@@ -534,6 +440,357 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
   });
 
   return recordForm;
+}
+
+export function buildFarmerActivityHistorySection({ plots = [], activities = [], navigateTab }) {
+  const nodes = [];
+
+  const rhythmContent = plots.length === 0
+    ? empty('ยังไม่มีแปลงปลูกในระบบ', 'เพิ่มแปลงปลูกแรกของคุณ', () => navigateTab('plots'))
+    : plots.length === 1
+      ? create14DayRhythmTrack(plots[0].id, activities, { compact: true })
+      : el('div', { className: 'farmer-rhythm-list' },
+        ...plots.map(p => create14DayRhythmTrack(p.id, activities, { compact: true }))
+      );
+
+  nodes.push(
+    el('section', { className: 'card activity-rhythm-card', 'aria-label': 'ความต่อเนื่อง 14 วันล่าสุด' },
+      el('div', { className: 'farmer-continuity-header' },
+        el('span', {}, 'ความต่อเนื่องการบันทึก (14 วันล่าสุด)'),
+        plots.length === 1 ? el('small', { className: 'muted' }, plots[0].name) : null
+      ),
+      rhythmContent
+    )
+  );
+
+  nodes.push(el('h3', { className: 'farmer-section-heading mt-10' }, `ประวัติกิจกรรม (${activities.length})`));
+
+  if (!activities.length) {
+    nodes.push(empty('ยังไม่มีการบันทึกกิจกรรม'));
+    return nodes;
+  }
+
+  for (const item of activities) {
+    const box = card(
+      el('div', { className: 'row between' },
+        el('b', {}, item.kind),
+        el('span', { className: 'pill' }, icon('calendar', 11), ' ', item.activity_date)
+      ),
+      el('p', { className: 'farmer-card-meta' }, item.plot_name || '-'),
+      el('p', { className: 'farmer-card-body' }, item.details)
+    );
+    box.classList.add('farmer-list-card');
+
+    if (item.evidence_id) {
+      box.append(el('button', {
+        type: 'button',
+        className: 'link-btn',
+        onclick: () => openEvidenceViewer(item.evidence_id)
+      }, icon('camera', 13), ' ดูภาพหลักฐานที่อัปโหลด'));
+    }
+
+    if (item.photo_url) {
+      const appendDataThumb = () => {
+        box.append(
+          el('div', { className: 'activity-photo-row mt-8' },
+            el('img', {
+              src: item.photo_url,
+              className: 'activity-photo-thumb',
+              alt: `ภาพกิจกรรม ${item.kind || ''}`.trim(),
+              onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+            }),
+            el('button', {
+              type: 'button',
+              className: 'link-btn',
+              onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+            }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)')
+          )
+        );
+      };
+
+      try {
+        const parsed = new URL(item.photo_url);
+        if (parsed.protocol === 'https:') {
+          box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูลิงก์ภาพภายนอก'));
+        } else if (item.photo_url.startsWith('data:')) {
+          appendDataThumb();
+        }
+      } catch {
+        if (item.photo_url.startsWith('data:')) appendDataThumb();
+      }
+    }
+
+    nodes.push(box);
+  }
+
+  return nodes;
+}
+
+export function buildFarmerPlotsView({ plots = [], reloadTab, navigateTab }) {
+  const root = el('div', { className: 'farmer-screen-root' });
+  let mode = 'list';
+  let editingPlot = null;
+  let queryText = '';
+
+  const buildPlotCard = (plot) => {
+    const conversionYear = plot.conversion_year || '';
+    const box = el('div', { className: 'card farmer-list-card' },
+      el('div', { className: 'row between' },
+        el('b', { className: 'farmer-card-title' }, `${plot.plot_code ? `[${plot.plot_code}] ` : ''}${plot.name}`),
+        el('span', { className: 'pill success' }, icon('leaf', 11), ' ', plot.crop)
+      ),
+      conversionYear ? el('div', { className: 'plot-badges-row' },
+        el('span', { className: 'pill' }, `ระยะปรับเปลี่ยน: ${conversionYear}`)
+      ) : null,
+      el('p', { className: 'farmer-card-meta' }, `ขนาดพื้นที่: ${plot.area || 'ไม่ระบุ'} • สร้างเมื่อ ${dated(plot.created_at)}`),
+      el('div', { className: 'farmer-card-actions' },
+        el('button', {
+          type: 'button',
+          className: 'secondary btn-sm',
+          onclick: () => { editingPlot = plot; mode = 'edit'; render(); }
+        }, icon('edit', 14), ' แก้ไข'),
+        el('button', {
+          type: 'button',
+          className: 'secondary btn-sm',
+          onclick: () => navigateTab?.('record')
+        }, icon('calendar', 14), ' บันทึกกิจกรรม')
+      )
+    );
+    return box;
+  };
+
+  const renderFormMode = (isEdit) => {
+    const backBtn = el('button', {
+      type: 'button',
+      id: isEdit ? 'cancelEditPlotBtn' : 'cancelAddPlotBtn',
+      className: 'screen-inline-back',
+      onclick: () => { mode = 'list'; editingPlot = null; render(); }
+    }, icon('chevronLeft', 16), ' กลับรายการแปลง');
+
+    const submitBtn = el('button', { type: 'submit', className: 'approval-btn-primary' },
+      icon('checkCircle', 17), isEdit ? 'บันทึกการแก้ไข' : 'บันทึกแปลงปลูก'
+    );
+    const cancelBtn = el('button', {
+      type: 'button',
+      className: 'approval-btn-secondary',
+      onclick: () => { mode = 'list'; editingPlot = null; render(); }
+    }, 'ยกเลิก');
+
+    const form = el('form', {
+      id: isEdit ? 'editPlotForm' : 'plotForm',
+      className: 'approval-form-stack'
+    },
+      inputField('name', 'ชื่อแปลง (เช่น แปลง A-03 ข้าวหอมมะลิ 105)', 'text', true, isEdit ? editingPlot?.name || '' : ''),
+      inputField('crop', 'พืชที่ปลูก (เช่น ข้าวหอมมะลิ 105, ถั่วเหลืองอินทรีย์)', 'text', true, isEdit ? editingPlot?.crop || '' : ''),
+      inputField('area', 'ขนาดพื้นที่ / รายละเอียด (เช่น 2 ไร่, แปลงโซน A)', 'text', false, isEdit ? editingPlot?.area || '' : ''),
+      el('div', { className: 'approval-form-actions' }, submitBtn, cancelBtn)
+    );
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (submitBtn.disabled) return;
+      const values = Object.fromEntries(new FormData(form));
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'กำลังบันทึก...';
+      try {
+        if (isEdit && editingPlot) {
+          await api(`/plots/${editingPlot.id}`, 'PATCH', values);
+          notify('แก้ไขแปลงสำเร็จ');
+        } else {
+          await api('/plots', 'POST', values);
+          notify('เพิ่มแปลงปลูกสำเร็จ');
+        }
+        if (typeof reloadTab === 'function') await reloadTab();
+      } catch (err) {
+        if (!err.handled) notify(err.message);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    const formCard = el('section', { className: 'card approval-form-card' },
+      el('h3', { className: 'approval-form-title' },
+        icon(isEdit ? 'edit' : 'mapPin', 18),
+        isEdit ? ` แก้ไขข้อมูล: ${editingPlot?.name || ''}` : ' เพิ่มแปลงปลูกใหม่'
+      ),
+      form
+    );
+
+    root.replaceChildren(backBtn, formCard);
+  };
+
+  const renderListMode = () => {
+    const viewChildren = [
+      el('div', { className: 'farmer-screen-header-row' },
+        el('h3', { className: 'farmer-screen-heading' }, `แปลงปลูกของฉัน (${plots.length})`),
+        el('button', {
+          type: 'button',
+          id: 'openAddPlotBtn',
+          className: 'farmer-add-pill-btn',
+          onclick: () => { mode = 'add'; render(); }
+        }, icon('plus', 15), ' เพิ่มแปลง')
+      )
+    ];
+
+    if (!plots.length) {
+      viewChildren.push(empty('ยังไม่มีแปลงปลูกในระบบ กดปุ่ม "+ เพิ่มแปลง" ด้านบนเพื่อสร้างแปลงแรก'));
+      root.replaceChildren(...viewChildren);
+      return;
+    }
+
+    const cardsList = el('div', { className: 'cards-list' }, ...plots.map(buildPlotCard));
+    if (plots.length > 2) {
+      const searchInput = el('input', {
+        type: 'search',
+        value: queryText,
+        placeholder: 'ค้นหาชื่อแปลง หรือพืชที่ปลูก...',
+        oninput: (e) => {
+          queryText = e.target.value.trim().toLowerCase();
+          const filtered = plots.filter(p =>
+            !queryText ||
+            String(p.name || '').toLowerCase().includes(queryText) ||
+            String(p.crop || '').toLowerCase().includes(queryText) ||
+            String(p.plot_code || '').toLowerCase().includes(queryText)
+          );
+          cardsList.replaceChildren(...(!filtered.length ? [empty('ไม่พบแปลงที่ตรงกับคำค้นหา')] : filtered.map(buildPlotCard)));
+        }
+      });
+      viewChildren.push(el('div', { className: 'search-filter-box' }, icon('search', 15), searchInput));
+    }
+
+    viewChildren.push(cardsList);
+    root.replaceChildren(...viewChildren);
+  };
+
+  const render = () => {
+    if (mode === 'add') renderFormMode(false);
+    else if (mode === 'edit') renderFormMode(true);
+    else renderListMode();
+  };
+
+  render();
+  return [root];
+}
+
+export function buildFarmerLotsView({ plots = [], rows = [], plotSelect, reloadTab, navigateTab, onOpenPassport }) {
+  const root = el('div', { className: 'farmer-screen-root' });
+  let mode = 'list';
+
+  const renderListMode = () => {
+    const viewChildren = [
+      el('div', { className: 'farmer-screen-header-row' },
+        el('h3', { className: 'farmer-screen-heading' }, `ล็อตผลผลิต (${rows.length})`),
+        plots.length > 0 ? el('button', {
+          type: 'button',
+          id: 'openAddLotBtn',
+          className: 'farmer-add-pill-btn',
+          onclick: () => { mode = 'add'; render(); }
+        }, icon('plus', 15), ' สร้างล็อตใหม่') : null
+      )
+    ];
+
+    if (!plots.length && !rows.length) {
+      viewChildren.push(empty('ยังไม่มีแปลงปลูก กรุณาเพิ่มแปลงปลูกก่อนสร้างล็อตผลผลิต', 'ไปหน้าแปลงปลูก', () => navigateTab?.('plots')));
+      root.replaceChildren(...viewChildren);
+      return;
+    }
+
+    if (!rows.length) {
+      viewChildren.push(empty('ยังไม่มีล็อตผลผลิต กดปุ่ม "+ สร้างล็อตใหม่" ด้านบนเพื่อสร้างล็อต'));
+      root.replaceChildren(...viewChildren);
+      return;
+    }
+
+    for (const item of rows) {
+      const lotStatusBadge = item.ics_review_status === 'approved'
+        ? statusBadge('normal', 'ผ่านการตรวจ ICS (ตัวอย่าง)')
+        : statusBadge('warn', 'รอเชื่อมผลตรวจ');
+
+      const box = el('div', { className: 'card farmer-list-card' },
+        el('div', { className: 'row between' },
+          el('b', { className: 'lot-title-text farmer-card-title' }, `ล็อต ${item.code || item.lot_code}`),
+          lotStatusBadge
+        ),
+        el('p', { className: 'farmer-card-body' }, `ชนิดผลผลิต: ${item.crop || '-'}`),
+        el('p', { className: 'farmer-card-meta' }, `แปลง: ${item.linked_plots || item.plot_name || '-'}`),
+        el('p', { className: 'farmer-card-meta' }, `ปริมาณ: ${item.total_bags_or_kg || `${item.quantity} กก.`} • เก็บเกี่ยว: ${dated(item.harvest_date)}`),
+        el('div', { className: 'mt-10' },
+          el('button', {
+            type: 'button',
+            className: 'approval-btn-secondary passport-trigger-btn',
+            onclick: () => onOpenPassport?.(item)
+          }, icon('fileText', 15), ' เปิดดูใบรับรองข้อมูลย้อนกลับ')
+        )
+      );
+      viewChildren.push(box);
+    }
+
+    root.replaceChildren(...viewChildren);
+  };
+
+  const renderAddMode = () => {
+    const backBtn = el('button', {
+      type: 'button',
+      id: 'cancelAddLotBtn',
+      className: 'screen-inline-back',
+      onclick: () => { mode = 'list'; render(); }
+    }, icon('chevronLeft', 16), ' กลับรายการล็อต');
+
+    const submitBtn = el('button', { type: 'submit', className: 'approval-btn-primary' },
+      icon('checkCircle', 17), 'บันทึกล็อตผลผลิต'
+    );
+    const cancelBtn = el('button', {
+      type: 'button',
+      className: 'approval-btn-secondary',
+      onclick: () => { mode = 'list'; render(); }
+    }, 'ยกเลิก');
+
+    const plotSel = typeof plotSelect === 'function'
+      ? plotSelect()
+      : selectField('plot_id', 'แปลงปลูก', plots.map(p => ({ value: p.id, label: `${p.name} — ${p.crop}` })));
+    const todayIso = formatLocalIsoDate(new Date());
+
+    const lotForm = el('form', { id: 'lotForm', className: 'approval-form-stack' },
+      plotSel,
+      inputField('code', 'รหัสล็อต (เช่น L-12, LOT-2026-001)'),
+      inputField('crop', 'ชนิดผลผลิต (เช่น ข้าวหอมมะลิ 105, ถั่วเหลืองอินทรีย์)'),
+      inputField('harvest_date', 'วันที่เก็บเกี่ยว', 'date', true, todayIso),
+      inputField('quantity', 'ปริมาณผลผลิต (กิโลกรัม)', 'number'),
+      el('div', { className: 'approval-form-actions' }, submitBtn, cancelBtn)
+    );
+
+    lotForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (submitBtn.disabled) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'กำลังบันทึก...';
+      try {
+        await api('/lots', 'POST', Object.fromEntries(new FormData(lotForm)));
+        notify('สร้างล็อตผลผลิตสำเร็จ');
+        if (typeof reloadTab === 'function') await reloadTab();
+      } catch (err) {
+        if (!err.handled) notify(err.message);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    root.replaceChildren(
+      backBtn,
+      el('section', { className: 'card approval-form-card' },
+        el('h3', { className: 'approval-form-title' }, icon('package', 18), ' สร้างล็อตผลผลิตใหม่'),
+        lotForm
+      )
+    );
+  };
+
+  const render = () => {
+    if (mode === 'add') renderAddMode();
+    else renderListMode();
+  };
+
+  render();
+  return [root];
 }
 
 export function openContactIcsDialog(me = null) {
@@ -586,323 +843,397 @@ export function openContactIcsDialog(me = null) {
 }
 
 export function buildFarmerApprovalView({ plots = [], rows = [], me = null, plotSelect, reloadTab, navigateTab }) {
-  const nodes = [];
-
   if (!plots.length) {
-    nodes.push(empty('กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถส่งคำขออนุมัติปัจจัยการผลิตได้', 'ไปหน้าแปลงปลูก', () => navigateTab('plots')));
-    return nodes;
+    return [empty('กรุณาเพิ่มแปลงปลูกก่อน จึงจะสามารถส่งคำขออนุมัติปัจจัยการผลิตได้', 'ไปหน้าแปลงปลูก', () => navigateTab('plots'))];
   }
 
-  // 1. Featured Status Alert Card (matches the reference design: แผนการใส่ปุ๋ย [ไม่ผ่านการอนุมัติ])
-  const featured = rows.find(r => r.status === 'rejected') || rows.find(r => r.status === 'pending') || rows[0];
-  if (featured) {
-    const isRejected = featured.status === 'rejected';
-    const isApproved = featured.status === 'approved';
-    const cardTone = isRejected ? 'rejected' : isApproved ? 'approved' : 'pending';
-    const badgeLabel = isRejected ? 'ไม่ผ่านการอนุมัติ' : isApproved ? 'ผ่านการอนุมัติ' : 'รอการพิจารณา';
-    const docIconName = isRejected ? 'docReject' : isApproved ? 'checkCircle' : 'clipboard';
-    const evalDateText = dated(featured.reviewed_at || featured.created_at);
+  const root = el('div', { className: 'approval-screen-root' });
+  let mode = 'status'; // 'status' | 'form'
 
-    const reasonText = featured.comment || featured.details || '';
-    const bulletItems = reasonText
-      .split(/\r?\n|\|/)
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    const featuredCard = el('div', { className: `approval-hero-alert tone-${cardTone}` },
-      el('div', { className: 'approval-hero-top' },
-        el('div', { className: `approval-doc-circle tone-${cardTone}` },
-          icon(docIconName, 28)
-        ),
-        el('div', { className: 'approval-hero-heading' },
-          el('div', { className: 'approval-title-line' },
-            el('h3', { className: 'approval-main-title' }, featured.input_name || 'แผนการใส่ปุ๋ย'),
-            el('span', { className: `approval-status-pill tone-${cardTone}` }, badgeLabel)
-          ),
-          el('div', { className: 'approval-date-sub' }, `วันที่ประเมิน : ${evalDateText} • แปลง: ${featured.plot_name || '-'}`)
-        )
-      ),
-      el('div', { className: `approval-reason-card tone-${cardTone}` },
-        el('b', { className: 'approval-reason-title' },
-          isRejected
-            ? 'เหตุผลในการไม่อนุมัติ'
-            : isApproved
-            ? 'ความเห็นการอนุมัติจากเจ้าหน้าที่ ICS'
-            : 'รายละเอียดสูตรที่ส่งให้เจ้าหน้าที่ ICS ตรวจสอบ'
-        ),
-        el('ul', { className: 'approval-reason-bullets' },
-          ...(bulletItems.length
-            ? bulletItems.map(line => el('li', {}, line))
-            : [el('li', {}, 'รอเจ้าหน้าที่ ICS ตรวจสอบความสอดคล้องตามมาตรฐานอินทรีย์')])
-        )
-      )
-    );
-    nodes.push(featuredCard);
-  }
-
-  // 2. "กรุณาดำเนินการต่อ" Action Section (2-column layout: ส่งปุ๋ยสูตรใหม่ + ติดต่อเจ้าหน้าที่)
-  const plotSel = typeof plotSelect === 'function'
-    ? plotSelect()
-    : selectField('plot_id', 'แปลงปลูก', plots.map(p => ({ value: p.id, label: `${p.name} — ${p.crop}` })));
-  const inputNameField = el('input', {
-    name: 'input_name',
-    type: 'text',
-    required: true,
-    placeholder: 'เช่น ปุ๋ยหมักอินทรีย์บำรุงดิน (สูตรปรับปรุง), น้ำหมักสมุนไพร'
-  });
-  const detailsField = el('textarea', {
-    name: 'details',
-    required: true,
-    maxlength: 500,
-    rows: 3,
-    placeholder: 'พิมพ์รายละเอียดสูตรปุ๋ยที่ปรับปรุง...'
-  });
-  const charCounter = el('div', { className: 'voice-char-counter' }, '0 / 500');
-  detailsField.addEventListener('input', () => {
-    charCounter.textContent = `${detailsField.value.length} / 500`;
-  });
-
-  // Voice assist dialog with speech recognition and Thai community voice presets
-  const openVoicePresetSelector = () => {
-    const previousFocus = document.activeElement;
-    const overlay = el('div', {
-      className: 'voice-dialog-overlay',
-      role: 'dialog',
-      'aria-modal': 'true',
-      'aria-label': 'ระบบบันทึกเสียงพูดภาษาไทย'
+  const renderFormView = () => {
+    const plotSel = typeof plotSelect === 'function'
+      ? plotSelect()
+      : selectField('plot_id', 'แปลงปลูก', plots.map(p => ({ value: p.id, label: `${p.name} — ${p.crop}` })));
+    const inputNameField = el('input', {
+      name: 'input_name',
+      type: 'text',
+      required: true,
+      placeholder: 'เช่น ปุ๋ยหมักอินทรีย์บำรุงดิน (สูตรปรับปรุง), น้ำหมักสมุนไพร'
+    });
+    const detailsField = el('textarea', {
+      name: 'details',
+      required: true,
+      maxlength: 500,
+      rows: 4,
+      placeholder: 'ระบุส่วนผสม วิธีทำ และอัตราการใช้ต่อไร่...'
+    });
+    const charCounter = el('div', { className: 'voice-char-counter' }, '0 / 500');
+    detailsField.addEventListener('input', () => {
+      charCounter.textContent = `${detailsField.value.length} / 500`;
     });
 
-    const closeDialog = () => {
-      overlay.remove();
-      document.removeEventListener('keydown', onKeyDown);
-      if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
-    };
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') closeDialog();
-    };
-    document.addEventListener('keydown', onKeyDown);
+    const openVoicePresetSelector = () => {
+      const previousFocus = document.activeElement;
+      const overlay = el('div', {
+        className: 'voice-dialog-overlay',
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-label': 'ระบบบันทึกเสียงพูดภาษาไทย'
+      });
 
-    const applyText = (text) => {
-      let i = 0;
-      detailsField.value = '';
-      charCounter.textContent = '0 / 500';
-      closeDialog();
-      detailsField.focus();
-      const timer = setInterval(() => {
-        if (i < text.length) {
-          detailsField.value += text[i];
-          charCounter.textContent = `${detailsField.value.length} / 500`;
-          i++;
-        } else {
-          clearInterval(timer);
-          notify(`บันทึกเสียงพูดสำเร็จ: "${text.slice(0, 32)}..."`);
+      const closeDialog = () => {
+        overlay.remove();
+        document.removeEventListener('keydown', onKeyDown);
+        if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+      };
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') closeDialog();
+      };
+      document.addEventListener('keydown', onKeyDown);
+
+      const applyText = (text) => {
+        detailsField.value = text.slice(0, 500);
+        charCounter.textContent = `${detailsField.value.length} / 500`;
+        closeDialog();
+        detailsField.focus();
+        notify(`กรอกรายละเอียดจากเสียงสำเร็จ`);
+      };
+
+      const sampleChoices = [
+        {
+          author: 'สูตรน้ำหมักสมุนไพร (ใบสะเดา + พริก)',
+          text: 'สูตรปรับปรุง: ใช้น้ำหมักชีวภาพสูตรใบสะเดาและพริกแกง เจือจาง 1 ต่อ 500 ฉีดพ่นขับไล่เพลี้ยช่วงเย็นสัปดาห์ละครั้ง'
+        },
+        {
+          author: 'สูตรปุ๋ยหมักมูลวัวนม 30 วัน',
+          text: 'สูตรปรับปรุง: ปุ๋ยหมักมูลวัวนมในฟาร์มอินทรีย์ผสมแกลบดำและรำละเอียด หมักกลับกองครบ 30 วัน อัตรา 40 กิโลกรัมต่อไร่'
+        },
+        {
+          author: 'สูตรน้ำส้มควันไม้เจือจาง',
+          text: 'สูตรปรับปรุง: ใช้น้ำส้มควันไม้เจือจาง 1 ต่อ 200 ฉีดพ่นทางใบช่วงเช้าตรู่ทุก 10 วัน'
         }
-      }, 10);
+      ];
+
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      const modalCard = el('div', { className: 'voice-dialog-card' },
+        el('div', { className: 'voice-dialog-header' },
+          el('h4', { className: 'voice-dialog-title' }, icon('mic', 18), ' ระบบบันทึกด้วยเสียงภาษาไทย'),
+          el('button', {
+            type: 'button',
+            className: 'voice-dialog-close-btn',
+            'aria-label': 'ปิดหน้าต่าง',
+            onclick: closeDialog
+          }, icon('x', 16))
+        ),
+        el('p', { className: 'muted text-sm' }, 'เลือกสูตรตัวอย่างสำหรับสาธิต หรือแตะพูดสดผ่านไมค์:'),
+        el('div', { className: 'voice-choices-list mt-12' },
+          ...sampleChoices.map(sc => el('button', {
+            type: 'button',
+            className: 'voice-choice-btn',
+            onclick: () => applyText(sc.text)
+          },
+            el('strong', { className: 'voice-choice-author' }, sc.author),
+            el('span', { className: 'voice-choice-quote' }, `"${sc.text}"`)
+          ))
+        ),
+        SpeechRec ? el('button', {
+          type: 'button',
+          className: 'btn-record-live mt-12',
+          onclick: () => {
+            closeDialog();
+            try {
+              const rec = new SpeechRec();
+              rec.lang = 'th-TH';
+              rec.continuous = false;
+              rec.interimResults = false;
+              notify('กำลังรับฟังเสียงพูดภาษาไทย...');
+              rec.onresult = (e) => {
+                const transcript = e.results[0]?.[0]?.transcript || '';
+                if (transcript) {
+                  detailsField.value = ((detailsField.value ? detailsField.value + ' ' : '') + transcript).slice(0, 500);
+                  charCounter.textContent = `${detailsField.value.length} / 500`;
+                  notify(`แปลงเสียงสำเร็จ: "${transcript}"`);
+                }
+              };
+              rec.onerror = () => notify('ไม่สามารถรับเสียงได้ กรุณาพิมพ์ข้อความหรือเลือกสูตร');
+              rec.start();
+            } catch {
+              notify('ไม่สามารถเปิดไมโครโฟนได้');
+            }
+          }
+        }, icon('mic', 16), ' กดเพื่อพูดสดด้วยไมค์ภาษาไทย') : null
+      );
+
+      overlay.append(modalCard);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
+      document.body.append(overlay);
     };
 
-    const sampleChoices = [
+    const embeddedMicBtn = el('button', {
+      type: 'button',
+      className: 'embedded-mic-btn',
+      title: 'พูดรายละเอียดสูตรปุ๋ยด้วยเสียง',
+      'aria-label': 'พูดรายละเอียดสูตรปุ๋ยด้วยเสียง',
+      onclick: openVoicePresetSelector
+    }, icon('mic', 18));
+
+    const presetFormulas = [
       {
-        author: 'คุณสมปอง คำภา (เกษตรกรแปลง A-03)',
-        text: 'สูตรปรับปรุง: ใช้น้ำหมักชีวภาพสูตรใบสะเดาและพริกแกง เจือจาง 1 ต่อ 500 ฉีดพ่นขับไล่เพลี้ยช่วงเย็นสัปดาห์ละครั้ง'
+        label: 'ปุ๋ยหมักมูลวัว + แกลบดำ (30 วัน)',
+        name: 'ปุ๋ยหมักอินทรีย์บำรุงดิน (ทำเอง)',
+        details: 'สูตร: มูลวัวในฟาร์มอินทรีย์ + แกลบดำ + รำอ่อน + จุลินทรีย์หน่อกล้วย หมักกลับกองครบ 30 วัน อัตรา 40 กก./ไร่'
       },
       {
-        author: 'คุณบัวผัน ศรีห้วยทับทัน (เกษตรกรแปลง B-01)',
-        text: 'สูตรปรับปรุง: ปุ๋ยหมักมูลวัวนมในฟาร์มอินทรีย์ผสมแกลบดำและรำละเอียด หมักกลับกองครบ 30 วัน อัตรา 40 กิโลกรัมต่อไร่'
-      },
-      {
-        author: 'คุณทองมี แก้วกัลยา (เกษตรกรแปลง C-12)',
-        text: 'สูตรปรับปรุง: ใช้น้ำส้มควันไม้เจือจาง 1 ต่อ 200 ฉีดพ่นทางใบช่วงเช้าตรู่ทุก 10 วัน'
+        label: 'น้ำหมักสมุนไพรไล่แมลง (7 วัน)',
+        name: 'น้ำหมักสมุนไพรไล่แมลง (ทำเอง)',
+        details: 'สูตร: ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน ใช้ป้องกันหนอนและเพลี้ยไฟ ตามเกณฑ์มาตรฐานเกษตรอินทรีย์ PGS'
       }
     ];
 
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    const card = el('div', { className: 'voice-dialog-card' },
-      el('div', { className: 'voice-dialog-header' },
-        el('h4', { className: 'voice-dialog-title' }, icon('mic', 18), ' ระบบสั่งการด้วยเสียงภาษาไทย'),
+    const formulaBtns = el('div', { className: 'formula-presets-box' },
+      el('small', { className: 'muted helper-label' }, 'เลือกสูตรมาตรฐานกลุ่ม (เติมข้อมูลอัตโนมัติ):'),
+      ...presetFormulas.map(f =>
         el('button', {
           type: 'button',
-          className: 'voice-dialog-close-btn',
-          title: 'ปิดหน้าต่าง',
-          onclick: closeDialog
-        }, icon('x', 16))
-      ),
-      el('p', { className: 'muted text-sm' }, 'เลือกตัวอย่างเสียงเกษตรกรสำหรับสาธิต หรือแตะพูดสดผ่านไมค์:'),
-      el('div', { className: 'voice-choices-list mt-12' },
-        ...sampleChoices.map(sc => el('button', {
-          type: 'button',
-          className: 'voice-choice-btn',
-          onclick: () => applyText(sc.text)
-        },
-          el('strong', { className: 'voice-choice-author' }, sc.author),
-          el('span', { className: 'voice-choice-quote' }, `"${sc.text}"`)
-        ))
-      ),
-      SpeechRec ? el('button', {
-        type: 'button',
-        className: 'btn-record-live mt-12',
-        onclick: () => {
-          closeDialog();
-          try {
-            const rec = new SpeechRec();
-            rec.lang = 'th-TH';
-            rec.continuous = false;
-            rec.interimResults = false;
-            notify('กำลังรับฟังเสียงพูดภาษาไทย...');
-            rec.onresult = (e) => {
-              const transcript = e.results[0]?.[0]?.transcript || '';
-              if (transcript) {
-                detailsField.value = ((detailsField.value ? detailsField.value + ' ' : '') + transcript).slice(0, 500);
-                charCounter.textContent = `${detailsField.value.length} / 500`;
-                notify(`แปลงเสียงสำเร็จ: "${transcript}"`);
-              }
-            };
-            rec.onerror = () => notify('ไม่สามารถรับเสียงได้ กรุณาพิมพ์ข้อความหรือเลือกเสียงจำลอง');
-            rec.start();
-          } catch {
-            notify('ไม่สามารถเปิดไมโครโฟนได้');
+          className: 'chip-btn chip-amber',
+          onclick: () => {
+            inputNameField.value = f.name;
+            detailsField.value = f.details;
+            charCounter.textContent = `${detailsField.value.length} / 500`;
+            notify(`เลือกสูตร: ${f.name}`);
           }
-        }
-      }, icon('mic', 16), ' กดเพื่อพูดสดด้วยไมค์ภาษาไทย') : null
+        }, f.label)
+      )
     );
 
-    overlay.append(card);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
-    document.body.append(overlay);
+    const submitApprovalBtn = el('button', {
+      type: 'submit',
+      className: 'approval-btn-primary'
+    }, icon('send', 16), ' ส่งคำขอเพื่อพิจารณา');
+
+    const cancelFormBtn = el('button', {
+      type: 'button',
+      className: 'approval-btn-secondary',
+      onclick: () => {
+        mode = 'status';
+        render();
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
+    }, 'ยกเลิก');
+
+    const approvalForm = el('form', { id: 'approvalForm', className: 'approval-form-stack', novalidate: true },
+      formulaBtns,
+      plotSel,
+      el('label', {}, 'ชื่อปุ๋ย / ปัจจัยการผลิต', inputNameField),
+      el('div', { className: 'voice-field-group' },
+        el('label', {}, 'รายละเอียดสูตรและอัตราการใช้'),
+        el('div', { className: 'voice-textarea-wrap' },
+          detailsField,
+          embeddedMicBtn
+        ),
+        charCounter
+      ),
+      el('div', { className: 'approval-form-actions' },
+        submitApprovalBtn,
+        cancelFormBtn
+      )
+    );
+
+    approvalForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (submitApprovalBtn.disabled) return;
+      const plotIdVal = approvalForm.querySelector('select[name="plot_id"]')?.value;
+      const nameVal = inputNameField.value.trim() || 'แผนการใส่ปุ๋ยอินทรีย์ (สูตรปรับปรุง)';
+      const detailsVal = detailsField.value.trim();
+      if (!detailsVal) {
+        notify('กรุณาพิมพ์รายละเอียดสูตรปุ๋ย หรือแตะเลือกสูตรมาตรฐานด้านบน');
+        detailsField.focus();
+        return;
+      }
+      submitApprovalBtn.disabled = true;
+      submitApprovalBtn.textContent = 'กำลังส่งพิจารณา...';
+      try {
+        await api('/approvals', 'POST', {
+          plot_id: Number(plotIdVal),
+          input_name: nameVal,
+          details: detailsVal
+        });
+        notify('ส่งคำขอให้เจ้าหน้าที่ ICS พิจารณาเรียบร้อย');
+        if (typeof reloadTab === 'function') await reloadTab();
+      } catch (err) {
+        if (!err.handled) notify(err.message);
+      } finally {
+        submitApprovalBtn.disabled = false;
+        submitApprovalBtn.replaceChildren(icon('send', 16), document.createTextNode(' ส่งคำขอเพื่อพิจารณา'));
+      }
+    });
+
+    const backToStatusBtn = el('button', {
+      type: 'button',
+      id: 'cancelNewApprovalBtn',
+      className: 'screen-inline-back',
+      onclick: () => {
+        mode = 'status';
+        render();
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
+    }, icon('chevronLeft', 16), ' กลับไปดูสถานะคำขอ');
+
+    const formCard = el('div', { className: 'card approval-form-card' },
+      el('h3', { className: 'approval-form-title' }, icon('fertilizerBag', 20), ' ส่งคำขอใช้ปัจจัยการผลิตใหม่'),
+      approvalForm
+    );
+
+    root.replaceChildren(backToStatusBtn, formCard);
   };
 
-  // Embedded microphone button inside the textarea box
-  const embeddedMicBtn = el('button', {
-    type: 'button',
-    className: 'embedded-mic-btn',
-    title: 'กดเพื่อพูดรายละเอียดสูตรปุ๋ยด้วยเสียง (หรือเลือกเสียงจำลองสำหรับสาธิต)',
-    'aria-label': 'พูดรายละเอียดสูตรปุ๋ยด้วยเสียง',
-    onclick: () => openVoicePresetSelector()
-  }, icon('mic', 18));
+  const renderStatusView = () => {
+    const viewChildren = [];
+    const featured = rows.find(r => r.status === 'rejected') || rows.find(r => r.status === 'pending') || rows[0] || null;
 
-  const presetFormulas = [
-    {
-      label: 'สูตรปุ๋ยหมักอินทรีย์บำรุงดิน (มูลวัวนม + แกลบดำ หมัก 30 วัน)',
-      name: 'ปุ๋ยหมักอินทรีย์บำรุงดิน (ทำเอง)',
-      details: 'สูตร: มูลวัวในฟาร์มอินทรีย์ + แกลบดำ + รำอ่อน + จุลินทรีย์หน่อกล้วย หมักกลับกองครบ 30 วัน อัตรา 40 กก./ไร่'
-    },
-    {
-      label: 'สูตรน้ำหมักสมุนไพรไล่แมลง (ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน)',
-      name: 'น้ำหมักสมุนไพรไล่แมลง (ทำเอง)',
-      details: 'สูตร: ใบสะเดา + พริก + กากน้ำตาล หมัก 7 วัน ใช้ป้องกันหนอนและเพลี้ยไฟ ตามเกณฑ์มาตรฐานเกษตรอินทรีย์ PGS'
+    const openFormBtn = el('button', {
+      type: 'button',
+      id: 'openNewApprovalFormBtn',
+      className: 'approval-btn-primary',
+      onclick: () => {
+        mode = 'form';
+        render();
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
+    }, 'ส่งคำขอใหม่');
+
+    const contactOfficerBtn = el('button', {
+      type: 'button',
+      id: 'approvalContactBtn',
+      className: 'approval-btn-secondary',
+      onclick: () => openContactIcsDialog(me)
+    }, 'ติดต่อเจ้าหน้าที่');
+
+    if (featured) {
+      const isRejected = featured.status === 'rejected';
+      const isApproved = featured.status === 'approved';
+      const cardTone = isRejected ? 'rejected' : isApproved ? 'approved' : 'pending';
+      const badgeLabel = isRejected ? 'ไม่ผ่านการอนุมัติ' : isApproved ? 'ผ่านการอนุมัติ' : 'รอการพิจารณา';
+      const docIconName = isRejected ? 'xCircle' : isApproved ? 'checkCircle' : 'clock';
+      const evalDateText = dated(featured.reviewed_at || featured.created_at);
+
+      const reasonText = featured.comment || featured.details || '';
+      const bulletItems = reasonText
+        .split(/\r?\n|\|/)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const adviceTitle = isRejected
+        ? 'คำแนะนำจากเจ้าหน้าที่'
+        : isApproved
+          ? 'พร้อมใช้งาน'
+          : 'ขั้นตอนถัดไป';
+      const adviceDesc = isRejected
+        ? 'ปรับสูตรและปริมาณให้เหมาะสมก่อนส่งพิจารณาอีกครั้ง'
+        : isApproved
+          ? 'สามารถนำปัจจัยนี้ไปใช้ในแปลงและบันทึกกิจกรรมได้ทันที'
+          : 'เจ้าหน้าที่จะตรวจสอบความสอดคล้องกับมาตรฐานอินทรีย์ก่อนใช้งานจริง';
+
+      const statusCard = el('div', { className: `approval-hero-alert tone-${cardTone}` },
+        el('div', { className: 'approval-status-top' },
+          el('div', { className: `approval-doc-circle tone-${cardTone}` },
+            icon(docIconName, 22)
+          ),
+          el('div', { className: 'approval-status-meta' },
+            el('span', { className: `approval-status-pill tone-${cardTone}` }, badgeLabel),
+            el('h3', { className: 'approval-main-title' }, featured.input_name || 'คำขอใช้ปัจจัยการผลิต'),
+            el('p', { className: 'approval-date-sub' }, `${featured.plot_name || '-'} • ${evalDateText}`)
+          )
+        ),
+        el('div', { className: 'approval-divider' }),
+        el('div', { className: 'approval-reason-section' },
+          el('b', { className: 'approval-reason-title' },
+            isRejected
+              ? 'เหตุผลที่ไม่อนุมัติ'
+              : isApproved
+                ? 'ความเห็นจากเจ้าหน้าที่ ICS'
+                : 'รายละเอียดคำขอที่ส่งตรวจ'
+          ),
+          bulletItems.length > 1
+            ? el('ul', { className: 'approval-reason-bullets' },
+                ...bulletItems.map(line => el('li', {}, line))
+              )
+            : el('p', { className: 'approval-reason-text' },
+                bulletItems[0] || 'รอเจ้าหน้าที่ ICS ตรวจสอบความสอดคล้องตามมาตรฐานอินทรีย์'
+              )
+        ),
+        el('div', { className: 'approval-advice-box' },
+          el('strong', { className: 'approval-advice-title' }, adviceTitle),
+          el('p', { className: 'approval-advice-desc' }, adviceDesc)
+        ),
+        el('div', { className: 'approval-actions-stack' },
+          openFormBtn,
+          contactOfficerBtn
+        )
+      );
+
+      viewChildren.push(statusCard);
+    } else {
+      const emptyStatusCard = el('div', { className: 'card approval-empty-card' },
+        el('div', { className: 'approval-doc-circle tone-pending' }, icon('clipboard', 22)),
+        el('h3', { className: 'approval-main-title mt-10' }, 'ยังไม่มีคำขอใช้ปัจจัยการผลิต'),
+        el('p', { className: 'muted text-sm' }, 'ยื่นขออนุญาตใช้ปุ๋ยอินทรีย์หรือสารชีวภัณฑ์ก่อนนำไปใช้จริงในแปลง'),
+        el('div', { className: 'approval-actions-stack mt-12' },
+          openFormBtn,
+          contactOfficerBtn
+        )
+      );
+      viewChildren.push(emptyStatusCard);
     }
-  ];
 
-  const formulaBtns = el('div', { className: 'formula-presets-box' },
-    el('small', { className: 'muted helper-label' }, 'แตะเลือกสูตรมาตรฐานกลุ่มวิสาหกิจชุมชน (ไม่ต้องพิมพ์เอง):'),
-    ...presetFormulas.map(f =>
-      el('button', {
-        type: 'button',
-        className: 'chip-btn chip-amber',
-        onclick: () => {
-          inputNameField.value = f.name;
-          detailsField.value = f.details;
-          charCounter.textContent = `${detailsField.value.length} / 500`;
-          notify(`เลือกสูตร: ${f.name}`);
-        }
-      }, f.label)
-    )
-  );
-
-  const submitApprovalBtn = el('button', {
-    type: 'submit',
-    className: 'btn-send-review'
-  }, icon('send', 16), ' ส่งพิจารณา');
-
-  const approvalForm = el('form', { id: 'approvalForm', className: 'action-card-submit', novalidate: true },
-    el('div', { className: 'action-card-header' },
-      el('span', { className: 'bag-icon-badge' }, icon('fertilizerBag', 24)),
-      el('h4', { className: 'action-card-title' }, 'ส่งปุ๋ยสูตรใหม่')
-    ),
-    formulaBtns,
-    plotSel,
-    el('label', {}, 'ชื่อปุ๋ย / ปัจจัยการผลิต', inputNameField),
-    el('div', { className: 'voice-field-group' },
-      el('label', {}, 'รายละเอียดสูตรปุ๋ยและอัตราการใช้'),
-      el('div', { className: 'voice-textarea-wrap' },
-        detailsField,
-        embeddedMicBtn
-      ),
-      charCounter
-    ),
-    submitApprovalBtn
-  );
-
-  approvalForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (submitApprovalBtn.disabled) return;
-    const plotIdVal = approvalForm.querySelector('select[name="plot_id"]')?.value;
-    const nameVal = inputNameField.value.trim() || 'แผนการใส่ปุ๋ยอินทรีย์ (สูตรปรับปรุง)';
-    const detailsVal = detailsField.value.trim();
-    if (!detailsVal) {
-      notify('กรุณาพิมพ์รายละเอียดสูตรปุ๋ย หรือแตะเลือกสูตรมาตรฐานด้านบน');
-      detailsField.focus();
-      return;
-    }
-    submitApprovalBtn.disabled = true;
-    submitApprovalBtn.textContent = 'กำลังส่งพิจารณา...';
-    try {
-      await api('/approvals', 'POST', {
-        plot_id: Number(plotIdVal),
-        input_name: nameVal,
-        details: detailsVal
+    if (rows.length > 0) {
+      const historyItems = rows.map(item => {
+        const isPending = item.status === 'pending';
+        const isApproved = item.status === 'approved';
+        const pillClass = isPending ? 'pill warn' : isApproved ? 'pill success' : 'pill danger';
+        const statusLabel = isPending ? 'รอพิจารณา' : isApproved ? 'อนุมัติแล้ว' : 'ไม่ผ่านการอนุมัติ';
+        return el('div', { className: 'card approval-history-card' },
+          el('div', { className: 'row between align-center' },
+            el('b', { className: 'approval-hist-title' }, item.input_name),
+            el('span', { className: pillClass }, statusLabel)
+          ),
+          el('p', { className: 'muted text-xs mt-4' }, `${item.plot_name || '-'} • ${dated(item.reviewed_at || item.created_at)}`),
+          item.details ? el('p', { className: 'text-sm mt-6' }, item.details) : null,
+          item.comment ? el('p', { className: 'approval-hist-comment mt-6' }, `ความเห็นเจ้าหน้าที่: ${item.comment}`) : null
+        );
       });
-      notify('ส่งปุ๋ยสูตรใหม่ให้เจ้าหน้าที่ ICS พิจารณาเรียบร้อย');
-      if (typeof reloadTab === 'function') await reloadTab();
-    } catch (err) {
-      if (!err.handled) notify(err.message);
-    } finally {
-      submitApprovalBtn.disabled = false;
-      submitApprovalBtn.replaceChildren(icon('send', 16), document.createTextNode(' ส่งพิจารณา'));
+
+      viewChildren.push(
+        el('section', { className: 'approval-history-section', 'aria-label': 'ประวัติคำขอทั้งหมด' },
+          el('h4', { className: 'farmer-section-heading' }, `ประวัติคำขอทั้งหมด (${rows.length})`),
+          el('div', { className: 'approval-history-list' }, ...historyItems)
+        )
+      );
     }
-  });
 
-  const contactCard = el('button', {
-    type: 'button',
-    className: 'action-card-contact',
-    onclick: () => openContactIcsDialog(me)
-  },
-    el('div', { className: 'contact-card-top' },
-      el('div', { className: 'contact-headset-badge' }, icon('headset', 28)),
-      el('span', { className: 'contact-card-title' }, 'ติดต่อเจ้าหน้าที่'),
-      el('span', { className: 'contact-chevron' }, icon('chevronRight', 20))
-    ),
-    el('p', { className: 'contact-card-desc' }, 'สอบถามรายละเอียดเพิ่มเติม หรือขอคำแนะนำการปรับสูตร')
-  );
+    root.replaceChildren(...viewChildren);
+  };
 
-  nodes.push(
-    el('div', { className: 'next-action-section' },
-      el('h3', { className: 'next-action-heading' }, 'กรุณาดำเนินการต่อ'),
-      el('div', { className: 'next-action-grid' },
-        approvalForm,
-        contactCard
-      )
-    )
-  );
+  const render = () => {
+    if (mode === 'form') renderFormView();
+    else renderStatusView();
+  };
 
-  return nodes;
+  render();
+  return [root];
 }
 
 export async function buildFarmerReviewsView() {
   const rows = await api('/reviews').catch(() => []);
-  const nodes = [
-    el('div', { className: 'notice' },
-      el('b', {}, icon('shield', 15), ' ประวัติผลการตรวจประเมินแปลง'),
-      el('p', { className: 'muted' }, rows.length
-        ? `พบประวัติการตรวจประเมินภายในกลุ่ม (ICS) ทั้งหมด ${rows.length} รายการ`
-        : 'ผลตรวจจะแสดงที่นี่เมื่อระบบเปิดให้เกษตรกรดูได้ โดยปัจจุบันเจ้าหน้าที่ ICS เป็นผู้บันทึกผลการตรวจประเมินภายในกลุ่ม')
-    )
-  ];
+  const nodes = [];
 
   if (!rows.length) {
-    nodes.push(empty('ผลตรวจจะแสดงที่นี่เมื่อระบบเปิดให้เกษตรกรดูได้ หากมีข้อสงสัยเกี่ยวกับผลการตรวจแปลง กรุณาติดต่อเจ้าหน้าที่ ICS ผู้รับผิดชอบของคุณ'));
+    nodes.push(empty('ยังไม่มีผลการตรวจแปลงในระบบ ผลตรวจจะแสดงที่นี่เมื่อเจ้าหน้าที่ ICS บันทึกผลประเมินแล้ว'));
     return nodes;
   }
+
+  nodes.push(el('h3', { className: 'farmer-screen-heading' }, `ผลการตรวจแปลง (${rows.length})`));
 
   for (const item of rows) {
     const isPass = item.result === 'ผ่าน';
@@ -911,26 +1242,18 @@ export async function buildFarmerReviewsView() {
     const statusIcon = isPass ? icon('checkCircle', 12) : isWarn ? icon('clock', 12) : icon('xCircle', 12);
     const stdLabel = item.standard_code ? (AUDIT_STANDARD_LABELS[item.standard_code] || item.standard_code) : null;
 
-    const box = card(
-      el('div', { className: 'row between' },
-        el('b', {}, item.plot_name || '-'),
-        el('div', { className: 'pill-list-row' },
-          stdLabel ? el('span', { className: 'pill' }, stdLabel) : null,
-          el('span', { className: pillClass }, statusIcon, item.result)
-        )
-      ),
-      el('p', {}, item.note || '-'),
-      el('small', { className: 'muted' }, `ตรวจประเมินเมื่อ ${dated(item.reviewed_at || item.created_at)}`)
-    );
-
+    const detailsChildren = [];
+    if (stdLabel) {
+      detailsChildren.push(el('span', { className: 'pill' }, stdLabel));
+    }
     if (item.evidence_id) {
-      box.append(el('button', {
+      detailsChildren.push(el('button', {
         type: 'button',
-        className: 'link-btn mt-8',
+        className: 'link-btn',
         onclick: () => openEvidenceViewer(item.evidence_id)
       }, icon('camera', 13), ' ดูภาพหลักฐานจากการตรวจแปลง'));
     } else if (item.photo_url) {
-      box.append(
+      detailsChildren.push(
         el('div', { className: 'mt-8' },
           el('img', {
             src: item.photo_url,
@@ -938,6 +1261,24 @@ export async function buildFarmerReviewsView() {
             alt: 'ภาพหลักฐานการตรวจแปลง',
             onclick: () => openPhotoPreviewModal(item.photo_url, `ภาพหลักฐานการตรวจแปลง ${item.plot_name || ''}`.trim())
           })
+        )
+      );
+    }
+
+    const box = el('div', { className: 'card farmer-list-card' },
+      el('div', { className: 'row between' },
+        el('span', { className: pillClass }, statusIcon, ' ', item.result),
+        el('small', { className: 'muted' }, dated(item.reviewed_at || item.created_at))
+      ),
+      el('b', { className: 'farmer-card-title mt-8' }, item.plot_name || '-'),
+      el('p', { className: 'farmer-card-body' }, item.note || '-')
+    );
+
+    if (detailsChildren.length) {
+      box.append(
+        el('details', { className: 'review-details-toggle mt-8' },
+          el('summary', {}, 'รายละเอียดเกณฑ์และภาพหลักฐาน'),
+          el('div', { className: 'review-details-body' }, ...detailsChildren)
         )
       );
     }
