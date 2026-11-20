@@ -1017,12 +1017,12 @@ async function loadTab() {
           : 'รอข้อมูลแปลงในความดูแล';
 
         const buildWatchlistActionButtons = (w) => {
-          const actionRow = el('div', { className: 'row' });
+          const actionRow = el('div', { className: 'row ics-action-row' });
           if (w.pendingApprovalId) {
             actionRow.append(
               el('button', {
                 type: 'button',
-                className: 'btn-sm',
+                className: 'btn-sm btn-primary-ics',
                 onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); }
               }, icon('clipboard', 13), ' พิจารณาคำขอ')
             );
@@ -1030,12 +1030,12 @@ async function loadTab() {
             actionRow.append(
               el('button', {
                 type: 'button',
-                className: 'btn-sm secondary',
+                className: 'btn-sm btn-secondary-ics',
                 onclick: async () => { tab = 'reviews'; renderTabs(); await loadTab(); }
-              }, icon('shield', 13), ' ' + (w.action || 'บันทึกตรวจแปลง')),
+              }, icon('shield', 13), ' ' + (w.action || 'นัดตรวจแปลง')),
               el('button', {
                 type: 'button',
-                className: 'btn-sm secondary',
+                className: 'btn-sm btn-line-ics',
                 onclick: () => sharePlotRiskToLine(w)
               }, icon('message', 13), ' แชร์ข้อความทาง LINE')
             );
@@ -1043,12 +1043,12 @@ async function loadTab() {
             actionRow.append(
               el('button', {
                 type: 'button',
-                className: 'btn-sm secondary',
+                className: 'btn-sm btn-secondary-ics',
                 onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
               }, icon('user', 12), ' สลับเป็นเกษตรกร A-03'),
               el('button', {
                 type: 'button',
-                className: 'btn-sm secondary',
+                className: 'btn-sm btn-line-ics',
                 onclick: () => sharePlotRiskToLine(w)
               }, icon('message', 13), ' แชร์ข้อความทาง LINE')
             );
@@ -1056,12 +1056,12 @@ async function loadTab() {
             actionRow.append(
               el('button', {
                 type: 'button',
-                className: 'btn-sm secondary',
+                className: 'btn-sm btn-secondary-ics',
                 onclick: async () => { tab = w.targetTab || 'lots'; renderTabs(); await loadTab(); }
-              }, w.action),
+              }, icon('alert', 13), ' ' + w.action),
               el('button', {
                 type: 'button',
-                className: 'btn-sm secondary',
+                className: 'btn-sm btn-line-ics',
                 onclick: () => sharePlotRiskToLine(w)
               }, icon('message', 13), ' แชร์ข้อความทาง LINE')
             );
@@ -1069,9 +1069,9 @@ async function loadTab() {
             actionRow.append(
               el('button', {
                 type: 'button',
-                className: 'btn-sm secondary',
+                className: 'btn-sm btn-secondary-ics',
                 onclick: async () => { tab = w.targetTab || 'lots'; renderTabs(); await loadTab(); }
-              }, w.action)
+              }, icon('shield', 13), ' ' + w.action)
             );
           }
           return actionRow;
@@ -1345,7 +1345,51 @@ async function loadTab() {
           isDemo
         });
 
+        let icsTaskHero = null;
+        if (pendingInput > 0) {
+          icsTaskHero = el('div', { className: 'ics-task-hero tone-pending' },
+            el('div', { className: 'ics-task-hero-body' },
+              el('div', { className: 'ics-task-hero-icon' }, icon('clipboard', 20)),
+              el('div', { className: 'ics-task-hero-text' },
+                el('h4', {}, `มีคำขอปัจจัยรอตรวจพิจารณา ${pendingInput} รายการ`),
+                el('p', {}, 'เกษตรกรส่งแผนปัจจัยการผลิตเข้ามา • ตรวจสอบความสอดคล้องตามมาตรฐานเพื่ออนุมัติให้ใช้งาน')
+              )
+            ),
+            el('button', {
+              type: 'button',
+              className: 'ics-task-hero-btn',
+              onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); scrollToTop(); }
+            }, icon('clipboard', 14), ' พิจารณาคำขอทันที')
+          );
+        } else if (riskAlerts > 0) {
+          icsTaskHero = el('div', { className: 'ics-task-hero tone-risk' },
+            el('div', { className: 'ics-task-hero-body' },
+              el('div', { className: 'ics-task-hero-icon' }, icon('alert', 20)),
+              el('div', { className: 'ics-task-hero-text' },
+                el('h4', {}, `พบแปลงเสี่ยงที่ต้องติดตาม ${riskAlerts} จุด`),
+                el('p', {}, 'มีแปลงที่ขาดการบันทึกเกิน 14 วัน หรือประวัติไม่สอดคล้องตามเกณฑ์อินทรีย์')
+              )
+            ),
+            el('button', {
+              type: 'button',
+              className: 'ics-task-hero-btn secondary',
+              onclick: async () => { tab = 'risks'; renderTabs(); await loadTab(); scrollToTop(); }
+            }, icon('alert', 14), ' จัดการจุดเสี่ยง')
+          );
+        } else {
+          icsTaskHero = el('div', { className: 'ics-task-hero tone-normal' },
+            el('div', { className: 'ics-task-hero-body' },
+              el('div', { className: 'ics-task-hero-icon' }, icon('check', 20)),
+              el('div', { className: 'ics-task-hero-text' },
+                el('h4', {}, 'ระบบมาตรฐานอินทรีย์กลุ่มเรียบร้อยดี'),
+                el('p', {}, 'ไม่มีคำขอค้างตรวจ และสมาชิกในความดูแลปฏิบัติตามเกณฑ์ PGS ครบถ้วน')
+              )
+            )
+          );
+        }
+
         nodes = [
+          icsTaskHero,
           icsHeroCard,
           kpiGrid,
           icsChartsPanel,
@@ -1359,7 +1403,7 @@ async function loadTab() {
               el('div', { className: 'row' },
                 el('button', {
                   type: 'button',
-                  className: 'btn-sm secondary desktop-only',
+                  className: 'btn-sm btn-secondary-ics desktop-only',
                   onclick: () => window.print()
                 }, icon('printer', 14), ' พิมพ์รายงานตรวจกลุ่ม'),
                 el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'ข้อมูลตัวอย่าง (Demo)' : 'ข้อมูลจริงจากระบบ')
@@ -1684,18 +1728,26 @@ async function loadTab() {
 
           if (isPending) {
             let selectedStatus = 'approved';
-            const approveBtn = el('button', { type: 'button', className: 'btn-sm' }, icon('check', 13), ' อนุมัติ');
-            const rejectBtn = el('button', { type: 'button', className: 'secondary btn-sm' }, icon('x', 13), ' ไม่อนุมัติ');
-            approveBtn.onclick = () => { selectedStatus = 'approved'; approveBtn.className = 'btn-sm'; rejectBtn.className = 'secondary btn-sm'; };
-            rejectBtn.onclick = () => { selectedStatus = 'rejected'; rejectBtn.className = 'btn-sm danger-btn'; approveBtn.className = 'secondary btn-sm'; };
+            const approveBtn = el('button', { type: 'button', className: 'btn-sm btn-choice-approve active' }, icon('check', 13), ' อนุมัติ');
+            const rejectBtn = el('button', { type: 'button', className: 'btn-sm btn-choice-reject' }, icon('x', 13), ' ไม่อนุมัติ');
+            approveBtn.onclick = () => {
+              selectedStatus = 'approved';
+              approveBtn.className = 'btn-sm btn-choice-approve active';
+              rejectBtn.className = 'btn-sm btn-choice-reject';
+            };
+            rejectBtn.onclick = () => {
+              selectedStatus = 'rejected';
+              rejectBtn.className = 'btn-sm btn-choice-reject active';
+              approveBtn.className = 'btn-sm btn-choice-approve';
+            };
 
             const commentArea = el('textarea', { placeholder: 'ระบุความเห็น ข้อแนะนำ หรือเหตุผลประกอบ (จำเป็นกรณีไม่อนุมัติ)' });
-            const confirmBtn = el('button', { type: 'submit', className: 'btn-sm' }, 'บันทึกผลการพิจารณา');
+            const confirmBtn = el('button', { type: 'submit', className: 'btn-sm btn-primary-ics btn-confirm-decision' }, 'บันทึกผลการพิจารณา');
             const decisionForm = el('form', { className: 'decision-box' },
               el('h4', {}, 'ตัดสินคำขอปัจจัยการผลิต'),
               el('div', { className: 'row mb-10' }, approveBtn, rejectBtn),
               el('label', {}, 'ความเห็น / ข้อเสนอแนะของเจ้าหน้าที่ ICS:', commentArea),
-              el('div', { className: 'row' }, confirmBtn)
+              el('div', { className: 'row mt-10' }, confirmBtn)
             );
             decisionForm.addEventListener('submit', async e => {
               e.preventDefault();

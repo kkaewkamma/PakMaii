@@ -588,7 +588,7 @@ export async function buildIcsRisksView() {
         el('div', { className: 'row mt-8' },
           el('button', {
             type: 'button',
-            className: 'secondary btn-sm',
+            className: targetTab === 'approval' ? 'btn-sm btn-primary-ics' : 'btn-sm btn-secondary-ics',
             onclick: async () => { await navigateTab(targetTab); }
           }, icon(targetTab === 'approval' ? 'clipboard' : targetTab === 'record' ? 'calendar' : 'shield', 13), ` ${actionLabel}`)
         )
