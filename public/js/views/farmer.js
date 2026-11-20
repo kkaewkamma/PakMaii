@@ -166,31 +166,31 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
     )
   );
 
-  const farmerHeroCard = el('div', { className: `farmer-hero-graphic-card ${statusTier}` },
-    el('div', { className: 'farmer-hero-top' },
-      el('div', { className: 'farmer-hero-info' },
-        el('div', { className: 'status-badge-row' },
-          el('span', { className: 'pill' }, 'สิ่งที่ต้องทำวันนี้'),
-          statusBadge(statusTier, statusBadgeText),
-          myPlot?.conversion_year ? el('span', { className: 'pill' }, myPlot.conversion_year) : null,
-          myPlot?.plot_code ? el('span', { className: 'pill' }, `รหัสแปลง: ${myPlot.plot_code}`) : null
-        ),
-        el('h3', { className: 'farmer-status-title' }, statusTitle),
-        el('p', { className: 'farmer-status-desc' }, statusDesc)
-      )
+  const farmerHeroCard = el('div', { className: `primary-action-card farmer-hero-graphic-card ${statusTier}` },
+    el('div', { className: 'task-header' },
+      el('div', { className: 'task-tag-group' },
+        el('span', { className: 'task-tag' }, 'สิ่งที่ต้องทำวันนี้'),
+        statusBadge(statusTier, statusBadgeText)
+      ),
+      el('span', { className: 'task-time' }, formatLocalIsoDate(new Date()))
     ),
+    el('h3', { className: 'task-title farmer-status-title' }, statusTitle),
+    el('p', { className: 'task-desc farmer-status-desc' }, statusDesc),
     farmerRhythmSection,
-    alertAdvice ? el('div', { className: `farmer-advice-box advice-${statusTier} mt-12` },
-      icon('alert', 15),
-      el('span', {}, alertAdvice)
+    alertAdvice ? el('div', { className: 'alert-banner mt-12' },
+      el('div', { className: 'alert-icon' }, '⚠️'),
+      el('div', { className: 'alert-content' },
+        el('div', { className: 'alert-title' }, 'คำแนะนำจากเจ้าหน้าที่ ICS'),
+        el('div', { className: 'alert-msg' }, alertAdvice)
+      )
     ) : null,
-    el('div', { className: 'row farmer-actions-row mt-12' },
+    el('div', { className: 'row farmer-actions-row mt-14' },
       el('button', {
         type: 'button',
         id: 'farmerPrimaryRecordBtn',
-        className: isOverdue ? 'pulse btn-hero-primary' : 'btn-hero-primary',
+        className: 'btn-hero-primary',
         onclick: () => navigateTab('record')
-      }, icon('calendar', 16), ' บันทึกกิจกรรม'),
+      }, el('span', { className: 'btn-hero-icon' }, '✍️'), ' แตะเพื่อเริ่มบันทึกกิจกรรม'),
       el('button', {
         type: 'button',
         className: 'secondary',
@@ -301,10 +301,19 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
     )
   );
 
+  const upcomingInspectionAlert = el('div', { className: 'alert-banner mb-16' },
+    el('div', { className: 'alert-icon' }, '📅'),
+    el('div', { className: 'alert-content' },
+      el('div', { className: 'alert-title' }, 'นัดหมายตรวจแปลงรอบที่ 2/2569'),
+      el('div', { className: 'alert-msg' }, 'สารวัตรเกษตร ICS จะเข้าสุ่มตรวจสารตกค้างในแปลงตามรอบมาตรฐาน PGS ผักไหม กรุณาเตรียมสมุดบันทึกแปลง')
+    )
+  );
+
   return [
     farmerHeroCard,
     serviceGrid,
     recentMiniList,
+    upcomingInspectionAlert,
     agroClimateWidget,
     pgsCriteriaCard,
     farmerKpiGrid

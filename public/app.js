@@ -421,25 +421,65 @@ async function start(forceLogin = false) {
       ? `${codeLabelPrefix}${me.agency_code || me.name} • ${me.village}`
       : `${codeLabelPrefix}${me.agency_code || me.name} • ${roleLabels[me.role] || me.role} (${statusLabels[me.status] || me.status})`;
 
-    $('#identity').replaceChildren(
-      el('div', { className: 'identity-bar' },
-        el('div', { className: 'identity-info' },
-          el('div', { className: `user-avatar avatar-${me.role}` }, icon(avatarIcon, 28)),
-          el('div', { className: 'identity-meta' },
-            el('div', { className: 'user-code' },
-              demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
-              displayFullName
-            ),
-            el('div', { className: 'user-role-text' }, villageOrRole)
+    if (me.role === 'farmer') {
+      const timeGreeting = new Date().getHours() < 12 ? 'สวัสดีตอนเช้า' : (new Date().getHours() < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น');
+      const totalRai = plots.reduce((acc, p) => acc + (parseFloat(p.area) || 0), 0) || (plots.length * 7);
+
+      const farmerCard = el('div', { className: 'farmer-identity-card' },
+        el('div', { className: 'card-pattern-overlay' }, 'ผ'),
+        el('div', { className: 'id-top-row' },
+          el('div', {},
+            el('span', { className: 'greeting-text' }, timeGreeting),
+            el('h2', { className: 'farmer-name' }, displayFullName)
+          ),
+          el('div', { className: 'organic-cert-pill' },
+            el('span', { className: 'cert-dot' }),
+            el('span', {}, 'อินทรีย์แท้')
           )
         ),
-        el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
-          icon('logOut', 14),
-          demoUser ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'
+        el('div', { className: 'id-bottom-row' },
+          el('div', { className: 'id-stat-box' },
+            el('label', {}, 'แปลงที่ดูแล'),
+            el('span', {}, `${plots.length} แปลง (${totalRai} ไร่)`)
+          ),
+          el('div', { className: 'id-stat-box' },
+            el('label', {}, 'รหัสสมาชิก'),
+            el('span', {}, `${me.agency_code || me.name} ${me.village ? `(${me.village})` : ''}`)
+          )
         )
-      ),
-      switcherBar
-    );
+      );
+
+      $('#identity').replaceChildren(
+        farmerCard,
+        el('div', { className: 'farmer-quick-actions-bar' },
+          el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
+            icon('logOut', 14),
+            demoUser ? ' ออกจากโหมดทดลอง' : ' ออกจากระบบ'
+          )
+        ),
+        switcherBar
+      );
+    } else {
+      $('#identity').replaceChildren(
+        el('div', { className: 'identity-bar' },
+          el('div', { className: 'identity-info' },
+            el('div', { className: `user-avatar avatar-${me.role}` }, icon(avatarIcon, 28)),
+            el('div', { className: 'identity-meta' },
+              el('div', { className: 'user-code' },
+                demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
+                displayFullName
+              ),
+              el('div', { className: 'user-role-text' }, villageOrRole)
+            )
+          ),
+          el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
+            icon('logOut', 14),
+            demoUser ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'
+          )
+        ),
+        switcherBar
+      );
+    }
 
     renderTabs();
     await loadTab();
@@ -1186,12 +1226,10 @@ async function loadTab() {
         });
       }
 
-      if (demoUser) {
+      if (demoUser && me.role !== 'farmer') {
         nodes.unshift(el('div', { className: 'notice demo-tip' },
           el('b', {}, icon('info', 15), ' ปลูกของดี — ระบบบริหารมาตรฐานสินค้าเกษตรอินทรีย์ วิสาหกิจชุมชนผักไหม'),
-          me.role === 'farmer'
-            ? 'สำหรับเกษตรกร: บันทึกกิจกรรมการเกษตรสะดวกรวดเร็ว ลดภาระงานเอกสารซ้ำซ้อน พร้อมระบบยื่นขออนุมัติปัจจัยการผลิตก่อนใช้จริง'
-            : 'สำหรับเจ้าหน้าที่ ICS: ควบคุมมาตรฐานและคัดกรองความเสี่ยงรายแปลงได้ทันที เพื่อป้องกันไม่ให้ข้อผิดพลาดของสมาชิกส่งผลกระทบต่อการรับรองของกลุ่ม'
+          'สำหรับเจ้าหน้าที่ ICS: ควบคุมมาตรฐานและคัดกรองความเสี่ยงรายแปลงได้ทันที เพื่อป้องกันไม่ให้ข้อผิดพลาดของสมาชิกส่งผลกระทบต่อการรับรองของกลุ่ม'
         ));
       }
     } else if (tab === 'farmers') {

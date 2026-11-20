@@ -4994,3 +4994,195 @@ body.is-login .hero {
   margin-bottom: 2px;
 }
 
+/* 2. Farmer Digital Card (ThaID / G-Wallet Style) */
+.farmer-identity-card {
+  background: #113B26;
+  color: #FFFFFF;
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 8px 20px rgba(17, 59, 38, 0.22);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.card-pattern-overlay {
+  position: absolute;
+  right: -25px;
+  bottom: -35px;
+  font-size: 140px;
+  opacity: 0.08;
+  font-weight: 800;
+  user-select: none;
+  pointer-events: none;
+  color: #FFFFFF;
+}
+
+.id-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.greeting-text {
+  font-size: 13px;
+  color: #A7F3D0;
+  font-weight: 400;
+}
+
+.farmer-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.2px;
+  margin-top: 2px;
+}
+
+.organic-cert-pill {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #F0FDF4;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cert-dot {
+  width: 6px;
+  height: 6px;
+  background: #34D399;
+  border-radius: 50%;
+}
+
+.id-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  gap: 12px;
+}
+
+.id-stat-box label {
+  display: block;
+  font-size: 11px;
+  color: #A7F3D0;
+  margin-bottom: 2px;
+}
+
+.id-stat-box span {
+  font-size: 15px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.farmer-quick-actions-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+/* Primary Action Hero Card */
+.primary-action-card {
+  background: #FFFFFF;
+  border: 2px solid #86EFAC;
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.08);
+  margin-bottom: 16px;
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.task-tag-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #15803D;
+  background: #DCFCE7;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.task-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.task-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.task-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+/* Alert Banner */
+.alert-banner {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.alert-icon {
+  font-size: 20px;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+.alert-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #92400E;
+  margin-bottom: 2px;
+}
+
+.alert-msg {
+  font-size: 12px;
+  color: #78350F;
+  line-height: 1.35;
+}
+
+/* Mobile Screen Cleanups */
+@media (max-width: 768px) {
+  body:not(.is-login) .hero > h2#welcome {
+    font-size: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    position: absolute;
+    width: 1px;
+    clip: rect(0, 0, 0, 0);
+  }
+}
+
+
