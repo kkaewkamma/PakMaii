@@ -611,7 +611,35 @@ export class D1Repository {
     return sortRisksBySeverity([...actionRisks, ...inactive, ...pending, ...missingEvidence]);
   }
 
-  async listReviews(userId) {
+  listIcsFarmers(icsUserId) {
+    return this.all(`SELECT u.id, u.name, c.code_hint agency_code,
+      COUNT(DISTINCT p.id) plot_count,
+      COUNT(DISTINCT a.id) activity_count,
+      COUNT(DISTINCT CASE WHEN app.status = 'pending' THEN app.id END) pending_approvals,
+      MAX(a.activity_date) last_activity_date
+      FROM users u
+      JOIN farmer_assignments fa ON fa.farmer_user_id = u.id AND fa.ics_user_id = ? AND fa.ends_at IS NULL
+      LEFT JOIN agency_credentials c ON c.user_id = u.id
+      LEFT JOIN plots p ON p.owner_id = u.id
+      LEFT JOIN activities a ON a.plot_id = p.id
+      LEFT JOIN approvals app ON app.plot_id = p.id
+      WHERE u.role = 'farmer'
+      GROUP BY u.id, u.name, c.code_hint
+      ORDER BY u.id`, icsUserId);
+  }
+
+  async listReviews(userOrId) {
+    const isUserObj = typeof userOrId === 'object' && userOrId !== null;
+    const role = isUserObj ? userOrId.role : 'ics';
+    const userId = isUserObj ? userOrId.id : userOrId;
+
+    const baseWhere = role === 'admin'
+      ? ''
+      : role === 'farmer'
+      ? 'WHERE p.owner_id=?'
+      : 'JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL';
+    const params = role === 'admin' ? [] : [userId];
+
     const fullQuery = `SELECT r.*,p.name plot_name,u.name farmer_name,rv.name reviewer_name,
       (SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id,
       ra.standard_code,ra.checklist_id,ra.checklist_results_json,
@@ -622,29 +650,29 @@ export class D1Repository {
       JOIN users u ON u.id=p.owner_id
       JOIN users rv ON rv.id=r.reviewer_id
       LEFT JOIN review_assessments ra ON ra.review_id=r.id
-      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
+      ${baseWhere}
       ORDER BY r.id DESC`;
     const withEvidence = `SELECT r.*,p.name plot_name,u.name farmer_name,rv.name reviewer_name,
       (SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id
       FROM reviews r JOIN plots p ON p.id=r.plot_id JOIN users u ON u.id=p.owner_id JOIN users rv ON rv.id=r.reviewer_id
-      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC`;
+      ${baseWhere} ORDER BY r.id DESC`;
     const legacy = `SELECT r.*,p.name plot_name FROM reviews r JOIN plots p ON p.id=r.plot_id
-      JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC`;
+      ${baseWhere} ORDER BY r.id DESC`;
     try {
-      const rows = await this.all(fullQuery, userId);
+      const rows = await this.all(fullQuery, ...params);
       return rows.map(row => ({
         ...row,
         checklist_results: parseJsonSafe(row.checklist_results_json, []),
       }));
     } catch (err) {
       if (/no such table: (?:review_assessments|corrective_actions)/i.test(String(err?.message))) {
-        try { return await this.all(withEvidence, userId); }
+        try { return await this.all(withEvidence, ...params); }
         catch (innerErr) {
-          if (/no such table: photo_evidence/i.test(String(innerErr?.message))) return this.all(legacy, userId);
+          if (/no such table: photo_evidence/i.test(String(innerErr?.message))) return this.all(legacy, ...params);
           throw innerErr;
         }
       }
-      if (/no such table: photo_evidence/i.test(String(err?.message))) return this.all(legacy, userId);
+      if (/no such table: photo_evidence/i.test(String(err?.message))) return this.all(legacy, ...params);
       throw err;
     }
   }

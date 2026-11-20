@@ -16,7 +16,11 @@ const demoBackend = demoApi ? demoApi.createDemoBackend() : null;
 const demoSession = demoBackend ? demoApi.createDemoSession(demoBackend, sessionStorage) : null;
 
 const $ = selector => document.querySelector(selector);
-const roleLabels = { farmer: 'Farmer', ics: 'ICS Officer', admin: 'System Admin' };
+const roleLabels = {
+  farmer: 'เกษตรกร (Farmer)',
+  ics: 'เจ้าหน้าที่ตรวจประเมินภายใน (ICS)',
+  admin: 'ผู้ดูแลระบบ (System Admin)'
+};
 const statusLabels = { active: 'เปิดใช้งาน', unlinked: 'รอผูก LINE', disabled: 'ระงับ', used: 'ใช้แล้ว', expired: 'หมดอายุ', revoked: 'เพิกถอนแล้ว' };
 
 import { ICONS, icon } from './js/core/icons.js';
@@ -35,17 +39,15 @@ const tabsFarmer = [
 ];
 const tabsIcs = [
   ['home', 'ภาพรวม', 'sprout'],
+  ['farmers', 'เกษตรกรในดูแล', 'users'],
   ['plots', 'แปลงเกษตรกร', 'mapPin'],
-  ['record', 'กิจกรรม', 'calendar'],
+  ['record', 'กิจกรรมสมาชิก', 'calendar'],
   ['approval', 'พิจารณาคำขอ', 'clipboard'],
   ['risks', 'ความเสี่ยง', 'alert'],
-  ['lots', 'ล็อตผลผลิต', 'package'],
-  ['reviews', 'ผลตรวจ', 'shield']
+  ['reviews', 'ผลตรวจแปลง', 'shield'],
+  ['lots', 'ล็อตผลผลิต', 'package']
 ];
-const tabsIcsDemo = [
-  ['farmers', 'เกษตรกรในดูแล', 'users'],
-  ...tabsIcs
-];
+const tabsIcsDemo = tabsIcs;
 const tabsAdmin = [
   ['overview', 'ภาพรวมระบบ', 'sprout'],
   ['invites', 'คำเชิญลงทะเบียน', 'user'],
@@ -205,8 +207,8 @@ function showLogin(development) {
 
   const form = el('form', { id: 'demoLoginForm', className: 'login-form', novalidate: true },
     el('div', { className: 'role-switch', role: 'radiogroup', 'aria-label': 'เลือกบทบาท' },
-      roleButton('farmer', 'sprout', 'Farmer', 'เกษตรกรผู้ปลูก'),
-      roleButton('ics', 'clipboard', 'ICS', 'เจ้าหน้าที่ตรวจสอบ')),
+      roleButton('farmer', 'sprout', 'Farmer (เกษตรกร)', 'บันทึกแปลง ถ่ายรูป ขออนุมัติปัจจัย'),
+      roleButton('ics', 'clipboard', 'ICS (ผู้ตรวจประเมิน)', 'ดูกราฟวงกลม ตรวจแปลง คัดกรองความเสี่ยง')),
     el('label', { for: 'demoCode' }, 'รหัสประจำตัว Demo'),
     codeInput,
     chips.length ? el('div', { className: 'chips' }, el('span', { className: 'muted' }, 'ตัวอย่าง:'), chips) : null,
@@ -254,7 +256,7 @@ function showLogin(development) {
         className: 'persona-card-btn',
         onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
       },
-        el('div', { className: 'persona-badge risk' }, 'แปลง A-03 • ขาดบันทึก 14 วัน'),
+        el('div', { className: 'persona-badge risk' }, 'เกษตรกร • แปลง A-03 (ขาดบันทึก 14 วัน)'),
         el('b', {}, 'คุณสมปอง คำภา (F-STG-001)'),
         el('small', {}, 'หมู่ 3 บ้านผักไหม • ข้าวหอมมะลิ 105 อินทรีย์ & ธนาคารน้ำใต้ดิน')
       ),
@@ -263,7 +265,7 @@ function showLogin(development) {
         className: 'persona-card-btn',
         onclick: () => acceptDemoLogin('farmer', 'F-STG-002')
       },
-        el('div', { className: 'persona-badge warn' }, 'แปลง B-01 • รออนุมัติปัจจัย'),
+        el('div', { className: 'persona-badge warn' }, 'เกษตรกร • แปลง B-01 (รออนุมัติปัจจัย)'),
         el('b', {}, 'คุณบัวผัน ศรีห้วยทับทัน (F-STG-002)'),
         el('small', {}, 'หมู่ 5 บ้านหนองสิม • ถั่วเหลืองอินทรีย์หลังนา & ปุ๋ยหมักชีวภาพ')
       ),
@@ -272,9 +274,9 @@ function showLogin(development) {
         className: 'persona-card-btn persona-ics',
         onclick: () => acceptDemoLogin('ics', 'ICS-STG-001')
       },
-        el('div', { className: 'persona-badge ics' }, 'หัวหน้าชุดตรวจประเมิน ICS'),
+        el('div', { className: 'persona-badge ics' }, 'เจ้าหน้าที่ ICS • หัวหน้าชุดตรวจประเมิน'),
         el('b', {}, 'คุณวิชัย ผักไหม (ICS-STG-001)'),
-        el('small', {}, 'ดูแผนภาพวงกลม อนุมัติปัจจัยการผลิต และบันทึกผลตรวจแปลง')
+        el('small', {}, 'ดูกราฟวงกลม อนุมัติปัจจัยการผลิต และบันทึกผลตรวจแปลง')
       )
     )
   );
@@ -386,7 +388,7 @@ async function start(forceLogin = false) {
     const roleIconName = me.role === 'farmer' ? 'sprout' : (me.role === 'ics' ? 'clipboard' : 'shield');
     
     const switcherBar = demoUser ? el('div', { className: 'role-switcher-bar' },
-      el('span', { className: 'switcher-label' }, icon('refresh', 13), ' สลับบัญชีทดสอบ:'),
+      el('span', { className: 'switcher-label' }, icon('refresh', 13), ' สลับบทบาททดสอบ:'),
       el('button', {
         type: 'button',
         className: `switcher-pill ${me.agency_code === 'F-STG-001' ? 'active' : ''}`,
@@ -413,7 +415,7 @@ async function start(forceLogin = false) {
     ) : null;
 
     const avatarIcon = me.role === 'farmer' ? 'farmerAvatar' : roleIconName;
-    const codeLabelPrefix = me.role === 'farmer' ? 'รหัสเกษตรกร : ' : 'รหัสเจ้าหน้าที่ : ';
+    const codeLabelPrefix = me.role === 'farmer' ? 'รหัสเกษตรกร : ' : (me.role === 'ics' ? 'รหัสเจ้าหน้าที่ ICS : ' : 'รหัสผู้ดูแลระบบ : ');
     const displayFullName = me.thai_name ? `${me.thai_name} (${me.name})` : (me.name || me.agency_code);
     const villageOrRole = me.village
       ? `${codeLabelPrefix}${me.agency_code || me.name} • ${me.village}`
@@ -464,7 +466,7 @@ function sharePlotRiskToLine(w) {
 
 
 function currentTabs() {
-  return me.role === 'admin' ? tabsAdmin : me.role === 'ics' ? (demoUser ? tabsIcsDemo : tabsIcs) : tabsFarmer;
+  return me.role === 'admin' ? tabsAdmin : me.role === 'ics' ? tabsIcs : tabsFarmer;
 }
 
 function applyFontScale(isLarge) {
@@ -627,10 +629,13 @@ function renderMobileDock() {
   const shortLabels = {
     overview: 'ภาพรวม',
     home: 'ภาพรวม',
+    farmers: 'เกษตรกร',
     plots: me.role === 'ics' ? 'แปลง' : 'แปลงปลูก',
     record: 'บันทึก',
     approval: me.role === 'ics' ? 'คำขอ' : 'ขอปัจจัย',
     risks: 'จุดเสี่ยง',
+    reviews: 'ผลตรวจ',
+    lots: 'ล็อต',
     invites: 'คำเชิญ',
     users: 'สมาชิก',
     assignments: 'มอบหมาย'

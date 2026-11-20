@@ -497,6 +497,23 @@ app.get('/api/evidence/:id/content', auth, wrap(async (req, res) => {
     'Referrer-Policy': 'no-referrer',
   }).send(obj.body);
 }));
+app.get('/api/ics/farmers', auth, ics, wrap((req, res) => {
+  const rows = db.prepare(`SELECT u.id, u.name, c.code_hint agency_code,
+    COUNT(DISTINCT p.id) plot_count,
+    COUNT(DISTINCT a.id) activity_count,
+    COUNT(DISTINCT CASE WHEN app.status = 'pending' THEN app.id END) pending_approvals,
+    MAX(a.activity_date) last_activity_date
+    FROM users u
+    JOIN farmer_assignments fa ON fa.farmer_user_id = u.id AND fa.ics_user_id = ? AND fa.ends_at IS NULL
+    LEFT JOIN agency_credentials c ON c.user_id = u.id
+    LEFT JOIN plots p ON p.owner_id = u.id
+    LEFT JOIN activities a ON a.plot_id = p.id
+    LEFT JOIN approvals app ON app.plot_id = p.id
+    WHERE u.role = 'farmer'
+    GROUP BY u.id, u.name, c.code_hint
+    ORDER BY u.id`).all(req.user.id);
+  res.json(rows);
+}));
 app.get('/api/approvals', auth, wrap((req, res) => {
   const base = 'SELECT a.*,p.name plot_name,u.name farmer FROM approvals a JOIN plots p ON p.id=a.plot_id JOIN users u ON u.id=a.user_id';
   if (req.user.role === 'admin') return res.json(db.prepare(`${base} ORDER BY a.id DESC`).all());
@@ -545,8 +562,8 @@ app.get('/api/risks', auth, ics, wrap((req, res) => {
 
   res.json(sortRisksBySeverity([...actionRisks, ...inactive, ...pending, ...missingEvidence]));
 }));
-app.get('/api/reviews', auth, ics, wrap((req, res) => {
-  const rows = db.prepare(`SELECT r.*,p.name plot_name,u.name farmer_name,rv.name reviewer_name,
+app.get('/api/reviews', auth, wrap((req, res) => {
+  const base = `SELECT r.*,p.name plot_name,u.name farmer_name,rv.name reviewer_name,
     (SELECT pe.id FROM photo_evidence pe WHERE pe.entity_type='review' AND pe.entity_id=r.id ORDER BY pe.id DESC LIMIT 1) evidence_id,
     ra.standard_code,ra.checklist_id,ra.checklist_results_json,
     (SELECT COUNT(*) FROM corrective_actions ca WHERE ca.review_id=r.id AND ca.status!='resolved') open_actions_count,
@@ -555,9 +572,15 @@ app.get('/api/reviews', auth, ics, wrap((req, res) => {
     JOIN plots p ON p.id=r.plot_id
     JOIN users u ON u.id=p.owner_id
     JOIN users rv ON rv.id=r.reviewer_id
-    LEFT JOIN review_assessments ra ON ra.review_id=r.id
-    JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL
-    ORDER BY r.id DESC`).all(req.user.id);
+    LEFT JOIN review_assessments ra ON ra.review_id=r.id`;
+  let rows = [];
+  if (req.user.role === 'admin') {
+    rows = db.prepare(`${base} ORDER BY r.id DESC`).all();
+  } else if (req.user.role === 'ics') {
+    rows = db.prepare(`${base} JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY r.id DESC`).all(req.user.id);
+  } else {
+    rows = db.prepare(`${base} WHERE p.owner_id=? ORDER BY r.id DESC`).all(req.user.id);
+  }
   res.json(rows.map(row => ({ ...row, checklist_results: parseJsonSafe(row.checklist_results_json, []) })));
 }));
 app.post('/api/reviews', auth, ics, wrap((req, res) => {

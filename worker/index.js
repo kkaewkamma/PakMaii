@@ -248,7 +248,7 @@ export async function handleApi(request, env) {
   }
 
   const readOnlyRoutes = new Set([
-    '/api/me', '/api/plots', '/api/activities', '/api/approvals', '/api/lots', '/api/risks', '/api/reviews',
+    '/api/me', '/api/plots', '/api/activities', '/api/approvals', '/api/lots', '/api/risks', '/api/reviews', '/api/ics/farmers',
     '/api/checklists', '/api/corrective-actions', '/api/audit-logs',
     '/api/admin/users', '/api/admin/assignments', '/api/admin/invites', '/api/admin/unlinked-farmers', '/api/admin/unlinked-users',
   ]);
@@ -664,8 +664,11 @@ export async function handleApi(request, env) {
     return denied || json(await repository.listRisks(user.id));
   }
   if (pathname === '/api/reviews') {
+    return json(await repository.listReviews(user));
+  }
+  if (pathname === '/api/ics/farmers') {
     const denied = requireRole(user, 'ics', 'เฉพาะเจ้าหน้าที่ ICS');
-    return denied || json(await repository.listReviews(user.id));
+    return denied || json(await repository.listIcsFarmers(user.id));
   }
   if (pathname === '/api/checklists') {
     if (!['ics', 'admin'].includes(user.role)) return json({ error: 'เฉพาะเจ้าหน้าที่ ICS หรือผู้ดูแลระบบ' }, 403);
