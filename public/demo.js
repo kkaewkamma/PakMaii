@@ -735,8 +735,18 @@
         return { id: item.id };
       }
       if (method === 'POST' && path === '/webhook/line') {
-        const firstFarmerPlot = store.plots.find(p => owners.has(p.owner_id)) || store.plots[0];
         const textMessage = input.message || 'บันทึกกิจกรรมผ่าน LINE OA สำเร็จ (สูบน้ำโซลาร์เซลล์ / แหนแดง)';
+        let replyText = '🌱 ระบบบริหารมาตรฐานเกษตรอินทรีย์ผักไหม ยินดีให้บริการครับ แตะเมนูลัดเพื่อถามสถานะได้ทันที';
+        if (/คำขอ|approval|ปัจจัย/.test(textMessage)) {
+          replyText = '🌱 ตรวจสอบสถานะคำขอ: มีคำขอใช้ปัจจัยรอพิจารณา เจ้าหน้าที่กำลังตรวจสอบความสอดคล้องตามเกณฑ์อินทรีย์';
+        } else if (/แปลง|สถานะ|plot/.test(textMessage)) {
+          replyText = '🌾 สรุปสถานะแปลง: แปลง A-03 ข้าวหอมมะลิ 105 (ระยะปรับเปลี่ยน) บันทึกสม่ำเสมอในรอบ 14 วัน';
+        } else if (/ตรวจ|ผลตรวจ|pgs/.test(textMessage)) {
+          replyText = '🛡️ ผลตรวจแปลงล่าสุด: ผ่านเกณฑ์มาตรฐานเกษตรอินทรีย์แบบมีส่วนร่วม (PGS)';
+        } else if (/ics|เจ้าหน้าที่|ติดต่อ/.test(textMessage)) {
+          replyText = '🧑‍🌾 เจ้าหน้าที่ ICS ผู้รับผิดชอบ: คุณวิชัย ผักไหม โทร. 081-234-5678';
+        }
+        const firstFarmerPlot = store.plots.find(p => owners.has(p.owner_id)) || store.plots[0];
         const item = {
           id: ++store.seq.activities,
           plot_id: firstFarmerPlot ? firstFarmerPlot.id : 1,
@@ -749,7 +759,7 @@
         };
         store.activities.push(item);
         save(store);
-        return { ok: true, message: 'LINE Webhook mapped to activity log', activity: item };
+        return { ok: true, message: 'LINE Webhook mapped to activity log', reply: replyText, activity: item };
       }
       if (method === 'POST' && path === '/approvals') {
         requireRole(account, 'farmer', 'เฉพาะเกษตรกร');

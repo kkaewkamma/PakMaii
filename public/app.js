@@ -77,8 +77,13 @@ function updateShellHeader() {
   const subNavEl = $('#farmerSubNav');
   const titleEl = $('#farmerScreenTitle');
   const demoBtnEl = $('#demoToolsBtn');
+  const lineOaBtnEl = $('#lineOaBtn');
+  const notifBellBtnEl = $('#notifBellBtn');
 
   document.body.classList.toggle('farmer-on-home', me?.role === 'farmer' && tab === 'home');
+
+  lineOaBtnEl?.classList.toggle('hide', !me);
+  notifBellBtnEl?.classList.toggle('hide', !me);
 
   if (me?.role === 'farmer') {
     const isSubScreen = tab !== 'home';
@@ -430,6 +435,7 @@ async function start(forceLogin = false) {
     document.body.classList.remove('is-login');
     me = await api('/me');
     setRoleBodyClass(me.role);
+    initLineNotifications(me);
     if (me.role === 'admin' && !tabsAdmin.some(item => item[0] === tab)) tab = 'overview';
     if (me.role !== 'admin' && !currentTabs().some(item => item[0] === tab)) tab = 'home';
     plots = me.role === 'admin' ? [] : await api('/plots');
@@ -518,6 +524,13 @@ import {
 import { showStoryPassport } from './js/views/passport.js';
 import { buildIcsAnalyticsChartsPanel, openInteractiveTutorial, checkAndShowIpTutorial } from './js/views/tutorial.js';
 import { openPitchGuide } from './js/views/pitchGuide.js';
+import {
+  initLineNotifications,
+  pushLineNotification,
+  openLineNotificationModal,
+  openLineOaChatModal,
+  onNotificationCountChange
+} from './js/views/line-oa.js';
 
 function sharePlotRiskToLine(w) {
   const text = `[แจ้งเตือนมาตรฐานเกษตรอินทรีย์ ผักไหม (PGS/ICS)]\n` +
@@ -663,6 +676,46 @@ function initFontScaleToggle() {
       scrollToTop();
     };
   }
+  const lineOaBtn = $('#lineOaBtn');
+  if (lineOaBtn) {
+    lineOaBtn.onclick = async () => {
+      const approvalsList = await api('/approvals').catch(() => []);
+      const actsList = await api('/activities').catch(() => []);
+      openLineOaChatModal({
+        me,
+        plots,
+        approvals: approvalsList,
+        activities: actsList,
+        onNavigate: async (targetTab) => {
+          tab = targetTab;
+          renderTabs();
+          await loadTab();
+          scrollToTop();
+        }
+      });
+    };
+  }
+  const notifBellBtn = $('#notifBellBtn');
+  if (notifBellBtn) {
+    notifBellBtn.onclick = () => {
+      openLineNotificationModal({
+        user: me,
+        onNavigate: async (targetTab) => {
+          tab = targetTab;
+          renderTabs();
+          await loadTab();
+          scrollToTop();
+        }
+      });
+    };
+  }
+  onNotificationCountChange(count => {
+    const badge = $('#notifBadge');
+    if (badge) {
+      badge.textContent = String(count);
+      badge.classList.toggle('hide', count <= 0);
+    }
+  });
   const demoBtn = $('#demoToolsBtn');
   if (demoBtn) {
     demoBtn.onclick = () => openDemoToolsSheet();
@@ -1769,6 +1822,15 @@ async function loadTab() {
                   comment: commentText || undefined,
                 });
                 notify(`บันทึกผลการพิจารณาเป็น "${selectedStatus === 'approved' ? 'อนุมัติ' : 'ไม่อนุมัติ'}" เรียบร้อย`);
+                pushLineNotification({
+                  title: selectedStatus === 'approved' ? 'คำขอใช้ปัจจัยได้รับการอนุมัติ ✅' : 'คำขอใช้ปัจจัยไม่ผ่านการอนุมัติ ❌',
+                  body: selectedStatus === 'approved'
+                    ? `คำขอ "${item.input_name}" ได้รับการอนุมัติแล้ว พร้อมใช้งานในแปลง`
+                    : `คำขอ "${item.input_name}" ไม่ผ่านการอนุมัติ: ${commentText || 'ปรับปรุงสูตรก่อนส่งใหม่'}`,
+                  type: selectedStatus === 'approved' ? 'approved' : 'rejected',
+                  targetTab: 'approval',
+                  user: me
+                });
                 await loadTab();
               } catch (err) {
                 if (!err.handled) notify(err.message);

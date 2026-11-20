@@ -7892,3 +7892,529 @@ body.role-farmer .next-action-grid {
   gap: 8px;
   align-items: flex-start;
 }
+
+/* ==========================================================================
+   21. LINE Official Account (LINE OA) Notifications, Chat & Shortcuts
+   ========================================================================== */
+.line-oa-header-btn {
+  background: #06C755 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #059440 !important;
+  border-radius: 9999px !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  min-height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  cursor: pointer !important;
+}
+
+.line-oa-header-btn:hover {
+  background: #059440 !important;
+}
+
+.notif-bell-btn {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 50% !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  cursor: pointer !important;
+}
+
+.notif-bell-btn:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #EF4444;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 1px 5px;
+  line-height: 1.2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.farmer-greeting-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.farmer-line-btn {
+  background: #06C755 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #059440 !important;
+  border-radius: 9999px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 5px 12px !important;
+  min-height: 34px !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
+}
+
+.farmer-line-btn:hover {
+  background: #059440 !important;
+}
+
+.farmer-bell-btn {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 50% !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.farmer-bell-btn:hover {
+  background: rgba(255, 255, 255, 0.28) !important;
+}
+
+/* Modals */
+.line-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+
+.line-modal-card {
+  max-width: 460px;
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.line-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #E2E8F0;
+  margin-bottom: 14px;
+}
+
+.line-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.line-logo-badge {
+  width: 38px;
+  height: 38px;
+  background: #F0FDF4;
+  color: #166534;
+  border: 1px solid #BBF7D0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.line-modal-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #173D2C;
+}
+
+.line-modal-sub {
+  margin: 0;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.line-modal-close-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #64748B !important;
+  cursor: pointer !important;
+  padding: 6px !important;
+  min-height: 34px !important;
+  border-radius: 8px !important;
+}
+
+.line-modal-close-btn:hover {
+  background: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+.line-notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  max-height: 55vh;
+}
+
+.line-notif-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.line-notif-item.tone-approved,
+.line-notif-item.tone-success {
+  border-left: 4px solid #10B981;
+  background: #F0FDF4;
+}
+
+.line-notif-item.tone-pending,
+.line-notif-item.tone-warn {
+  border-left: 4px solid #F59E0B;
+  background: #FFFBEB;
+}
+
+.line-notif-item.tone-rejected,
+.line-notif-item.tone-danger {
+  border-left: 4px solid #EF4444;
+  background: #FEF2F2;
+}
+
+.line-notif-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.line-notif-tag {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #1E293B;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.line-notif-time {
+  font-size: 11.5px;
+  color: #64748B;
+}
+
+.line-notif-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.4;
+}
+
+.line-notif-link-btn {
+  background: none !important;
+  border: none !important;
+  color: #0B6B38 !important;
+  font-weight: 600 !important;
+  font-size: 12.5px !important;
+  padding: 2px 0 !important;
+  min-height: 28px !important;
+  cursor: pointer !important;
+  text-decoration: underline;
+}
+
+/* LINE Chat Modal Card */
+.line-chat-modal-card {
+  max-width: 440px;
+  width: 100%;
+  height: 620px;
+  max-height: 90vh;
+  background: #8CABD9;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+}
+
+.line-chat-header {
+  background: #173D2C;
+  color: #FFFFFF;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.line-chat-header-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.line-chat-avatar {
+  width: 36px;
+  height: 36px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.line-chat-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.line-chat-status {
+  font-size: 11px;
+  color: #A7F3D0;
+}
+
+.line-chat-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.line-chat-bubble {
+  display: flex;
+  flex-direction: column;
+}
+
+.line-chat-bubble.bot {
+  align-self: flex-start;
+}
+
+.line-chat-bubble.user {
+  align-self: flex-end;
+}
+
+.line-chat-bubble.bot .line-bubble-content {
+  background: #FFFFFF;
+  color: #1E293B;
+  border-radius: 16px 16px 16px 4px;
+  padding: 12px 14px;
+  max-width: 88%;
+  font-size: 13.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.line-chat-bubble.user .line-bubble-content {
+  background: #8DE055;
+  color: #1E293B;
+  border-radius: 16px 16px 4px 16px;
+  padding: 10px 14px;
+  max-width: 82%;
+  font-size: 13.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.line-bubble-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.line-bubble-action-btn {
+  margin-top: 10px;
+  width: 100%;
+  background: #06C755 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #059440 !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 7px 12px !important;
+  min-height: 36px !important;
+  cursor: pointer !important;
+}
+
+.line-bubble-action-btn:hover {
+  background: #059440 !important;
+}
+
+.line-quick-reply-bar {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 8px 10px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  border-top: 1px solid #CBD5E1;
+}
+
+.line-quick-reply-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.line-quick-chip {
+  background: #FFFFFF !important;
+  border: 1px solid #06C755 !important;
+  color: #059440 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  border-radius: 9999px !important;
+  padding: 6px 12px !important;
+  min-height: 32px !important;
+  cursor: pointer !important;
+  flex-shrink: 0;
+}
+
+.line-quick-chip:hover {
+  background: #F0FDF4 !important;
+}
+
+.line-chat-input-row {
+  background: #FFFFFF;
+  padding: 8px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid #E2E8F0;
+}
+
+.line-chat-input {
+  flex: 1;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 9999px !important;
+  padding: 8px 14px !important;
+  font-size: 13.5px !important;
+  outline: none !important;
+}
+
+.line-chat-input:focus {
+  border-color: #06C755 !important;
+}
+
+.line-chat-send-btn {
+  background: #06C755 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  flex-shrink: 0;
+}
+
+.line-chat-send-btn:hover {
+  background: #059440 !important;
+}
+
+/* Floating LINE Push Toast */
+.line-push-toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  max-width: 380px;
+  width: calc(100% - 32px);
+  background: #FFFFFF;
+  border-left: 5px solid #06C755;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  z-index: 1100;
+  transform: translateY(-40px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.line-push-toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.line-toast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.line-badge-pill {
+  background: #06C755;
+  color: #FFFFFF;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+}
+
+.line-toast-time {
+  font-size: 11px;
+  color: #64748B;
+}
+
+.line-toast-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.line-toast-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #F0FDF4;
+  color: #059440;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.line-toast-text strong {
+  display: block;
+  font-size: 13.5px;
+  color: #0F172A;
+  margin-bottom: 2px;
+}
+
+.line-toast-text p {
+  margin: 0;
+  font-size: 12.5px;
+  color: #475569;
+  line-height: 1.35;
+}

@@ -192,6 +192,40 @@ const genericRegistrationError = () => new HttpError(400, 'ข้อมูลล
 
 app.post('/api/webhook/line', wrap((req, res) => {
   const events = Array.isArray(req.body?.events) ? req.body.events : [];
+  const replies = [];
+  for (const evt of events) {
+    if (evt.type === 'message' && evt.message?.type === 'text') {
+      const userMsg = (evt.message.text || '').trim();
+      let replyText = '🌱 ระบบบริหารมาตรฐานเกษตรอินทรีย์ผักไหม ยินดีให้บริการครับ แตะเมนูลัดเพื่อถามสถานะได้ทันที';
+      if (/คำขอ|approval|ปัจจัย/.test(userMsg)) {
+        replyText = '🌱 ตรวจสอบสถานะคำขอ: คุณมีคำขอใช้ปัจจัยรอพิจารณา เจ้าหน้าที่ ICS กำลังตรวจสอบความสอดคล้องตามเกณฑ์อินทรีย์';
+      } else if (/แปลง|สถานะ|plot/.test(userMsg)) {
+        replyText = '🌾 สรุปสถานะแปลง: แปลง A-03 ข้าวหอมมะลิ 105 (ระยะปรับเปลี่ยน) มีการบันทึกสม่ำเสมอตามเกณฑ์ PGS';
+      } else if (/บันทึก|กิจกรรม/.test(userMsg)) {
+        replyText = '📝 แตะเพื่อเปิดแอปบันทึกแปลงผ่าน LINE LIFF: https://liff.line.me/' + (process.env.LIFF_ID || '');
+      } else if (/ตรวจ|ผลตรวจ|pgs/.test(userMsg)) {
+        replyText = '🛡️ ผลตรวจแปลงล่าสุด: ผ่านเกณฑ์มาตรฐานเกษตรอินทรีย์แบบมีส่วนร่วม (PGS)';
+      } else if (/ics|เจ้าหน้าที่|ติดต่อ/.test(userMsg)) {
+        replyText = '🧑‍🌾 เจ้าหน้าที่ ICS ผู้รับผิดชอบ: คุณวิชัย ผักไหม โทร. 081-234-5678';
+      }
+      replies.push({
+        replyToken: evt.replyToken,
+        messages: [{
+          type: 'text',
+          text: replyText,
+          quickReply: {
+            items: [
+              { type: 'action', action: { type: 'message', label: '🔍 เช็คสถานะคำขอ', text: 'เช็คสถานะคำขอ' } },
+              { type: 'action', action: { type: 'message', label: '🌾 สรุปสถานะแปลง', text: 'สรุปสถานะแปลง' } },
+              { type: 'action', action: { type: 'message', label: '📝 บันทึกแปลง', text: 'บันทึกแปลง' } },
+              { type: 'action', action: { type: 'message', label: '🛡️ เช็คผลตรวจแปลง', text: 'เช็คผลตรวจแปลง' } },
+              { type: 'action', action: { type: 'message', label: '📞 ติดต่อ ICS', text: 'ติดต่อ ics' } }
+            ]
+          }
+        }]
+      });
+    }
+  }
   res.json({
     ok: true,
     service: 'PakMaii LINE Webhook',
@@ -201,6 +235,7 @@ app.post('/api/webhook/line', wrap((req, res) => {
       source: evt.source?.userId ? 'line_user' : 'simulator',
       status: 'mapped_to_activity_log'
     })),
+    replies,
     timestamp: new Date().toISOString()
   });
 }));
