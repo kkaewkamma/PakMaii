@@ -33,6 +33,11 @@ const server = http.createServer((req, res) => {
   let pathname = parsedUrl.pathname;
 
   // Mock API endpoints for offline / demo testing
+  if (pathname === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
   if (pathname === '/api/config') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ demoOnly: true, development: true, evidenceUploadEnabled: false }));

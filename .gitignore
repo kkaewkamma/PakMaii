@@ -23,6 +23,7 @@ Thumbs.db
 data/evidence/
 test-results/
 playwright-report/
+audit-screenshots/
 .agent/
 __pycache__/
 *.py[cod]

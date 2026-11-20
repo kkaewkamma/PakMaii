@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Concept A — Premium AgriTech SaaS | PakMaii</title>
+  <link rel="stylesheet" href="/app.css">
+  <style>
+    /* Scope styles for Concept A - Premium AgriTech SaaS */
+    :root {
+      --saas-bg: #0C1510;
+      --saas-sidebar: #070E0B;
+      --saas-surface: #111E17;
+      --saas-card: #14241C;
+      --saas-card-border: rgba(46, 117, 83, 0.22);
+      --saas-card-hover: rgba(52, 140, 98, 0.35);
+      --saas-text-main: #ECFDF5;
+      --saas-text-muted: #8EAA9B;
+      --saas-emerald: #10B981;
+      --saas-emerald-glow: rgba(16, 185, 129, 0.15);
+      --saas-gold: #F59E0B;
+      --saas-red: #EF4444;
+      --saas-blue: #0EA5E9;
+    }
+
+    body.concept-a {
+      margin: 0;
+      padding: 0;
+      background: var(--saas-bg);
+      color: var(--saas-text-main);
+      font-family: 'IBM Plex Sans Thai', -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* Left Sidebar */
+    .saas-sidebar {
+      width: 240px;
+      background: var(--saas-sidebar);
+      border-right: 1px solid var(--saas-card-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      min-height: 100vh;
+    }
+
+    .saas-logo-area {
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--saas-card-border);
+    }
+
+    .saas-logo-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #064E3B;
+      color: #34D399;
+      border: 1px solid #10B981;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .saas-logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .saas-logo-text strong {
+      font-size: 15px;
+      color: #FFFFFF;
+      letter-spacing: -0.01em;
+    }
+
+    .saas-logo-text span {
+      font-size: 11px;
+      color: #34D399;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .saas-nav {
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .saas-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: var(--saas-text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .saas-nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #FFFFFF;
+    }
+
+    .saas-nav-item.active {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 600;
+    }
+
+    .saas-nav-badge {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.2);
+      color: #F87171;
+      font-weight: 700;
+    }
+
+    .saas-user-box {
+      padding: 16px;
+      border-top: 1px solid var(--saas-card-border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .saas-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #064E3B;
+      border: 2px solid #10B981;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: #FFFFFF;
+    }
+
+    /* Main Content Area */
+    .saas-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      max-height: 100vh;
+    }
+
+    .saas-topbar {
+      height: 64px;
+      border-bottom: 1px solid var(--saas-card-border);
+      background: rgba(17, 30, 23, 0.7);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .saas-breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      color: var(--saas-text-muted);
+    }
+
+    .saas-breadcrumbs strong {
+      color: #FFFFFF;
+    }
+
+    .saas-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .saas-chip-pill {
+      font-size: 12.5px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--saas-text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .saas-chip-pill strong {
+      color: #34D399;
+    }
+
+    .saas-btn-primary {
+      background: #10B981;
+      color: #064E3B;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13.5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .saas-btn-primary:hover {
+      background: #34D399;
+      transform: translateY(-1px);
+    }
+
+    /* Dashboard Workspace */
+    .saas-workspace {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* KPI Row */
+    .saas-kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .saas-kpi-card {
+      background: var(--saas-card);
+      border: 1px solid var(--saas-card-border);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.2s ease;
+    }
+
+    .saas-kpi-card:hover {
+      border-color: var(--saas-card-hover);
+    }
+
+    .saas-kpi-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--saas-text-muted);
+    }
+
+    .saas-kpi-val {
+      font-size: 28px;
+      font-weight: 700;
+      color: #FFFFFF;
+      letter-spacing: -0.02em;
+    }
+
+    .saas-kpi-change {
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .change-pos { color: #34D399; }
+    .change-warn { color: #FBBF24; }
+    .change-neg { color: #F87171; }
+
+    /* Bento Grid (2-Column Main Section) */
+    .saas-bento-grid {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 20px;
+    }
+
+    .saas-card-panel {
+      background: var(--saas-card);
+      border: 1px solid var(--saas-card-border);
+      border-radius: 14px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .saas-card-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .saas-card-panel-header h3 {
+      margin: 0;
+      font-size: 16.5px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    /* 14-Day Micro Timeline */
+    .saas-timeline-row {
+      display: grid;
+      grid-template-columns: repeat(14, 1fr);
+      gap: 6px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .saas-time-cell {
+      height: 38px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--saas-text-muted);
+    }
+
+    .saas-time-cell.filled {
+      background: #065F46;
+      color: #34D399;
+      font-weight: 700;
+      border: 1px solid #10B981;
+    }
+
+    .saas-time-cell.today-alert {
+      border: 1.5px dashed #EF4444;
+      color: #F87171;
+    }
+
+    /* Environmental Weather Widget */
+    .saas-weather-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .saas-weather-cell {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .saas-weather-cell small {
+      display: block;
+      color: var(--saas-text-muted);
+      font-size: 11.5px;
+    }
+
+    .saas-weather-cell strong {
+      font-size: 20px;
+      color: #FFFFFF;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* Status Pills */
+    .saas-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .pill-saas-risk {
+      background: rgba(239, 68, 68, 0.15);
+      color: #F87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .pill-saas-pass {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    @media (max-width: 900px) {
+      .saas-sidebar { display: none; }
+      .saas-kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .saas-bento-grid { grid-template-columns: 1fr; }
+      .saas-workspace { padding: 16px; }
+      .saas-timeline-row { grid-template-columns: repeat(7, 1fr); }
+    }
+  </style>
+</head>
+<body class="concept-a">
+
+  <!-- Left Sidebar Navigation -->
+  <aside class="saas-sidebar">
+    <div class="saas-logo-area">
+      <div class="saas-logo-badge">P</div>
+      <div class="saas-logo-text">
+        <strong>PakMaii Cloud</strong>
+        <span>Enterprise AgriTech</span>
+      </div>
+    </div>
+
+    <nav class="saas-nav">
+      <a class="saas-nav-item active">
+        <span>🌱</span>
+        <span>ภาพรวมแปลงปลูก</span>
+      </a>
+      <a class="saas-nav-item">
+        <span>📍</span>
+        <span>แปลงเกษตรกร</span>
+      </a>
+      <a class="saas-nav-item">
+        <span>📅</span>
+        <span>ประวัติกิจกรรม</span>
+      </a>
+      <a class="saas-nav-item">
+        <span>🧪</span>
+        <span>คำขอปัจจัยการผลิต</span>
+        <span class="saas-nav-badge">1 รอตรวจ</span>
+      </a>
+      <a class="saas-nav-item">
+        <span>🛡️</span>
+        <span>ผลตรวจประเมิน PGS</span>
+      </a>
+      <a class="saas-nav-item">
+        <span>📦</span>
+        <span>ล็อตผลผลิต & QR</span>
+      </a>
+    </nav>
+
+    <div class="saas-user-box">
+      <div class="saas-avatar">ส</div>
+      <div style="display:flex; flex-direction:column; overflow:hidden;">
+        <strong style="font-size:13px; color:#FFFFFF; white-space:nowrap; text-overflow:ellipsis;">คุณสมปอง คำภา</strong>
+        <span style="font-size:11px; color:var(--saas-text-muted);">F-STG-001 • แปลง A-03</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Work Area -->
+  <main class="saas-main">
+    <header class="saas-topbar">
+      <div class="saas-breadcrumbs">
+        <span>กลุ่มผักไหม</span>
+        <span>/</span>
+        <strong>แปลง A-03 (ข้าวหอมมะลิ 105 อินทรีย์)</strong>
+      </div>
+      <div class="saas-topbar-actions">
+        <div class="saas-chip-pill">
+          <span>สภาพอากาศ:</span>
+          <strong>แดดจัด 32°C</strong>
+        </div>
+        <div class="saas-chip-pill">
+          <span>ความชื้นดิน:</span>
+          <strong>48% (ปกติ)</strong>
+        </div>
+        <button type="button" class="saas-btn-primary">
+          <span>+</span>
+          <span>บันทึกแปลงด่วน</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="saas-workspace">
+      <!-- High-Level KPI Row -->
+      <div class="saas-kpi-row">
+        <div class="saas-kpi-card">
+          <div class="saas-kpi-header">
+            <span>พื้นที่แปลงอินทรีย์</span>
+            <span>📍</span>
+          </div>
+          <div class="saas-kpi-val">12 <small style="font-size:14px; color:var(--saas-text-muted);">ไร่</small></div>
+          <div class="saas-kpi-change change-pos">แปลง A-03 • ระยะปรับเปลี่ยนปี 1</div>
+        </div>
+
+        <div class="saas-kpi-card">
+          <div class="saas-kpi-header">
+            <span>จังหวะการบันทึก (14 วัน)</span>
+            <span>⏱️</span>
+          </div>
+          <div class="saas-kpi-val">16 <small style="font-size:14px; color:var(--saas-text-muted);">วันก่อน</small></div>
+          <div class="saas-kpi-change change-neg">⚠️ ขาดบันทึกเกินเกณฑ์ PGS</div>
+        </div>
+
+        <div class="saas-kpi-card">
+          <div class="saas-kpi-header">
+            <span>ปัจจัยการผลิตที่ยื่นขอ</span>
+            <span>🧪</span>
+          </div>
+          <div class="saas-kpi-val">1 <small style="font-size:14px; color:var(--saas-text-muted);">สูตร</small></div>
+          <div class="saas-kpi-change change-warn">รอการพิจารณาจาก ICS</div>
+        </div>
+
+        <div class="saas-kpi-card">
+          <div class="saas-kpi-header">
+            <span>ผลผลิตคาดการณ์</span>
+            <span>🌾</span>
+          </div>
+          <div class="saas-kpi-val">3,800 <small style="font-size:14px; color:var(--saas-text-muted);">กก.</small></div>
+          <div class="saas-kpi-change change-pos">เก็บเกี่ยว พ.ย. 2569</div>
+        </div>
+      </div>
+
+      <!-- Main Bento Grid -->
+      <div class="saas-bento-grid">
+        <!-- Main Plot Monitor -->
+        <section class="saas-card-panel">
+          <div class="saas-card-panel-header">
+            <div>
+              <h3>ความต่อเนื่องของการบันทึกแปลง (14-Day Farm Rhythm)</h3>
+              <small style="color:var(--saas-text-muted);">เกณฑ์มาตรฐาน PGS ชุมชน: เกษตรกรต้องอัปเดตการดูแลอย่างน้อยทุก 14 วัน</small>
+            </div>
+            <span class="saas-status-pill pill-saas-risk">ขาดบันทึก 16 วัน</span>
+          </div>
+
+          <!-- Modern Timeline Grid -->
+          <div class="saas-timeline-row">
+            <div class="saas-time-cell">7</div>
+            <div class="saas-time-cell">8</div>
+            <div class="saas-time-cell">9</div>
+            <div class="saas-time-cell">10</div>
+            <div class="saas-time-cell">11</div>
+            <div class="saas-time-cell">12</div>
+            <div class="saas-time-cell">13</div>
+            <div class="saas-time-cell">14</div>
+            <div class="saas-time-cell">15</div>
+            <div class="saas-time-cell">16</div>
+            <div class="saas-time-cell">17</div>
+            <div class="saas-time-cell">18</div>
+            <div class="saas-time-cell">19</div>
+            <div class="saas-time-cell today-alert">20</div>
+          </div>
+
+          <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:12px; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:20px;">⚠️</span>
+              <div>
+                <strong style="color:#FCA5A5; font-size:13.5px;">คำแนะนำระบบ: แปลง A-03 ขาดการบันทึกเกิน 14 วัน</strong>
+                <p style="margin:2px 0 0; color:var(--saas-text-muted); font-size:12px;">กรุณาบันทึกการให้น้ำ ใส่ปุ๋ยหมัก หรือตรวจแปลงเพื่อรักษาความต่อเนื่องของข้อมูลการตรวจรับรอง</p>
+              </div>
+            </div>
+            <button type="button" class="saas-btn-primary" style="white-space:nowrap;">บันทึกกิจกรรมด่วน</button>
+          </div>
+        </section>
+
+        <!-- Right Side: Weather & Terroir Telemetry -->
+        <section class="saas-card-panel">
+          <div class="saas-card-panel-header">
+            <h3>ข้อมูลสภาพแวดล้อม ต.ผักไหม</h3>
+            <span class="saas-status-pill pill-saas-pass">เซ็นเซอร์เสมือนจริง</span>
+          </div>
+
+          <div class="saas-weather-grid">
+            <div class="saas-weather-cell">
+              <small>อุณหภูมิปัจจุบัน</small>
+              <strong>32°C</strong>
+              <small style="color:#34D399;">สูงสุด 34° / ต่ำสุด 23°</small>
+            </div>
+            <div class="saas-weather-cell">
+              <small>ความชื้นสัมพัทธ์</small>
+              <strong>62%</strong>
+              <small style="color:#34D399;">ปลอดภัยจากเชื้อรา</small>
+            </div>
+            <div class="saas-weather-cell">
+              <small>ความชื้นผิวดิน</small>
+              <strong>48%</strong>
+              <small style="color:#FBBF24;">เหมาะใส่ปุ๋ยหมักแห้ง</small>
+            </div>
+            <div class="saas-weather-cell">
+              <small>ธนาคารน้ำใต้ดิน</small>
+              <strong>ระดับ 2.4 ม.</strong>
+              <small style="color:#34D399;">ปริมาณน้ำเพียงพอ</small>
+            </div>
+          </div>
+
+          <div style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.18); border-radius:8px; padding:12px; font-size:12.5px; color:#A7F3D0; line-height:1.5;">
+            🌾 <strong>คำแนะนำฤดูกาล:</strong> ช่วงเตรียมดินหลังเกี่ยว หว่านปอเทือง 5 กก./ไร่ ไถกลบตอซัง ไม่เผาฟาง เพื่อสะสมไนโตรเจนอินทรีย์
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+</body>
+</html>

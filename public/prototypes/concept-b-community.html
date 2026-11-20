@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Concept B — Modern Thai Community Platform | PakMaii</title>
+  <link rel="stylesheet" href="/app.css">
+  <style>
+    /* Scope styles for Concept B - Modern Thai Community Platform */
+    :root {
+      --com-bg: #FAF7F0;
+      --com-header: #194833;
+      --com-card: #FFFFFF;
+      --com-card-border: #E8E2D5;
+      --com-green: #226D45;
+      --com-green-light: #EBF7EE;
+      --com-terracotta: #D97706;
+      --com-terracotta-light: #FEF3C7;
+      --com-ink: #262923;
+      --com-ink-muted: #6B7265;
+    }
+
+    body.concept-b {
+      margin: 0;
+      padding: 0;
+      background: var(--com-bg);
+      color: var(--com-ink);
+      font-family: 'IBM Plex Sans Thai', -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* Friendly Community Header */
+    .com-header {
+      background: var(--com-header);
+      color: #FFFFFF;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid #F59E0B;
+    }
+
+    .com-header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .com-header-seal {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      color: #194833;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 20px;
+      border: 2px solid #F59E0B;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .com-header-title h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .com-header-title p {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: #D6EAD7;
+    }
+
+    .com-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .com-pill-btn {
+      background: rgba(255, 255, 255, 0.15);
+      color: #FFFFFF;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Container */
+    .com-container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px 20px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    /* Human-Centered Hero Profile */
+    .com-profile-card {
+      background: #FFFFFF;
+      border: 1.5px solid var(--com-card-border);
+      border-radius: 20px;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 6px 20px rgba(40, 50, 30, 0.05);
+    }
+
+    .com-profile-left {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .com-profile-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--com-green-light);
+      border: 3px solid #22C55E;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+    }
+
+    .com-profile-info h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--com-header);
+    }
+
+    .com-profile-info p {
+      margin: 4px 0 0;
+      font-size: 13.5px;
+      color: var(--com-ink-muted);
+    }
+
+    .com-badges-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .com-badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+
+    .com-badge-gold {
+      background: #FEF3C7;
+      color: #92400E;
+      border: 1px solid #FDE68A;
+    }
+
+    .com-badge-green {
+      background: #DCFCE7;
+      color: #166534;
+      border: 1px solid #BBF7D0;
+    }
+
+    /* Large Senior-Friendly Action Hero */
+    .com-action-hero {
+      background: #FFFDF8;
+      border: 2px solid #F59E0B;
+      border-left: 8px solid #D97706;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(217, 119, 6, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .com-action-left h3 {
+      margin: 0;
+      font-size: 19px;
+      color: #92400E;
+      font-weight: 700;
+    }
+
+    .com-action-left p {
+      margin: 6px 0 0;
+      font-size: 14.5px;
+      color: #57534E;
+      line-height: 1.5;
+    }
+
+    .com-btn-giant {
+      background: #15803D;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 26px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 14px rgba(21, 128, 61, 0.3);
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .com-btn-giant:hover {
+      background: #166534;
+      transform: translateY(-2px);
+    }
+
+    /* 3-Card Thumb Grid */
+    .com-thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .com-thumb-card {
+      background: #FFFFFF;
+      border: 1.5px solid var(--com-card-border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+
+    .com-thumb-card:hover {
+      border-color: var(--com-green);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(34, 109, 69, 0.1);
+    }
+
+    .com-thumb-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--com-green-light);
+      color: var(--com-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .com-thumb-card h4 {
+      margin: 0;
+      font-size: 16.5px;
+      font-weight: 700;
+      color: var(--com-header);
+    }
+
+    .com-thumb-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--com-ink-muted);
+      line-height: 1.4;
+    }
+
+    /* Weekly Rhythm Ribbon */
+    .com-ribbon-card {
+      background: #FFFFFF;
+      border: 1.5px solid var(--com-card-border);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    }
+
+    .com-ribbon-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .com-ribbon-header h3 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--com-header);
+    }
+
+    .com-days-track {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+    }
+
+    .com-day-stamp {
+      background: #F7F5EE;
+      border: 1px solid #E5E0D3;
+      border-radius: 12px;
+      padding: 12px 6px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .com-day-stamp.active {
+      background: #DCFCE7;
+      border-color: #22C55E;
+      color: #166534;
+      font-weight: 700;
+    }
+
+    .com-day-stamp.missed {
+      background: #FEF2F2;
+      border-color: #F87171;
+      color: #991B1B;
+    }
+
+    .com-day-label {
+      font-size: 12px;
+    }
+
+    .com-day-icon {
+      font-size: 18px;
+    }
+
+    @media (max-width: 768px) {
+      .com-action-hero { flex-direction: column; align-items: flex-start; }
+      .com-btn-giant { width: 100%; justify-content: center; }
+      .com-thumb-grid { grid-template-columns: 1fr; }
+      .com-profile-card { flex-direction: column; align-items: flex-start; gap: 14px; }
+      .com-container { padding: 14px; }
+    }
+  </style>
+</head>
+<body class="concept-b">
+
+  <!-- Friendly Community Header -->
+  <header class="com-header">
+    <div class="com-header-brand">
+      <div class="com-header-seal">ผ</div>
+      <div class="com-header-title">
+        <h1>วิสาหกิจชุมชนเกษตรอินทรีย์ตำบลผักไหม</h1>
+        <p>อ.ห้วยทับทัน จ.ศรีสะเกษ • ระบบควบคุมมาตรฐานภายใน (ICS/PGS)</p>
+      </div>
+    </div>
+    <div class="com-header-actions">
+      <span style="font-size:13px; color:#FEF3C7; font-weight:600;">☀️ วันนี้: แดดจัด 32°C</span>
+      <button type="button" class="com-pill-btn">ก+ ตัวอักษรใหญ่</button>
+    </div>
+  </header>
+
+  <main class="com-container">
+    <!-- Human Profile Hero Card -->
+    <div class="com-profile-card">
+      <div class="com-profile-left">
+        <div class="com-profile-avatar">👨‍🌾</div>
+        <div class="com-profile-info">
+          <h2>สวัสดีคุณพ่อสมปอง คำภา</h2>
+          <p>สมาชิกกลุ่มผักไหม • แปลง A-03 (ข้าวหอมมะลิ 105 อินทรีย์ ทุ่งกุลาร้องไห้)</p>
+          <div class="com-badges-row">
+            <span class="com-badge com-badge-gold">รหัสเกษตรกร : F-STG-001</span>
+            <span class="com-badge com-badge-green">แปลงขนาด 12 ไร่ (ระยะปรับเปลี่ยนปี 1)</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <button type="button" style="background:#F3F4F6; border:1px solid #D1D5DB; padding:8px 16px; border-radius:8px; font-size:13.5px; cursor:pointer;">สลับบัญชีทดสอบ</button>
+      </div>
+    </div>
+
+    <!-- Senior Action Hero (Immediate Task) -->
+    <div class="com-action-hero">
+      <div class="com-action-left">
+        <h3>📢 งานด่วนวันนี้: แปลง A-03 ขาดการบันทึกเกิน 14 วัน</h3>
+        <p>บันทึกกิจกรรมล่าสุดเมื่อ 16 วันก่อน กรุณาอัปเดตการดูแลแปลงเพื่อรักษามาตรฐาน PGS และแจ้งผู้ตรวจ ICS ทราบ</p>
+      </div>
+      <button type="button" class="com-btn-giant">
+        <span>✏️</span>
+        <span>แตะเพื่อเริ่มบันทึกทันที</span>
+      </button>
+    </div>
+
+    <!-- 3 Big Thumb-Friendly Shortcuts -->
+    <div class="com-thumb-grid">
+      <div class="com-thumb-card">
+        <div class="com-thumb-icon">🎙️</div>
+        <h4>สั่งการด้วยเสียงพูด</h4>
+        <p>แตะแล้วพูดภาษาไทย ไม่ต้องพิมพ์เอง เหมาะสำหรับคุณพ่อคุณแม่</p>
+      </div>
+
+      <div class="com-thumb-card">
+        <div class="com-thumb-icon">🧪</div>
+        <h4>ยื่นขอสูตรปุ๋ยอินทรีย์</h4>
+        <p>ส่งสูตรปุ๋ยหมักชีวภาพ ให้เจ้าหน้าที่ตรวจและอนุมัติก่อนใช้จริง</p>
+      </div>
+
+      <div class="com-thumb-card">
+        <div class="com-thumb-icon">📜</div>
+        <h4>ใบรับรองและประวัติแปลง</h4>
+        <p>เปิดดูบัตรรับรอง PGS ทุ่งกุลาร้องไห้ และ QR Code ประจำถุงข้าว</p>
+      </div>
+    </div>
+
+    <!-- Weekly Timeline Ribbon -->
+    <div class="com-ribbon-card">
+      <div class="com-ribbon-header">
+        <div>
+          <h3>รอบการดูแลแปลงสัปดาห์นี้ (7 วันล่าสุด)</h3>
+          <small style="color:var(--com-ink-muted);">มาตรฐานเกษตรอินทรีย์ PGS ชุมชนผักไหม</small>
+        </div>
+        <span style="font-size:13px; color:#B45309; font-weight:700;">ขาดบันทึก 1 แปลง</span>
+      </div>
+
+      <div class="com-days-track">
+        <div class="com-day-stamp active">
+          <span class="com-day-label">จ. 14</span>
+          <span class="com-day-icon">💧</span>
+          <small>ให้น้ำ</small>
+        </div>
+        <div class="com-day-stamp active">
+          <span class="com-day-label">อ. 15</span>
+          <span class="com-day-icon">🌿</span>
+          <small>ใส่ปุ๋ย</small>
+        </div>
+        <div class="com-day-stamp">
+          <span class="com-day-label">พ. 16</span>
+          <span class="com-day-icon">—</span>
+          <small>พักแปลง</small>
+        </div>
+        <div class="com-day-stamp active">
+          <span class="com-day-label">พฤ. 17</span>
+          <span class="com-day-icon">🌾</span>
+          <small>ตรวจแปลง</small>
+        </div>
+        <div class="com-day-stamp">
+          <span class="com-day-label">ศ. 18</span>
+          <span class="com-day-icon">—</span>
+          <small>พักแปลง</small>
+        </div>
+        <div class="com-day-stamp">
+          <span class="com-day-label">ส. 19</span>
+          <span class="com-day-icon">—</span>
+          <small>พักแปลง</small>
+        </div>
+        <div class="com-day-stamp missed">
+          <span class="com-day-label">อา. 20</span>
+          <span class="com-day-icon">⚠️</span>
+          <small>ครบ 14 วัน</small>
+        </div>
+      </div>
+    </div>
+  </main>
+
+</body>
+</html>

@@ -121,6 +121,51 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
         ...plots.map(p => create14DayRhythmTrack(p.id, activities, { title: `จังหวะบันทึกแปลง ${p.name} (14 วันล่าสุด)` }))
       );
 
+  const serviceGrid = el('div', { className: 'service-grid-section mb-16' },
+    el('div', { className: 'section-title-row' },
+      el('span', { className: 'section-title-text' }, 'บริการสำหรับเกษตรกร'),
+      el('span', { className: 'section-sub-text' }, 'แตะเลือกรายการเพื่อเข้าใช้งานด่วน')
+    ),
+    el('div', { className: 'service-grid' },
+      el('button', {
+        type: 'button',
+        className: 'service-item',
+        onclick: () => navigateTab('plots')
+      },
+        el('div', { className: 'service-icon-box icon-green' }, icon('sprout', 24)),
+        el('span', { className: 'service-label' }, 'แปลงของฉัน'),
+        el('span', { className: 'service-badge' }, `${plots.length} แปลง`)
+      ),
+      el('button', {
+        type: 'button',
+        className: 'service-item',
+        onclick: () => navigateTab('record')
+      },
+        el('div', { className: 'service-icon-box icon-orange' }, icon('calendar', 24)),
+        el('span', { className: 'service-label' }, 'บันทึกงาน'),
+        el('span', { className: 'service-badge' }, 'จดวันนี้')
+      ),
+      el('button', {
+        type: 'button',
+        className: 'service-item',
+        onclick: () => navigateTab('approval')
+      },
+        el('div', { className: 'service-icon-box icon-blue' }, icon('clipboard', 24)),
+        el('span', { className: 'service-label' }, 'ขออนุมัติ'),
+        el('span', { className: 'service-badge' }, pendingCount > 0 ? `รอตรวจ ${pendingCount}` : 'ยื่นสูตรปุ๋ย')
+      ),
+      el('button', {
+        type: 'button',
+        className: 'service-item',
+        onclick: () => navigateTab('inspections')
+      },
+        el('div', { className: 'service-icon-box icon-purple' }, icon('shield', 24)),
+        el('span', { className: 'service-label' }, 'ผลตรวจแปลง'),
+        el('span', { className: 'service-badge' }, 'มาตรฐาน PGS')
+      )
+    )
+  );
+
   const farmerHeroCard = el('div', { className: `farmer-hero-graphic-card ${statusTier}` },
     el('div', { className: 'farmer-hero-top' },
       el('div', { className: 'farmer-hero-info' },
@@ -143,7 +188,7 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
       el('button', {
         type: 'button',
         id: 'farmerPrimaryRecordBtn',
-        className: isOverdue ? 'pulse' : '',
+        className: isOverdue ? 'pulse btn-hero-primary' : 'btn-hero-primary',
         onclick: () => navigateTab('record')
       }, icon('calendar', 16), ' บันทึกกิจกรรม'),
       el('button', {
@@ -153,6 +198,26 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
       }, icon('clipboard', 16), ' ขออนุมัติปัจจัย')
     )
   );
+
+  const recentMiniList = activities.length > 0 ? el('div', { className: 'card recent-activities-mini-card mb-16' },
+    el('div', { className: 'row between align-center mb-8' },
+      el('b', { className: 'recent-mini-title' }, icon('clock', 14), ' บันทึกล่าสุดในแปลง'),
+      el('button', {
+        type: 'button',
+        className: 'link-btn text-sm',
+        onclick: () => navigateTab('record')
+      }, `ดูทั้งหมด (${activities.length}) >`)
+    ),
+    el('div', { className: 'recent-mini-items-list' },
+      ...sortedActs.slice(0, 2).map(act => el('div', { className: 'recent-mini-row' },
+        el('div', { className: 'recent-mini-main' },
+          el('strong', {}, `${act.kind || act.activity_type || 'กิจกรรมแปลง'}`),
+          el('p', { className: 'muted text-xs' }, `${act.plot_name || myPlot?.name || 'แปลงปลูก'} • ${dated(act.activity_date)}`)
+        ),
+        el('span', { className: 'pill success' }, 'บันทึกแล้ว')
+      ))
+    )
+  ) : null;
 
   const pgsCriteriaCard = el('div', { className: 'card pgs-criteria-card' },
     el('div', { className: 'row between' },
@@ -238,10 +303,12 @@ export function buildFarmerHomeView({ plots = [], activities = [], lots = [], pe
 
   return [
     farmerHeroCard,
+    serviceGrid,
+    recentMiniList,
     agroClimateWidget,
     pgsCriteriaCard,
     farmerKpiGrid
-  ];
+  ].filter(Boolean);
 }
 
 export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, navigateTab }) {

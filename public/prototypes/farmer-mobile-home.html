@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ผักไหม (PakMaii) — หน้าหลักเกษตรกร (Thai Mobile Super-App)</title>
+  <link rel="stylesheet" href="/prototypes/farmer-superapp.css">
+</head>
+<body>
+
+  <main class="mobile-screen">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="brand-cluster">
+        <div class="brand-emblem">ผ</div>
+        <div class="brand-meta">
+          <h1>ผักไหมอินทรีย์</h1>
+          <p>ระบบตรวจสอบมาตรฐานวิสาหกิจชุมชน</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" aria-label="การแจ้งเตือน" data-sheet="notifications">
+          🔔
+          <span class="badge-dot"></span>
+        </button>
+        <button class="icon-btn" aria-label="โปรไฟล์" data-sheet="plots">
+          👤
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Mobile Content -->
+    <div class="screen-content">
+
+      <!-- 1. Farmer Digital Identity Card (สไตล์ ThaID & G-Wallet) -->
+      <section class="farmer-identity-card" aria-label="บัตรประจำตัวเกษตรกรอินทรีย์">
+        <div class="card-pattern-overlay">ผ</div>
+        <div class="id-top-row">
+          <div>
+            <span class="greeting-text">สวัสดีตอนบ่าย</span>
+            <h2 class="farmer-name">นายสมศรี วงศ์อินทร์</h2>
+          </div>
+          <div class="organic-cert-pill">
+            <span class="cert-dot"></span>
+            <span>อินทรีย์แท้</span>
+          </div>
+        </div>
+        <div class="id-bottom-row">
+          <div class="id-stat-box">
+            <label>แปลงที่ดูแล</label>
+            <span>2 แปลง (14 ไร่)</span>
+          </div>
+          <div class="id-stat-box">
+            <label>รหัสสมาชิก</label>
+            <span>PKM-65012 (กลุ่ม 2)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Primary Hero Task Today (ภารกิจเด่นวันนี้) -->
+      <section class="primary-action-card" aria-label="ภารกิจประจำวัน">
+        <div class="task-header">
+          <span class="task-tag">ภารกิจวันนี้</span>
+          <span class="task-time">พฤหัสบดี 20 พ.ย.</span>
+        </div>
+        <h3 class="task-title">บันทึกกิจกรรมประจำวันในแปลง</h3>
+        <p class="task-desc">แปลงนาทุ่งใหญ่และโคกหนองนายังไม่มีรายการกิจกรรมวันนี้ จดบันทึกเพื่อรักษาระดับมาตรฐาน Organic Thailand</p>
+        <a href="/prototypes/farmer-mobile-record.html" class="btn-hero-primary" id="btnStartRecord">
+          <span class="btn-hero-icon">✍️</span> แตะเพื่อเริ่มบันทึกกิจกรรม
+        </a>
+      </section>
+
+      <!-- 3. Service Menu Grid (สไตล์เป๋าตัง 4-Grid Icon) -->
+      <section aria-label="เมนูบริการหลัก">
+        <div class="section-title">
+          <span>บริการสำหรับเกษตรกร</span>
+          <span class="section-sub">แตะเลือกรายการ</span>
+        </div>
+        <div class="service-grid">
+          <button type="button" class="service-item" data-sheet="plots">
+            <div class="service-icon-box icon-green">🌾</div>
+            <span class="service-label">แปลงของฉัน</span>
+            <span class="service-badge">2 แปลง</span>
+          </button>
+          <a href="/prototypes/farmer-mobile-record.html" class="service-item">
+            <div class="service-icon-box icon-orange">📝</div>
+            <span class="service-label">บันทึกงาน</span>
+            <span class="service-badge">จดวันนี้</span>
+          </a>
+          <button type="button" class="service-item" data-sheet="inputs">
+            <div class="service-icon-box icon-blue">🧪</div>
+            <span class="service-label">ขออนุมัติ</span>
+            <span class="service-badge">รอตรวจ 1</span>
+          </button>
+          <button type="button" class="service-item" data-sheet="inspections">
+            <div class="service-icon-box icon-purple">📋</div>
+            <span class="service-label">ผลตรวจแปลง</span>
+            <span class="service-badge">ผ่าน 100%</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 4. Important Alerts Only (แจ้งเตือนสำคัญเฉพาะเรื่องเร่งด่วน) -->
+      <section class="alert-banner" aria-label="การแจ้งเตือนนัดตรวจ">
+        <div class="alert-icon">📅</div>
+        <div class="alert-content">
+          <div class="alert-title">นัดหมายตรวจแปลงรอบที่ 2/2569</div>
+          <div class="alert-msg">สารวัตรเกษตร ICS จะเข้าสุ่มตรวจสารตกค้างในแปลงนาทุ่งใหญ่ ในอีก 4 วัน (24 พ.ย. 69) กรุณาเตรียมสมุดตรวจรับปุ๋ย</div>
+        </div>
+      </section>
+
+      <!-- 5. Recent History Mini-List (ย้อนหลัง 2 รายการสั้นๆ) -->
+      <section aria-label="ประวัติล่าสุด">
+        <div class="section-title">
+          <span>ประวัติกิจกรรมล่าสุด</span>
+          <button type="button" class="btn-text-link" data-sheet="plots">ดูทั้งหมด (14) &gt;</button>
+        </div>
+        <div class="recent-list">
+          <div class="recent-item">
+            <div class="item-main">
+              <h4>ใส่ปุ๋ยหมักชีวภาพ พด.1 (50 กก.)</h4>
+              <p>แปลงนาทุ่งใหญ่ • วานนี้ 16:30 น.</p>
+            </div>
+            <span class="item-status status-done">บันทึกแล้ว</span>
+          </div>
+          <div class="recent-item">
+            <div class="item-main">
+              <h4>ตรวจวัดระดับน้ำและระบายน้ำเข้าแปลง</h4>
+              <p>แปลงโคกหนองนา • 18 พ.ย. 69</p>
+            </div>
+            <span class="item-status status-done">บันทึกแล้ว</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Bottom Navigation Dock (สไตล์แอปมือถือ 4 แท็บ) -->
+    <nav class="mobile-bottom-dock" aria-label="เมนูหลักด้านล่าง">
+      <button class="dock-btn active">
+        <span class="dock-icon">🏠</span>
+        <span>หน้าแรก</span>
+      </button>
+      <button class="dock-btn" data-sheet="plots">
+        <span class="dock-icon">🌾</span>
+        <span>แปลงปลูก</span>
+      </button>
+      <a href="/prototypes/farmer-mobile-record.html" class="dock-btn">
+        <span class="dock-icon">📝</span>
+        <span>บันทึกงาน</span>
+      </a>
+      <button class="dock-btn" data-sheet="notifications">
+        <span class="dock-icon">🔔</span>
+        <span>แจ้งเตือน</span>
+        <span class="dock-badge">1</span>
+      </button>
+    </nav>
+  </main>
+
+  <!-- Interactive Bottom Sheet Modal for Exploration -->
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+  <div class="bottom-sheet" id="bottomSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title-row">
+      <h3 id="sheetTitle">หัวข้อ</h3>
+      <button class="sheet-close-btn" aria-label="ปิด">✕</button>
+    </div>
+    <div id="sheetBody"></div>
+  </div>
+
+  <script type="module" src="/prototypes/farmer-mobile-home.js"></script>
+</body>
+</html>

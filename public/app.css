@@ -4837,3 +4837,160 @@ body.is-login .hero {
   border-bottom: 1px dotted #5E6E64;
   margin-bottom: 6px;
 }
+
+/* ==========================================================================
+   Thai Mobile Super-App (Paotang Service Grid & Farmer Touch Optimization)
+   ========================================================================== */
+
+.service-grid-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 4px;
+}
+
+.section-title-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.section-sub-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  background: var(--surface);
+  padding: 16px 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.service-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+  transition: transform 0.15s ease;
+}
+
+.service-item:active {
+  transform: scale(0.94);
+}
+
+.service-icon-box {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.service-icon-box.icon-green {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+.service-icon-box.icon-orange {
+  background: #FFF7ED;
+  color: #D97706;
+  border: 1px solid #FED7AA;
+}
+
+.service-icon-box.icon-blue {
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+}
+
+.service-icon-box.icon-purple {
+  background: #FAF5FF;
+  color: #7C3AED;
+  border: 1px solid #E9D5FF;
+}
+
+.service-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.service-badge {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.btn-hero-primary {
+  min-height: 50px !important;
+  background: #14532D !important;
+  color: #FFFFFF !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 4px 12px rgba(20, 83, 45, 0.25) !important;
+}
+
+.btn-hero-primary:active {
+  background: #0F3E22 !important;
+  transform: scale(0.98);
+}
+
+.recent-activities-mini-card {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+}
+
+.recent-mini-title {
+  font-size: 14px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recent-mini-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent-mini-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--sage-50);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+}
+
+.recent-mini-main strong {
+  font-size: 13px;
+  color: var(--ink);
+  display: block;
+  margin-bottom: 2px;
+}
+

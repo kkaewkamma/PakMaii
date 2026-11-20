@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Concept C — Minimal Professional Operations Console | PakMaii</title>
+  <link rel="stylesheet" href="/app.css">
+  <style>
+    /* Scope styles for Concept C - Minimal Professional Operations Console */
+    :root {
+      --con-bg: #F8FAFC;
+      --con-surface: #FFFFFF;
+      --con-border: #E2E8F0;
+      --con-border-dark: #CBD5E1;
+      --con-text: #0F172A;
+      --con-muted: #64748B;
+      --con-primary: #0F766E;
+      --con-primary-light: #F0FDFA;
+      --con-danger: #DC2626;
+      --con-warn: #D97706;
+      --con-ok: #16A34A;
+    }
+
+    body.concept-c {
+      margin: 0;
+      padding: 0;
+      background: var(--con-bg);
+      color: var(--con-text);
+      font-family: 'IBM Plex Sans Thai', -apple-system, sans-serif;
+      font-size: 13.5px;
+      line-height: 1.45;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Console Bar */
+    .con-topbar {
+      height: 48px;
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--con-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+    }
+
+    .con-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #0F172A;
+    }
+
+    .con-sys-tag {
+      font-size: 11px;
+      background: #E2E8F0;
+      color: #475569;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    .con-search {
+      width: 320px;
+      height: 30px;
+      background: #F1F5F9;
+      border: 1px solid var(--con-border);
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 12.5px;
+      color: var(--con-text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .con-user-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--con-muted);
+    }
+
+    /* Subheader Stats Strip */
+    .con-stats-strip {
+      height: 38px;
+      background: #F1F5F9;
+      border-bottom: 1px solid var(--con-border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 20px;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .con-stat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .con-stat-pill b {
+      font-size: 13px;
+      color: var(--con-text);
+    }
+
+    /* Master-Detail Split Workspace */
+    .con-workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 480px 1fr;
+      overflow: hidden;
+    }
+
+    /* Left Master Pane: Member Roster Table */
+    .con-master-pane {
+      background: #FFFFFF;
+      border-right: 1px solid var(--con-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .con-pane-header {
+      padding: 10px 14px;
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--con-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .con-filter-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .con-tab-btn {
+      background: none;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--con-muted);
+      cursor: pointer;
+    }
+
+    .con-tab-btn.active {
+      background: #E2E8F0;
+      color: var(--con-text);
+      font-weight: 600;
+    }
+
+    .con-roster-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .con-roster-row {
+      padding: 12px 14px;
+      border-bottom: 1px solid #F1F5F9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: background 0.1s ease;
+    }
+
+    .con-roster-row:hover {
+      background: #F8FAFC;
+    }
+
+    .con-roster-row.selected {
+      background: var(--con-primary-light);
+      border-left: 3px solid var(--con-primary);
+    }
+
+    .con-roster-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .con-plot-title {
+      font-weight: 600;
+      font-size: 13.5px;
+      color: var(--con-text);
+    }
+
+    .con-plot-sub {
+      font-size: 12px;
+      color: var(--con-muted);
+    }
+
+    .con-badge-risk {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #FEE2E2;
+      color: #991B1B;
+      border: 1px solid #FCA5A5;
+    }
+
+    .con-badge-pass {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #DCFCE7;
+      color: #166534;
+      border: 1px solid #86EFAC;
+    }
+
+    /* Right Detail Pane: Live Dossier */
+    .con-detail-pane {
+      background: #F8FAFC;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 20px;
+      gap: 16px;
+    }
+
+    .con-detail-card {
+      background: #FFFFFF;
+      border: 1px solid var(--con-border);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .con-detail-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #F1F5F9;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+
+    .con-detail-card-header h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #0F172A;
+    }
+
+    .con-field-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      font-size: 12.5px;
+    }
+
+    .con-field-item small {
+      display: block;
+      color: var(--con-muted);
+      margin-bottom: 2px;
+    }
+
+    .con-field-item b {
+      color: var(--con-text);
+      font-size: 13.5px;
+    }
+
+    /* 1-Click Action Bar */
+    .con-action-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .con-btn-action-ok {
+      background: #16A34A;
+      color: #FFFFFF;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .con-btn-action-no {
+      background: #DC2626;
+      color: #FFFFFF;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    @media (max-width: 900px) {
+      .con-workspace { grid-template-columns: 1fr; }
+      .con-detail-pane { display: none; }
+      body.concept-c { height: auto; overflow: visible; }
+    }
+  </style>
+</head>
+<body class="concept-c">
+
+  <!-- Top Console Header -->
+  <header class="con-topbar">
+    <div class="con-logo">
+      <span>🛡️</span>
+      <span>PakMaii ICS Console</span>
+      <span class="con-sys-tag">v2.4-AUDIT</span>
+    </div>
+
+    <div class="con-search">
+      <span>🔍 ค้นหารหัสแปลง, สมาชิก, พืช...</span>
+      <span style="font-size:11px; color:#94A3B8;">⌘K</span>
+    </div>
+
+    <div class="con-user-chip">
+      <span>ICS-STG-001 (คุณวิชัย ผักไหม)</span>
+      <span style="color:#22C55E;">● Online</span>
+    </div>
+  </header>
+
+  <!-- Subheader Metric Strip -->
+  <div class="con-stats-strip">
+    <div class="con-stat-pill">
+      <span>สมาชิกในความดูแล:</span>
+      <b>65 ราย</b>
+    </div>
+    <div class="con-stat-pill">
+      <span>แปลงทั้งหมด:</span>
+      <b>120 แปลง (380 ไร่)</b>
+    </div>
+    <div class="con-stat-pill">
+      <span>จุดเสี่ยงเฝ้าระวัง:</span>
+      <b style="color:#DC2626;">12 แปลง</b>
+    </div>
+    <div class="con-stat-pill">
+      <span>คำขอรออนุมัติ:</span>
+      <b style="color:#D97706;">9 คำขอ</b>
+    </div>
+    <div class="con-stat-pill" style="margin-left:auto;">
+      <span>ความพร้อมกลุ่ม PGS:</span>
+      <b style="color:#16A34A;">86% (เป้าหมาย 85%)</b>
+    </div>
+  </div>
+
+  <!-- Master-Detail Split Workspace -->
+  <div class="con-workspace">
+    <!-- Left: Master Plot Roster -->
+    <aside class="con-master-pane">
+      <div class="con-pane-header">
+        <span>คิวตรวจสอบและเฝ้าระวังแปลง (Triage Roster)</span>
+        <div class="con-filter-tabs">
+          <button type="button" class="con-tab-btn active">เสี่ยง (12)</button>
+          <button type="button" class="con-tab-btn">คำขอ (9)</button>
+          <button type="button" class="con-tab-btn">ทั้งหมด</button>
+        </div>
+      </div>
+
+      <div class="con-roster-list">
+        <!-- Selected Row: A-03 -->
+        <div class="con-roster-row selected">
+          <div class="con-roster-main">
+            <span class="con-plot-title">แปลง A-03 (ข้าวหอมมะลิ 105 อินทรีย์)</span>
+            <span class="con-plot-sub">คุณสมปอง คำภา • 12 ไร่ • ปรับเปลี่ยนปี 1</span>
+          </div>
+          <span class="con-badge-risk">ขาดบันทึก 16 วัน</span>
+        </div>
+
+        <!-- Row: B-01 -->
+        <div class="con-roster-row">
+          <div class="con-roster-main">
+            <span class="con-plot-title">แปลง B-01 (ถั่วเหลืองอินทรีย์แฟร์เทรด)</span>
+            <span class="con-plot-sub">คุณบัวผัน ศรีห้วยทับทัน • 8 ไร่ • ได้รับรอง</span>
+          </div>
+          <span style="font-size:11px; background:#FEF3C7; color:#92400E; border:1px solid #FDE68A; padding:2px 6px; border-radius:4px; font-weight:700;">รออนุมัติปุ๋ย</span>
+        </div>
+
+        <!-- Row: C-12 -->
+        <div class="con-roster-row">
+          <div class="con-roster-main">
+            <span class="con-plot-title">แปลง C-12 (ปอเทืองบำรุงดิน)</span>
+            <span class="con-plot-sub">คุณทองมี แก้วกัลยา • 10 ไร่ • ปรับเปลี่ยนปี 2</span>
+          </div>
+          <span class="con-badge-risk">CAPA ค้างแก้ไข</span>
+        </div>
+
+        <!-- Row: D-05 -->
+        <div class="con-roster-row">
+          <div class="con-roster-main">
+            <span class="con-plot-title">แปลง D-05 (ข้าวหอมมะลิอินทรีย์)</span>
+            <span class="con-plot-sub">คุณคำพูน พรมมา • 15 ไร่ • ได้รับรอง</span>
+          </div>
+          <span class="con-badge-pass">ปกติ (7 วัน)</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right: Selected Plot Dossier -->
+    <main class="con-detail-pane">
+      <!-- Plot Dossier Card -->
+      <section class="con-detail-card">
+        <div class="con-detail-card-header">
+          <div>
+            <h3>แฟ้มตรวจสอบ: แปลง A-03 (คุณสมปอง คำภา)</h3>
+            <small style="color:var(--con-muted);">รหัสเกษตรกร: F-STG-001 • หมู่ 3 บ้านผักไหม ต.ผักไหม อ.ห้วยทับทัน จ.ศรีสะเกษ</small>
+          </div>
+          <div class="con-action-bar">
+            <button type="button" class="con-btn-action-ok">บันทึกตรวจแปลง</button>
+            <button type="button" style="background:#E2E8F0; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">แจ้งเตือน LINE</button>
+          </div>
+        </div>
+
+        <div class="con-field-grid">
+          <div class="con-field-item">
+            <small>พืชปลูกปัจจุบัน</small>
+            <b>ข้าวหอมมะลิ 105</b>
+          </div>
+          <div class="con-field-item">
+            <small>ขนาดพื้นที่</small>
+            <b>12 ไร่ (ดินร่วนปนทราย)</b>
+          </div>
+          <div class="con-field-item">
+            <small>สถานะการรับรอง</small>
+            <span class="con-badge-risk">ขาดบันทึก 16 วัน</span>
+          </div>
+          <div class="con-field-item">
+            <small>ผลตรวจรอบก่อน</small>
+            <b style="color:#16A34A;">ผ่าน (30 ต.ค. 69)</b>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pending Input Triage Card -->
+      <section class="con-detail-card">
+        <div class="con-detail-card-header">
+          <div>
+            <h3>คำขอปัจจัยการผลิตที่รอการพิจารณา (Approval Triage)</h3>
+            <small style="color:var(--con-muted);">ตรวจสอบสูตรก่อนอนุญาตให้ใช้ในแปลงจริงเพื่อป้องกันสารเคมีสังเคราะห์</small>
+          </div>
+          <span style="font-size:12px; font-weight:700; color:#D97706;">ยื่นเมื่อ 2 ชั่วโมงก่อน</span>
+        </div>
+
+        <div style="background:#F1F5F9; border-radius:6px; padding:14px; margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <strong style="font-size:14px;">สูตร: ปุ๋ยหมักอินทรีย์บำรุงดิน (ทำเอง)</strong>
+            <span class="con-sys-tag">สูตรปรับปรุงรอบที่ 2</span>
+          </div>
+          <p style="margin:0; font-size:13px; color:#334155;">
+            ส่วนผสม: มูลวัวนมในฟาร์มอินทรีย์ + แกลบดำ + รำละเอียด หมักกลับกองครบ 30 วัน อัตรา 40 กิโลกรัมต่อไร่
+          </p>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button type="button" class="con-btn-action-no">ปฏิเสธพร้อมระบุเหตุผล</button>
+          <button type="button" class="con-btn-action-ok">✓ อนุมัติการใช้ปัจจัยนี้</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+</body>
+</html>
