@@ -104,12 +104,20 @@ app.use(helmet({
       formAction: ["'self'"],
       objectSrc: ["'none'"],
       manifestSrc: ["'self'"],
+      workerSrc: ["'self'"],
       upgradeInsecureRequests: [],
     },
   },
 }));
 app.use(express.json({ limit: '100kb' }));
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false }));
+app.use((req, res, next) => {
+  if (req.path === '/sw.js') {
+    res.setHeader('Service-Worker-Allowed', '/');
+    res.setHeader('Cache-Control', 'no-cache');
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);

@@ -4865,6 +4865,29 @@ body.is-login .hero {
   transition: all 0.2s ease;
 }
 
+.offline-status-pill.is-offline {
+  background: rgba(245, 158, 11, 0.2) !important;
+  color: #FEF3C7 !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+}
+
+.offline-status-pill.is-offline .offline-status-dot {
+  background: #F59E0B !important;
+  box-shadow: 0 0 8px #F59E0B !important;
+}
+
+.offline-status-pill.has-pending {
+  background: rgba(217, 119, 6, 0.25) !important;
+  color: #FFFBEB !important;
+  border-color: #F59E0B !important;
+  font-weight: 600;
+}
+
+.offline-status-pill.has-pending .offline-status-dot {
+  background: #FBBF24 !important;
+  box-shadow: 0 0 10px #F59E0B !important;
+}
+
 @media (max-width: 768px) {
 
   .offline-status-pill,
@@ -4885,6 +4908,91 @@ body.is-login .hero {
   border-radius: 50%;
   background: #22C55E;
   box-shadow: 0 0 6px #22C55E;
+}
+
+/* Offline Sync Banner (Sticky / Prominent for Mobile & Desktop) */
+.offline-sync-banner {
+  margin: 0 0 16px 0;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.08);
+  animation: slideDown 0.25s ease-out;
+}
+
+.offline-sync-banner.is-offline {
+  background: #FEF3C7;
+  border-color: #FCD34D;
+  color: #78350F;
+}
+
+.offline-sync-banner.has-pending {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #065F46;
+}
+
+.offline-sync-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.offline-sync-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.offline-sync-text {
+  flex: 1 1 200px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.offline-sync-btn {
+  background: #059669;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.offline-sync-btn:hover {
+  background: #047857;
+}
+
+/* Offline Pending Items in Farmer History */
+.card-pending-offline {
+  background: #FFFDF7 !important;
+  border: 1.5px dashed #F59E0B !important;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.07) !important;
+}
+
+.offline-pending-note {
+  font-size: 11px;
+  color: #92400E;
+  margin: 6px 0 0 0;
+  line-height: 1.4;
+}
+
+.sync-pending-btn {
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  border-radius: 6px !important;
+}
+
+.text-amber {
+  color: #B45309 !important;
 }
 
 /* Pitch Guide Button in Header */

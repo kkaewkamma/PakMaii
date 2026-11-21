@@ -1,0 +1,20 @@
+{
+  "name": "ปลูกของดี — PakMaii (Ready to Grow)",
+  "short_name": "ปลูกของดี",
+  "description": "ระบบบันทึกและตรวจสอบมาตรฐานเกษตรอินทรีย์ วิสาหกิจชุมชนตำบลผักไหม",
+  "start_url": "/?pwa=1",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F4F7F5",
+  "theme_color": "#183F32",
+  "lang": "th",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#183F32"/>
+  <circle cx="256" cy="256" r="190" fill="#143429"/>
+  <g transform="translate(106, 106) scale(8.33)">
+    <!-- Main leaf -->
+    <path d="M6 28C6 16 14 6 24 4C24 16 16 26 6 28Z" fill="#15803D"/>
+    <path d="M8 26C12 21 16 15 20 8" stroke="#DCFCE7" stroke-width="2" stroke-linecap="round"/>
+    <!-- Young sprout -->
+    <path d="M17 28C17 18 23 10 32 8C32 18 26 26 17 28Z" fill="#22C55E"/>
+    <path d="M19 26C22 22 25 17 29 12" stroke="#DCFCE7" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+</svg>

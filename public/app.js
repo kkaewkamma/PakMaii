@@ -28,6 +28,12 @@ import { ICONS, icon } from './js/core/icons.js';
 import { parseLocalIsoDate, formatLocalIsoDate, statusBadge, el, notify, inputField, selectField, card, empty, dated } from './js/core/dom.js';
 import { exportCsv } from './js/core/api.js';
 import { create14DayRhythmTrack } from './js/core/rhythm.js';
+import {
+  getPendingActivities,
+  countPendingActivities,
+  syncPendingActivities,
+  onOfflineQueueChange
+} from './js/core/offline-store.js';
 
 const tabsFarmer = [
   ['home', 'ภาพรวม', 'sprout'],
@@ -741,6 +747,90 @@ function openDemoToolsSheet() {
   closeBtn.focus();
 }
 
+async function updateOfflineStatusUI() {
+  const isOnline = typeof navigator === 'undefined' || navigator.onLine;
+  const pendingCount = await countPendingActivities();
+  const offlineBadge = $('#offlineStatusBadge');
+  const banner = $('#offlineSyncBanner');
+  const bannerText = $('#offlineSyncText');
+  const bannerBtn = $('#offlineSyncBtn');
+
+  if (offlineBadge) {
+    offlineBadge.className = 'offline-status-pill ' + (
+      !isOnline ? 'is-offline' : (pendingCount > 0 ? 'has-pending' : 'is-online')
+    );
+    const dot = el('span', { className: 'offline-status-dot' });
+    if (!isOnline) {
+      offlineBadge.replaceChildren(dot, document.createTextNode(pendingCount > 0 ? ` 📡 ออฟไลน์ (${pendingCount})` : ' 📡 โหมดออฟไลน์'));
+      offlineBadge.title = 'ระบบอยู่ในโหมดออฟไลน์กลางทุ่ง บันทึกข้อมูลในเครื่องได้';
+    } else if (pendingCount > 0) {
+      offlineBadge.replaceChildren(dot, document.createTextNode(` 🔄 ซิงค์ข้อมูล (${pendingCount})`));
+      offlineBadge.title = `มีข้อมูลรอซิงค์ ${pendingCount} รายการ แตะเพื่อส่งข้อมูลขึ้นระบบ`;
+    } else {
+      offlineBadge.replaceChildren(dot, document.createTextNode(' พร้อมบันทึกออฟไลน์'));
+      offlineBadge.title = 'ระบบพร้อมบันทึกข้อมูลในเครื่องแม้อยู่กลางทุ่งนาไม่มีสัญญาณอินเทอร์เน็ต';
+    }
+  }
+
+  if (banner && bannerText && bannerBtn) {
+    if (!isOnline) {
+      banner.classList.remove('hide');
+      banner.className = 'offline-sync-banner is-offline';
+      bannerText.textContent = pendingCount > 0
+        ? `📡 โหมดออฟไลน์กลางทุ่ง: บันทึกข้อมูลได้ต่อเนื่อง (มี ${pendingCount} รายการรอส่ง)`
+        : '📡 โหมดออฟไลน์กลางทุ่ง: บันทึกกิจกรรมแปลงได้ตามปกติ ข้อมูลจะซิงค์เมื่อมีเน็ต';
+      bannerBtn.classList.add('hide');
+    } else if (pendingCount > 0) {
+      banner.classList.remove('hide');
+      banner.className = 'offline-sync-banner has-pending';
+      bannerText.textContent = `🟢 พบสัญญาณเน็ตแล้ว • มีข้อมูลรอส่ง ${pendingCount} รายการ`;
+      bannerBtn.classList.remove('hide');
+      bannerBtn.textContent = 'ซิงค์ข้อมูลเดี๋ยวนี้';
+      bannerBtn.onclick = async () => {
+        bannerBtn.disabled = true;
+        bannerBtn.textContent = 'กำลังซิงค์...';
+        const res = await syncPendingActivities(api);
+        bannerBtn.disabled = false;
+        if (res.synced > 0) {
+          notify(`🟢 ซิงค์ข้อมูลสำเร็จ ${res.synced} รายการ`);
+          await loadTab();
+        }
+        await updateOfflineStatusUI();
+      };
+    } else {
+      banner.classList.add('hide');
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', async () => {
+    await updateOfflineStatusUI();
+    const res = await syncPendingActivities(api);
+    if (res.synced > 0) {
+      notify(`🟢 เชื่อมต่อสัญญาณแล้ว • ซิงค์ข้อมูลแปลงสำเร็จ ${res.synced} รายการ`);
+      if (typeof loadTab === 'function') await loadTab();
+    }
+    await updateOfflineStatusUI();
+  });
+
+  window.addEventListener('offline', async () => {
+    await updateOfflineStatusUI();
+    notify('📡 เข้าสู่โหมดออฟไลน์กลางทุ่ง: คุณยังสามารถบันทึกกิจกรรมแปลงได้ตามปกติ');
+  });
+
+  onOfflineQueueChange(async () => {
+    await updateOfflineStatusUI();
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .catch(err => console.debug('SW reg error:', err));
+    });
+  }
+}
+
 function initFontScaleToggle() {
   const saved = sessionStorage.getItem('pakmaii_large_text') === '1';
   applyFontScale(saved);
@@ -775,8 +865,24 @@ function initFontScaleToggle() {
   }
   const offlineBadge = $('#offlineStatusBadge');
   if (offlineBadge) {
-    offlineBadge.onclick = () => notify('ระบบพร้อมใช้งานออฟไลน์: ข้อมูลกิจกรรมแปลงและคำขอถูกเก็บในเครื่อง และจะเชื่อมโยงข้อมูลอัตโนมัติเมื่อพบสัญญาณ');
+    offlineBadge.onclick = async () => {
+      const pendingCount = await countPendingActivities();
+      if (pendingCount > 0 && (typeof navigator === 'undefined' || navigator.onLine)) {
+        notify('กำลังส่งข้อมูลขึ้นระบบ...');
+        const res = await syncPendingActivities(api);
+        if (res.synced > 0) {
+          notify(`🟢 ซิงค์ข้อมูลสำเร็จ ${res.synced} รายการ`);
+          await loadTab();
+        }
+        await updateOfflineStatusUI();
+      } else if (pendingCount > 0 && !navigator.onLine) {
+        notify(`ขณะนี้อยู่ในโหมดออฟไลน์ มีข้อมูลรอส่ง ${pendingCount} รายการ ระบบจะซิงค์ให้อัตโนมัติเมื่อพบสัญญาณเน็ต`);
+      } else {
+        notify('ระบบพร้อมใช้งานออฟไลน์: บันทึกข้อมูลได้แม้อยู่กลางทุ่งนาไม่มีสัญญาณอินเทอร์เน็ต ข้อมูลจะถูกเก็บในเครื่องและส่งขึ้นเซิร์ฟเวอร์ให้อัตโนมัติเมื่อพบสัญญาณ');
+      }
+    };
   }
+  updateOfflineStatusUI();
   const tutBtn = $('#tutorialHelpBtn');
   if (tutBtn) {
     tutBtn.onclick = () => openInteractiveTutorial({
@@ -1762,6 +1868,20 @@ async function loadTab() {
           ...buildFarmerActivityHistorySection({
             plots,
             activities: rows,
+            pendingActivities: await getPendingActivities(),
+            onSyncPending: async () => {
+              if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                notify('ยังไม่มีสัญญาณเน็ต เมื่อเชื่อมต่อแล้วระบบจะซิงค์ให้อัตโนมัติ');
+                return;
+              }
+              notify('กำลังซิงค์ข้อมูลขึ้นระบบ...');
+              const res = await syncPendingActivities(api);
+              if (res.synced > 0) {
+                notify(`🟢 ซิงค์ข้อมูลสำเร็จ ${res.synced} รายการ`);
+                await loadTab();
+              }
+              await updateOfflineStatusUI();
+            },
             navigateTab: async (targetTab) => { tab = targetTab; renderTabs(); await loadTab(); scrollToTop(); }
           })
         );

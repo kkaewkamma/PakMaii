@@ -7,6 +7,7 @@ import { createFarmerAvatarSvg } from '../core/graphics.js';
 import { createPhotoUploader, openEvidenceViewer, openPhotoPreviewModal } from '../core/photo.js';
 import { create14DayRhythmTrack } from '../core/rhythm.js';
 import { AUDIT_STANDARD_LABELS } from './admin.js';
+import { savePendingActivity, getPendingActivities } from '../core/offline-store.js';
 
 export function createVoiceInput(textarea) {
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -440,19 +441,37 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'กำลังบันทึก...';
+    const payload = {
+      plot_id: formData.get('plot_id'),
+      kind: formData.get('kind'),
+      activity_date: formData.get('activity_date'),
+      details: finalDetails,
+      photo_url: resolvedPhotoUrl,
+      evidence_id: formData.get('evidence_id') || ''
+    };
     try {
-      await api('/activities', 'POST', {
-        plot_id: formData.get('plot_id'),
-        kind: formData.get('kind'),
-        activity_date: formData.get('activity_date'),
-        details: finalDetails,
-        photo_url: resolvedPhotoUrl,
-        evidence_id: formData.get('evidence_id') || ''
-      });
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('OFFLINE_NETWORK');
+      }
+      await api('/activities', 'POST', payload);
       notify('บันทึกกิจกรรมสำเร็จ');
       if (typeof reloadTab === 'function') await reloadTab();
     } catch (error) {
-      if (!error.handled) notify(error.message);
+      const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        error.message === 'OFFLINE_NETWORK' ||
+        /network|fetch|offline|Failed to fetch/i.test(String(error?.message || ''));
+      if (isOffline) {
+        const plotSel = recordForm.querySelector('select[name="plot_id"]');
+        await savePendingActivity({
+          ...payload,
+          plot_name: plotSel?.options?.[plotSel.selectedIndex]?.text || payload.plot_id
+        });
+        notify('บันทึกในเครื่องแล้ว (โหมดออฟไลน์กลางทุ่ง) ข้อมูลจะส่งขึ้นระบบให้อัตโนมัติเมื่อพบสัญญาณเน็ต');
+        recordForm.reset();
+        if (typeof reloadTab === 'function') await reloadTab();
+      } else if (!error.handled) {
+        notify(error.message);
+      }
     } finally {
       submitBtn.disabled = false;
       submitBtn.replaceChildren(icon('checkCircle', 16), document.createTextNode(' บันทึกกิจกรรม'));
@@ -462,8 +481,40 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
   return recordForm;
 }
 
-export function buildFarmerActivityHistorySection({ plots = [], activities = [], navigateTab }) {
+export function buildFarmerActivityHistorySection({ plots = [], activities = [], pendingActivities = [], navigateTab, onSyncPending }) {
   const nodes = [];
+
+  if (pendingActivities && pendingActivities.length > 0) {
+    const pendingCards = pendingActivities.map(item => {
+      const pBox = card(
+        el('div', { className: 'row between align-center' },
+          el('b', {}, item.kind || 'กิจกรรม'),
+          el('span', { className: 'pill pending' }, icon('clock', 11), ' รอส่ง (ออฟไลน์)')
+        ),
+        el('p', { className: 'farmer-card-meta' }, item.plot_name || item.plot_id || '-'),
+        el('p', { className: 'farmer-card-body' }, item.details),
+        el('p', { className: 'offline-pending-note' }, '💾 ข้อมูลถูกจัดเก็บในเครื่องอย่างปลอดภัย และจะซิงค์ขึ้นระบบให้อัตโนมัติเมื่อพบสัญญาณเน็ต')
+      );
+      pBox.classList.add('farmer-list-card', 'card-pending-offline');
+      return pBox;
+    });
+
+    nodes.push(
+      el('section', { className: 'offline-pending-section', 'aria-label': 'รายการรอซิงค์ข้อมูล' },
+        el('div', { className: 'row between align-center mb-8' },
+          el('h4', { className: 'farmer-section-heading text-amber' },
+            `📡 บันทึกในเครื่องรอส่งขึ้นระบบ (${pendingActivities.length})`
+          ),
+          onSyncPending ? el('button', {
+            type: 'button',
+            className: 'btn-secondary sync-pending-btn',
+            onclick: onSyncPending
+          }, icon('refreshCw', 12), ' ซิงค์ตอนนี้') : null
+        ),
+        ...pendingCards
+      )
+    );
+  }
 
   const rhythmContent = plots.length === 0
     ? empty('ยังไม่มีแปลงปลูกในระบบ', 'เพิ่มแปลงปลูกแรกของคุณ', () => navigateTab('plots'))

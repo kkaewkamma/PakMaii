@@ -5,7 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="description" content="Ready to Grow — ระบบบันทึกและตรวจสอบเกษตรอินทรีย์ สำหรับเกษตรกร เจ้าหน้าที่ ICS และผู้ดูแลระบบ">
   <meta name="theme-color" content="#183F32">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ปลูกของดี">
   <title>Ready to Grow — รักษามาตรฐานสินค้าเกษตรอินทรีย์ ชุมชนผักไหม</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icon.svg">
   <link rel="stylesheet" href="/app.css">
   <script defer src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script defer src="/demo.js"></script>
@@ -52,6 +58,13 @@
     </div>
   </header>
   <main class="wrap">
+    <div id="offlineSyncBanner" class="offline-sync-banner hide" role="status" aria-live="polite">
+      <div class="offline-sync-banner-content">
+        <span class="offline-sync-icon" aria-hidden="true">📡</span>
+        <span id="offlineSyncText" class="offline-sync-text">โหมดออฟไลน์: บันทึกกิจกรรมแปลงได้แม้อยู่กลางทุ่ง</span>
+        <button type="button" id="offlineSyncBtn" class="offline-sync-btn hide">ซิงค์ข้อมูลเดี๋ยวนี้</button>
+      </div>
+    </div>
     <div class="hero">
       <h2 id="welcome">ยินดีต้อนรับ</h2>
       <div id="identity" aria-live="polite">

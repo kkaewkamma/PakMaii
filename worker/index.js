@@ -839,6 +839,16 @@ export default {
         const indexRequest = new Request(new URL('/index.html', request.url), request);
         return await env.ASSETS.fetch(indexRequest);
       }
+      if (url.pathname === '/sw.js') {
+        const newHeaders = new Headers(assetResponse.headers);
+        newHeaders.set('Service-Worker-Allowed', '/');
+        newHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        return new Response(assetResponse.body, {
+          status: assetResponse.status,
+          statusText: assetResponse.statusText,
+          headers: newHeaders
+        });
+      }
       return assetResponse;
     } catch (error) {
       if (error?.expose && Number.isInteger(error.status)) return json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status, noStore ? { 'Cache-Control': 'no-store' } : {});
