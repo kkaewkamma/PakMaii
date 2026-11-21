@@ -58,17 +58,31 @@ const tabsAdmin = [
 
 import { setToken, setConfig, setDemoUser } from './js/core/state.js';
 
-const FARMER_SCREEN_TITLES = {
-  home: 'หน้าหลัก',
-  plots: 'แปลงปลูก',
-  record: 'บันทึกกิจกรรม',
-  approval: 'ขอใช้ปัจจัย',
-  reviews: 'ผลการตรวจ',
-  lots: 'ล็อตผลผลิต'
+const SCREEN_TITLES = {
+  farmer: {
+    home: 'หน้าหลัก',
+    plots: 'แปลงปลูก',
+    record: 'บันทึกกิจกรรม',
+    approval: 'ขอใช้ปัจจัย',
+    reviews: 'ผลการตรวจ',
+    lots: 'ล็อตผลผลิต'
+  },
+  ics: {
+    home: 'ภาพรวมระบบตรวจ',
+    farmers: 'เกษตรกรในความดูแล',
+    plots: 'แปลงเกษตรกร',
+    record: 'กิจกรรมสมาชิก',
+    approval: 'พิจารณาคำขอ',
+    risks: 'จุดเสี่ยงเฝ้าระวัง',
+    reviews: 'ผลการตรวจแปลง',
+    lots: 'ล็อตผลผลิต'
+  }
 };
 
+const FARMER_SCREEN_TITLES = SCREEN_TITLES.farmer;
+
 function setRoleBodyClass(role) {
-  document.body.classList.remove('role-farmer', 'role-ics', 'role-admin', 'farmer-on-home');
+  document.body.classList.remove('role-farmer', 'role-ics', 'role-admin', 'farmer-on-home', 'ics-on-home');
   if (role) document.body.classList.add(`role-${role}`);
 }
 
@@ -77,20 +91,17 @@ function updateShellHeader() {
   const subNavEl = $('#farmerSubNav');
   const titleEl = $('#farmerScreenTitle');
   const demoBtnEl = $('#demoToolsBtn');
-  const lineOaBtnEl = $('#lineOaBtn');
-  const notifBellBtnEl = $('#notifBellBtn');
 
   document.body.classList.toggle('farmer-on-home', me?.role === 'farmer' && tab === 'home');
+  document.body.classList.toggle('ics-on-home', me?.role === 'ics' && tab === 'home');
 
-  lineOaBtnEl?.classList.toggle('hide', !me);
-  notifBellBtnEl?.classList.toggle('hide', !me);
-
-  if (me?.role === 'farmer') {
+  if (me?.role === 'farmer' || me?.role === 'ics') {
     const isSubScreen = tab !== 'home';
     brandEl?.classList.toggle('hide', isSubScreen);
     subNavEl?.classList.toggle('hide', !isSubScreen);
     if (titleEl && isSubScreen) {
-      titleEl.textContent = FARMER_SCREEN_TITLES[tab] || '';
+      const titles = SCREEN_TITLES[me.role] || SCREEN_TITLES.farmer;
+      titleEl.textContent = titles[tab] || '';
     }
     demoBtnEl?.classList.toggle('hide', !demoUser);
   } else {
@@ -120,6 +131,12 @@ async function loadConfig() {
 }
 
 import { ensureLiff } from './js/core/auth.js';
+import {
+  capturePendingTab,
+  consumePendingTab,
+  clearPendingTab,
+  shouldAttemptLiffAutoLogin
+} from './js/core/deep-link.js';
 
 function showState(title, message, actionLabel, action) {
   $('#tabs').classList.add('hide');
@@ -178,6 +195,7 @@ async function logout() {
   catch (error) { if (!error.handled) notify(error.message); }
   finally {
     clearSession();
+    clearPendingTab(sessionStorage);
     sessionStorage.removeItem('admin_login');
     sessionStorage.setItem('logged_out', '1');
     notify('ออกจากระบบแล้ว');
@@ -284,6 +302,15 @@ function showLogin(development) {
       onclick: () => (development ? showAdminLogin(true) : adminLineLogin())
     }, 'Admin Login');
 
+  const memberLineLoginBtn = (!config?.demoOnly && !development && config?.liffId)
+    ? el('button', {
+      type: 'button',
+      id: 'lineLoginButton',
+      className: 'btn-lg secondary',
+      onclick: () => adminLineLogin()
+    }, icon('logIn', 18), 'เข้าสู่ระบบด้วย LINE (สำหรับสมาชิก)')
+    : null;
+
   const footer = el('div', { className: 'login-footer' },
     el('button', {
       type: 'button',
@@ -339,6 +366,7 @@ function showLogin(development) {
       el('p', { className: 'muted login-lead' }, 'เลือกบทบาท แล้วแตะรหัสตัวอย่าง หรือเลือกบัญชีทดลองด้านล่าง')
     ),
     form,
+    memberLineLoginBtn,
     el('div', { className: 'login-divider' }, el('span', {}, 'หรือเข้าใช้งานทันทีด้วยบัญชีตัวอย่าง')),
     quickPersonas,
     el('p', { className: 'login-note' }, icon('shield', 14), ' ข้อมูลทดลองเก็บในเบราว์เซอร์นี้เท่านั้น แยกจากข้อมูลจริงทั้งหมด'),
@@ -419,14 +447,24 @@ async function start(forceLogin = false) {
       sessionStorage.removeItem('logged_out');
       sessionStorage.removeItem('admin_login');
     }
+    capturePendingTab({ search: window.location.search, pathname: window.location.pathname, storage: sessionStorage });
     if (!token && !demoUser && demoSession) demoUser = demoSession.restore();
     if (!token && !demoUser) {
       const cfg = await loadConfig().catch(() => ({ liffId: '', development: false, demoOnly: false }));
       if (cfg.demoOnly) return showLogin(false);
-      // Demo-first: only resume LINE when Admin Login was explicitly started.
-      if (cfg.development || sessionStorage.getItem('admin_login') !== '1') return showLogin(Boolean(cfg.development));
-      const liff = await ensureLiff();
-      if (!liff.isLoggedIn() || sessionStorage.getItem('logged_out') === '1') {
+      if (!shouldAttemptLiffAutoLogin({ cfg, storage: sessionStorage, userAgent: navigator.userAgent })) {
+        return showLogin(Boolean(cfg.development));
+      }
+      const explicitLineLogin = sessionStorage.getItem('admin_login') === '1';
+      let liff;
+      try {
+        liff = await ensureLiff();
+      } catch (err) {
+        if (!explicitLineLogin) return showLogin(false);
+        throw err;
+      }
+      const inClient = typeof liff?.isInClient === 'function' && liff.isInClient();
+      if ((!inClient && !explicitLineLogin) || !liff.isLoggedIn() || sessionStorage.getItem('logged_out') === '1') {
         sessionStorage.removeItem('admin_login');
         return showLogin(false);
       }
@@ -435,79 +473,129 @@ async function start(forceLogin = false) {
     document.body.classList.remove('is-login');
     me = await api('/me');
     setRoleBodyClass(me.role);
-    initLineNotifications(me);
+    const deepLinkedTab = consumePendingTab({
+      validTabs: currentTabs().map(item => item[0]),
+      storage: sessionStorage,
+      locationHref: window.location.href,
+      replaceUrl: (cleaned) => window.history.replaceState(null, '', cleaned)
+    });
+    if (deepLinkedTab) tab = deepLinkedTab;
     if (me.role === 'admin' && !tabsAdmin.some(item => item[0] === tab)) tab = 'overview';
     if (me.role !== 'admin' && !currentTabs().some(item => item[0] === tab)) tab = 'home';
     plots = me.role === 'admin' ? [] : await api('/plots');
 
     $('#welcome').textContent = `สวัสดี, ${me.name}`;
-    const roleIconName = me.role === 'farmer' ? 'sprout' : (me.role === 'ics' ? 'clipboard' : 'shield');
-
-    const switcherBar = demoUser ? el('div', { className: 'role-switcher-bar' },
-      el('span', { className: 'switcher-label' }, icon('refresh', 13), ' สลับบทบาททดสอบ:'),
-      el('button', {
-        type: 'button',
-        className: `switcher-pill ${me.agency_code === 'F-STG-001' ? 'active' : ''}`,
-        onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
-      }, 'เกษตรกร A-03 (F-STG-001)'),
-      el('button', {
-        type: 'button',
-        className: `switcher-pill ${me.agency_code === 'F-STG-002' ? 'active' : ''}`,
-        onclick: () => acceptDemoLogin('farmer', 'F-STG-002')
-      }, 'เกษตรกร B-01 (F-STG-002)'),
-      el('button', {
-        type: 'button',
-        className: `switcher-pill ${me.agency_code === 'F-STG-003' ? 'active' : ''}`,
-        onclick: () => acceptDemoLogin('farmer', 'F-STG-003')
-      }, 'เกษตรกร C-12 (F-STG-003)'),
-      el('button', {
-        type: 'button',
-        className: `switcher-pill switcher-ics ${me.role === 'ics' ? 'active' : ''}`,
-        onclick: () => {
-          tab = 'home';
-          acceptDemoLogin('ics', 'ICS-STG-001');
-        }
-      }, 'ผู้ตรวจประเมิน ICS (ICS-STG-001)')
-    ) : null;
-
-    const avatarIcon = roleIconName;
-    const codeLabelPrefix = me.role === 'ics' ? 'รหัสเจ้าหน้าที่ ICS : ' : 'รหัสผู้ดูแลระบบ : ';
-    const displayFullName = me.thai_name ? `${me.thai_name} (${me.name})` : (me.name || me.agency_code);
-    const villageOrRole = me.village
-      ? `${codeLabelPrefix}${me.agency_code || me.name} • ${me.village}`
-      : `${codeLabelPrefix}${me.agency_code || me.name} • ${roleLabels[me.role] || me.role} (${statusLabels[me.status] || me.status})`;
-
-    if (me.role === 'farmer') {
-      // Farmer uses a consumer banking-app pattern: greeting lives inside Farmer Home,
-      // Demo Tools live in the compact header sheet, and sub-screens get the full viewport.
-      $('#identity').replaceChildren();
-    } else {
-      $('#identity').replaceChildren(
-        el('div', { className: 'identity-bar' },
-          el('div', { className: 'identity-info' },
-            el('div', { className: `user-avatar avatar-${me.role}` }, icon(avatarIcon, 28)),
-            el('div', { className: 'identity-meta' },
-              el('div', { className: 'user-code' },
-                demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
-                displayFullName
-              ),
-              el('div', { className: 'user-role-text' }, villageOrRole)
-            )
-          ),
-          el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
-            icon('logOut', 14),
-            demoUser ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'
-          )
-        ),
-        switcherBar
-      );
-    }
-
+    renderIdentity();
     renderTabs();
     await loadTab();
   } catch (error) {
     if (!error.handled) showState('เกิดข้อผิดพลาด', error.message, 'ลองใหม่', () => start());
   }
+}
+
+function renderIdentity() {
+  if (!me) {
+    $('#identity').replaceChildren();
+    return;
+  }
+  if (me.role === 'farmer') {
+    // Farmer uses a consumer banking-app pattern: greeting lives inside Farmer Home,
+    // Demo Tools live in the compact header sheet, and sub-screens get the full viewport.
+    $('#identity').replaceChildren();
+    return;
+  }
+  if (me.role === 'ics') {
+    // On sub-screens, clear identity to give full viewport without vertical clutter
+    if (tab !== 'home') {
+      $('#identity').replaceChildren();
+      return;
+    }
+    const displayFullName = me.thai_name ? `${me.thai_name} (${me.name})` : (me.name || me.agency_code);
+    $('#identity').replaceChildren(
+      el('div', { className: 'ics-identity-bar' },
+        el('div', { className: 'ics-identity-info' },
+          el('div', { className: 'user-avatar avatar-ics' }, icon('clipboard', 20)),
+          el('div', { className: 'ics-identity-meta' },
+            el('div', { className: 'ics-user-name' },
+              demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
+              displayFullName
+            ),
+            el('div', { className: 'ics-user-sub' },
+              `หัวหน้าชุดตรวจ ICS (${me.agency_code || 'ICS-STG-001'}) • ${me.village || 'ต.ผักไหม จ.ศรีสะเกษ'}`
+            )
+          )
+        ),
+        el('div', { className: 'ics-identity-actions' },
+          demoUser ? el('button', {
+            type: 'button',
+            className: 'btn-sm btn-secondary-ics ics-demo-switch-btn',
+            onclick: () => openDemoToolsSheet()
+          }, icon('refresh', 13), ' สลับบทบาท') : null,
+          el('button', {
+            type: 'button',
+            id: 'logoutButton',
+            className: 'btn-sm ghost ics-logout-btn',
+            onclick: logout
+          }, icon('logOut', 13), demoUser ? 'ออก' : 'ออกจากระบบ')
+        )
+      )
+    );
+    return;
+  }
+
+  // Admin role:
+  const avatarIcon = 'shield';
+  const displayFullName = me.thai_name ? `${me.thai_name} (${me.name})` : (me.name || me.agency_code);
+  const villageOrRole = me.village
+    ? `รหัสผู้ดูแลระบบ : ${me.agency_code || me.name} • ${me.village}`
+    : `รหัสผู้ดูแลระบบ : ${me.agency_code || me.name} • ${roleLabels[me.role] || me.role} (${statusLabels[me.status] || me.status})`;
+
+  const switcherBar = demoUser ? el('div', { className: 'role-switcher-bar' },
+    el('span', { className: 'switcher-label' }, icon('refresh', 13), ' สลับบทบาททดสอบ:'),
+    el('button', {
+      type: 'button',
+      className: `switcher-pill ${me.agency_code === 'F-STG-001' ? 'active' : ''}`,
+      onclick: () => acceptDemoLogin('farmer', 'F-STG-001')
+    }, 'เกษตรกร A-03 (F-STG-001)'),
+    el('button', {
+      type: 'button',
+      className: `switcher-pill ${me.agency_code === 'F-STG-002' ? 'active' : ''}`,
+      onclick: () => acceptDemoLogin('farmer', 'F-STG-002')
+    }, 'เกษตรกร B-01 (F-STG-002)'),
+    el('button', {
+      type: 'button',
+      className: `switcher-pill ${me.agency_code === 'F-STG-003' ? 'active' : ''}`,
+      onclick: () => acceptDemoLogin('farmer', 'F-STG-003')
+    }, 'เกษตรกร C-12 (F-STG-003)'),
+    el('button', {
+      type: 'button',
+      className: `switcher-pill switcher-ics ${me.role === 'ics' ? 'active' : ''}`,
+      onclick: () => {
+        tab = 'home';
+        acceptDemoLogin('ics', 'ICS-STG-001');
+      }
+    }, 'ผู้ตรวจประเมิน ICS (ICS-STG-001)')
+  ) : null;
+
+  $('#identity').replaceChildren(
+    el('div', { className: 'identity-bar' },
+      el('div', { className: 'identity-info' },
+        el('div', { className: `user-avatar avatar-${me.role}` }, icon(avatarIcon, 28)),
+        el('div', { className: 'identity-meta' },
+          el('div', { className: 'user-code' },
+            demoUser ? el('span', { className: 'demo-badge' }, 'DEMO') : null,
+            displayFullName
+          ),
+          el('div', { className: 'user-role-text' }, villageOrRole)
+        )
+      ),
+      el('button', { type: 'button', id: 'logoutButton', className: 'secondary btn-sm', onclick: logout },
+        icon('logOut', 14),
+        demoUser ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'
+      )
+    ),
+    switcherBar
+  );
 }
 
 import { openEvidenceViewer, openPhotoPreviewModal, createPhotoUploader } from './js/core/photo.js';
@@ -524,13 +612,6 @@ import {
 import { showStoryPassport } from './js/views/passport.js';
 import { buildIcsAnalyticsChartsPanel, openInteractiveTutorial, checkAndShowIpTutorial } from './js/views/tutorial.js';
 import { openPitchGuide } from './js/views/pitchGuide.js';
-import {
-  initLineNotifications,
-  pushLineNotification,
-  openLineNotificationModal,
-  openLineOaChatModal,
-  onNotificationCountChange
-} from './js/views/line-oa.js';
 
 function sharePlotRiskToLine(w) {
   const text = `[แจ้งเตือนมาตรฐานเกษตรอินทรีย์ ผักไหม (PGS/ICS)]\n` +
@@ -676,46 +757,6 @@ function initFontScaleToggle() {
       scrollToTop();
     };
   }
-  const lineOaBtn = $('#lineOaBtn');
-  if (lineOaBtn) {
-    lineOaBtn.onclick = async () => {
-      const approvalsList = await api('/approvals').catch(() => []);
-      const actsList = await api('/activities').catch(() => []);
-      openLineOaChatModal({
-        me,
-        plots,
-        approvals: approvalsList,
-        activities: actsList,
-        onNavigate: async (targetTab) => {
-          tab = targetTab;
-          renderTabs();
-          await loadTab();
-          scrollToTop();
-        }
-      });
-    };
-  }
-  const notifBellBtn = $('#notifBellBtn');
-  if (notifBellBtn) {
-    notifBellBtn.onclick = () => {
-      openLineNotificationModal({
-        user: me,
-        onNavigate: async (targetTab) => {
-          tab = targetTab;
-          renderTabs();
-          await loadTab();
-          scrollToTop();
-        }
-      });
-    };
-  }
-  onNotificationCountChange(count => {
-    const badge = $('#notifBadge');
-    if (badge) {
-      badge.textContent = String(count);
-      badge.classList.toggle('hide', count <= 0);
-    }
-  });
   const demoBtn = $('#demoToolsBtn');
   if (demoBtn) {
     demoBtn.onclick = () => openDemoToolsSheet();
@@ -767,6 +808,7 @@ function renderTabs() {
   ));
   $('#tabs').classList.remove('hide');
   updateShellHeader();
+  renderIdentity();
   renderMobileDock();
 }
 
@@ -1296,41 +1338,61 @@ async function loadTab() {
           )
         );
 
-        const kpiGrid = el('div', { className: 'grid kpi-grid' },
-          el('div', { className: 'card kpi-card' },
+        const kpiGrid = el('div', { className: 'grid kpi-grid ics-kpi-grid' },
+          el('div', {
+            className: 'card kpi-card ics-kpi-card-compact',
+            role: 'button',
+            tabindex: '0',
+            onclick: async () => { tab = 'farmers'; renderTabs(); await loadTab(); scrollToTop(); }
+          },
             el('div', { className: 'kpi-top' },
-              el('div', { className: 'kpi-icon-badge kpi-forest' }, icon('users', 18)),
+              el('div', { className: 'kpi-icon-badge kpi-forest' }, icon('users', 16)),
               el('span', { className: 'kpi-tag' }, 'เกษตรกร')
             ),
             el('div', { className: 'kpi-num' }, `${totalMembers}`, el('small', {}, ' ราย')),
-            el('div', { className: 'kpi-desc muted' }, totalMembers > 0 ? (isDemo ? 'วิสาหกิจชุมชนผักไหม (Demo)' : 'สมาชิกในความรับผิดชอบ') : 'รอการมอบหมายสมาชิก'),
+            el('div', { className: 'kpi-desc muted' }, totalMembers > 0 ? (isDemo ? 'วิสาหกิจชุมชนผักไหม' : 'สมาชิกในดูแล') : 'ยังไม่มีสมาชิก'),
             el('div', { className: 'kpi-bar kpi-bar-forest' })
           ),
-          el('div', { className: 'card kpi-card' },
+          el('div', {
+            className: 'card kpi-card ics-kpi-card-compact',
+            role: 'button',
+            tabindex: '0',
+            onclick: async () => { tab = 'plots'; renderTabs(); await loadTab(); scrollToTop(); }
+          },
             el('div', { className: 'kpi-top' },
-              el('div', { className: 'kpi-icon-badge kpi-emerald' }, icon('mapPin', 18)),
+              el('div', { className: 'kpi-icon-badge kpi-emerald' }, icon('mapPin', 16)),
               el('span', { className: 'kpi-tag' }, 'พื้นที่แปลง')
             ),
             el('div', { className: 'kpi-num' }, `${totalPlots}`, el('small', {}, ' แปลง')),
-            el('div', { className: 'kpi-desc muted' }, totalPlots > 0 ? (isDemo ? 'รวมพื้นที่ 380 ไร่' : 'แปลงในความดูแล') : 'ยังไม่มีแปลงในระบบ'),
+            el('div', { className: 'kpi-desc muted' }, totalPlots > 0 ? (isDemo ? 'รวม 380 ไร่' : 'แปลงในความดูแล') : 'ยังไม่มีแปลง'),
             el('div', { className: 'kpi-bar kpi-bar-emerald' })
           ),
-          el('div', { className: 'card kpi-card' },
+          el('div', {
+            className: 'card kpi-card ics-kpi-card-compact',
+            role: 'button',
+            tabindex: '0',
+            onclick: async () => { tab = 'approval'; renderTabs(); await loadTab(); scrollToTop(); }
+          },
             el('div', { className: 'kpi-top' },
-              el('div', { className: 'kpi-icon-badge kpi-amber' }, icon('clock', 18)),
-              el('span', { className: 'kpi-tag tag-amber' }, 'รอพิจารณา')
+              el('div', { className: 'kpi-icon-badge kpi-amber' }, icon('clock', 16)),
+              el('span', { className: 'kpi-tag tag-amber' }, 'รอตรวจ')
             ),
             el('div', { className: 'kpi-num stat-amber' }, `${pendingInput}`, el('small', {}, ' รายการ')),
-            el('div', { className: 'kpi-desc muted' }, 'สูตรปุ๋ย/น้ำหมักอินทรีย์'),
+            el('div', { className: 'kpi-desc muted' }, 'ปัจจัยการผลิต'),
             el('div', { className: 'kpi-bar kpi-bar-amber' })
           ),
-          el('div', { className: 'card kpi-card' },
+          el('div', {
+            className: 'card kpi-card ics-kpi-card-compact',
+            role: 'button',
+            tabindex: '0',
+            onclick: async () => { tab = 'risks'; renderTabs(); await loadTab(); scrollToTop(); }
+          },
             el('div', { className: 'kpi-top' },
-              el('div', { className: 'kpi-icon-badge kpi-rose' }, icon('alert', 18)),
+              el('div', { className: 'kpi-icon-badge kpi-rose' }, icon('alert', 16)),
               el('span', { className: 'kpi-tag tag-rose' }, 'ความเสี่ยง')
             ),
             el('div', { className: 'kpi-num stat-rose' }, `${riskAlerts}`, el('small', {}, ' จุด')),
-            el('div', { className: 'kpi-desc muted' }, riskAlerts > 0 ? 'ขาดบันทึก / ไม่สอดคล้อง' : 'ไม่พบจุดเสี่ยง'),
+            el('div', { className: 'kpi-desc muted' }, riskAlerts > 0 ? 'ขาดบันทึก / เสี่ยง' : 'ปกติ'),
             el('div', { className: 'kpi-bar kpi-bar-rose' })
           )
         );
@@ -1441,30 +1503,109 @@ async function loadTab() {
           );
         }
 
-        nodes = [
-          icsTaskHero,
-          icsHeroCard,
-          kpiGrid,
-          icsChartsPanel,
-          el('div', { className: 'ics-home-lower-grid' },
-            icsRisksSummaryCard,
-            icsRecentActivitiesCard
+        const sendOverdueReminderBtn = el('button', {
+          type: 'button',
+          className: 'btn-sm btn-line-ics',
+          onclick: async () => {
+            if (isDemo) {
+              notify('📢 ส่งการแจ้งเตือนรอบบันทึก 14 วันผ่าน LINE ให้เกษตรกรแปลง A-03 (คุณสมปอง คำภา) สำเร็จ!');
+            } else {
+              try {
+                sendOverdueReminderBtn.disabled = true;
+                sendOverdueReminderBtn.textContent = 'กำลังส่งแจ้งเตือน...';
+                const res = await api('/notifications/remind-overdue', 'POST');
+                notify(`📢 ส่งการแจ้งเตือนทาง LINE เตือนเกษตรกรขาดบันทึกเรียบร้อย (${res.sent || 0} แปลง)`);
+              } catch (err) {
+                notify(err.message || 'ส่งแจ้งเตือนไม่สำเร็จ');
+              } finally {
+                sendOverdueReminderBtn.disabled = false;
+                sendOverdueReminderBtn.replaceChildren(icon('message', 13), document.createTextNode(' แจ้งเตือน LINE แปลงขาดบันทึก'));
+              }
+            }
+          }
+        }, icon('message', 13), ' แจ้งเตือน LINE แปลงขาดบันทึก');
+
+        const watchlistCard = el('div', { className: 'card watchlist-card' },
+          el('div', { className: 'row between' },
+            el('h3', {}, icon('alert', 16), ' รายการแปลงที่ต้องติดตาม'),
+            el('div', { className: 'row' },
+              sendOverdueReminderBtn,
+              el('button', {
+                type: 'button',
+                className: 'btn-sm btn-secondary-ics desktop-only',
+                onclick: () => window.print()
+              }, icon('printer', 14), ' พิมพ์รายงานตรวจกลุ่ม'),
+              el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'ข้อมูลตัวอย่าง (Demo)' : 'ข้อมูลจริงจากระบบ')
+            )
           ),
-          el('div', { className: 'card watchlist-card' },
-            el('div', { className: 'row between' },
-              el('h3', {}, icon('alert', 16), ' รายการแปลงที่ต้องติดตาม'),
-              el('div', { className: 'row' },
-                el('button', {
-                  type: 'button',
-                  className: 'btn-sm btn-secondary-ics desktop-only',
-                  onclick: () => window.print()
-                }, icon('printer', 14), ' พิมพ์รายงานตรวจกลุ่ม'),
-                el('span', { className: isDemo ? 'pill warn' : 'pill success' }, isDemo ? 'ข้อมูลตัวอย่าง (Demo)' : 'ข้อมูลจริงจากระบบ')
-              )
-            ),
-            el('p', { className: 'muted card-lead' }, 'ระบบคัดกรองแปลงที่ต้องการการดูแลเร่งด่วน (ขาดการบันทึกเกิน 14 วัน / รออนุมัติปัจจัยการผลิต / ประวัติไม่สอดคล้อง) เพื่อให้เจ้าหน้าที่ ICS ติดตามได้ทันที'),
-            watchlistContent
+          el('p', { className: 'muted card-lead' }, 'ระบบคัดกรองแปลงที่ต้องการการดูแลเร่งด่วน เพื่อให้เจ้าหน้าที่ ICS ติดตามได้ทันที'),
+          watchlistContent
+        );
+
+        let activeSegment = sessionStorage.getItem('ics_home_segment') || 'urgent';
+
+        const segmentNav = el('div', { className: 'ics-segmented-bar', role: 'tablist', 'aria-label': 'แถบสลับมุมมองงาน' },
+          el('button', {
+            type: 'button',
+            className: `ics-segment-btn ${activeSegment === 'urgent' ? 'active' : ''}`,
+            role: 'tab',
+            'aria-selected': activeSegment === 'urgent' ? 'true' : 'false',
+            onclick: () => switchSegment('urgent')
+          }, icon('alert', 14), ` งานด่วน & จุดเสี่ยง (${pendingInput + riskAlerts})`),
+          el('button', {
+            type: 'button',
+            className: `ics-segment-btn ${activeSegment === 'standards' ? 'active' : ''}`,
+            role: 'tab',
+            'aria-selected': activeSegment === 'standards' ? 'true' : 'false',
+            onclick: () => switchSegment('standards')
+          }, icon('shield', 14), ' มาตรฐาน PGS & ชาร์ต'),
+          el('button', {
+            type: 'button',
+            className: `ics-segment-btn ${activeSegment === 'feed' ? 'active' : ''}`,
+            role: 'tab',
+            'aria-selected': activeSegment === 'feed' ? 'true' : 'false',
+            onclick: () => switchSegment('feed')
+          }, icon('calendar', 14), ` กิจกรรมล่าสุด (${activities.length})`)
+        );
+
+        const urgentPane = el('div', { className: `ics-home-pane ics-pane-urgent ${activeSegment === 'urgent' ? '' : 'hide'}` },
+          icsTaskHero,
+          icsRisksSummaryCard,
+          watchlistCard
+        );
+
+        const standardsPane = el('div', { className: `ics-home-pane ics-pane-standards ${activeSegment === 'standards' ? '' : 'hide'}` },
+          icsHeroCard,
+          icsChartsPanel
+        );
+
+        const feedPane = el('div', { className: `ics-home-pane ics-pane-feed ${activeSegment === 'feed' ? '' : 'hide'}` },
+          el('div', { className: 'ics-home-lower-grid' },
+            icsRecentActivitiesCard
           )
+        );
+
+        const switchSegment = (seg) => {
+          activeSegment = seg;
+          sessionStorage.setItem('ics_home_segment', seg);
+          segmentNav.querySelectorAll('.ics-segment-btn').forEach(b => {
+            const isAct = (seg === 'urgent' && b.textContent.includes('งานด่วน')) ||
+                          (seg === 'standards' && b.textContent.includes('มาตรฐาน')) ||
+                          (seg === 'feed' && b.textContent.includes('กิจกรรม'));
+            b.classList.toggle('active', isAct);
+            b.setAttribute('aria-selected', isAct ? 'true' : 'false');
+          });
+          urgentPane.classList.toggle('hide', seg !== 'urgent');
+          standardsPane.classList.toggle('hide', seg !== 'standards');
+          feedPane.classList.toggle('hide', seg !== 'feed');
+        };
+
+        nodes = [
+          kpiGrid,
+          segmentNav,
+          urgentPane,
+          standardsPane,
+          feedPane
         ];
       } else {
         nodes = buildFarmerHomeView({
@@ -1483,10 +1624,10 @@ async function loadTab() {
         });
       }
 
-      if (demoUser && me.role !== 'farmer') {
+      if (demoUser && me.role === 'admin') {
         nodes.unshift(el('div', { className: 'notice demo-tip' },
           el('b', {}, icon('info', 15), ' ปลูกของดี — ระบบบริหารมาตรฐานสินค้าเกษตรอินทรีย์ วิสาหกิจชุมชนผักไหม'),
-          'สำหรับเจ้าหน้าที่ ICS: ควบคุมมาตรฐานและคัดกรองความเสี่ยงรายแปลงได้ทันที เพื่อป้องกันไม่ให้ข้อผิดพลาดของสมาชิกส่งผลกระทบต่อการรับรองของกลุ่ม'
+          'สำหรับผู้ดูแลระบบ: ควบคุมมาตรฐานและคัดกรองความเสี่ยงรายแปลงได้ทันที เพื่อป้องกันไม่ให้ข้อผิดพลาดของสมาชิกส่งผลกระทบต่อการรับรองของกลุ่ม'
         ));
       }
     } else if (tab === 'farmers') {
@@ -1625,71 +1766,114 @@ async function loadTab() {
           })
         );
       } else {
-        nodes.push(el('div', { className: 'notice' },
-          el('b', {}, icon('calendar', 15), ' รายการกิจกรรมของเกษตรกรในความดูแล'),
-          el('p', { className: 'muted' }, `บันทึกแล้วทั้งหมด ${rows.length} รายการ`)
-        ));
-        if (!rows.length) nodes.push(empty('ยังไม่มีการบันทึกกิจกรรม'));
-        for (const item of rows) {
-          const box = card(
-            el('div', { className: 'row between' },
-              el('b', {}, item.kind),
-              el('span', { className: 'pill' }, icon('calendar', 11), item.activity_date)
-            ),
-            el('p', {}, `${item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
-            el('p', { className: 'muted' }, item.details)
+        const uniquePlots = Array.from(new Set(rows.map(r => r.plot_name).filter(Boolean)));
+        let selectedPlotFilter = 'all';
+        const cardsContainer = el('div', { className: 'cards-list' });
+
+        const renderFilteredCards = () => {
+          const filtered = selectedPlotFilter === 'all'
+            ? rows
+            : rows.filter(r => r.plot_name === selectedPlotFilter);
+          cardsContainer.replaceChildren(
+            ...(filtered.length
+              ? filtered.map(item => {
+                  const box = card(
+                    el('div', { className: 'row between' },
+                      el('b', {}, item.kind),
+                      el('span', { className: 'pill' }, icon('calendar', 11), item.activity_date)
+                    ),
+                    el('p', {}, `${item.plot_name} ${item.farmer ? `• เกษตรกร: ${item.farmer}` : ''}`),
+                    el('p', { className: 'muted' }, item.details)
+                  );
+                  if (item.evidence_id) {
+                    box.append(el('button', {
+                      type: 'button',
+                      className: 'link-btn',
+                      onclick: () => openEvidenceViewer(item.evidence_id)
+                    }, icon('camera', 13), ' ดูภาพหลักฐานที่อัปโหลด'));
+                  }
+                  if (item.photo_url) {
+                    try {
+                      const url = new URL(item.photo_url);
+                      if (url.protocol === 'https:') {
+                        box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูลิงก์ภาพภายนอก'));
+                      } else if (item.photo_url.startsWith('data:')) {
+                        box.append(
+                          el('div', { className: 'activity-photo-row mt-8' },
+                            el('img', {
+                              src: item.photo_url,
+                              className: 'activity-photo-thumb',
+                              alt: `ภาพกิจกรรม ${item.kind || ''}`.trim(),
+                              onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+                            }),
+                            el('button', {
+                              type: 'button',
+                              className: 'link-btn',
+                              onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+                            }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)')
+                          )
+                        );
+                      }
+                    } catch {
+                      if (item.photo_url.startsWith('data:')) {
+                        box.append(
+                          el('div', { className: 'activity-photo-row mt-8' },
+                            el('img', {
+                              src: item.photo_url,
+                              className: 'activity-photo-thumb',
+                              alt: `ภาพกิจกรรม ${item.kind || ''}`.trim(),
+                              onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+                            }),
+                            el('button', {
+                              type: 'button',
+                              className: 'link-btn',
+                              onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
+                            }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)')
+                          )
+                        );
+                      }
+                    }
+                  }
+                  return box;
+                })
+              : [empty('ไม่พบกิจกรรมในแปลงที่เลือก')])
           );
-          if (item.evidence_id) {
-            box.append(el('button', {
+        };
+
+        const filterChips = el('div', { className: 'ics-filter-bar mb-10' },
+          el('div', { className: 'filter-chips-row' },
+            el('button', {
               type: 'button',
-              className: 'link-btn',
-              onclick: () => openEvidenceViewer(item.evidence_id)
-            }, icon('camera', 13), ' ดูภาพหลักฐานที่อัปโหลด'));
-          }
-          if (item.photo_url) {
-            try {
-              const url = new URL(item.photo_url);
-              if (url.protocol === 'https:') {
-                box.append(el('a', { href: item.photo_url, target: '_blank', rel: 'noopener noreferrer', className: 'link-btn' }, icon('camera', 13), ' ดูลิงก์ภาพภายนอก'));
-              } else if (item.photo_url.startsWith('data:')) {
-                box.append(
-                  el('div', { className: 'activity-photo-row mt-8' },
-                    el('img', {
-                      src: item.photo_url,
-                      className: 'activity-photo-thumb',
-                      alt: `ภาพกิจกรรม ${item.kind || ''}`.trim(),
-                      onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
-                    }),
-                    el('button', {
-                      type: 'button',
-                      className: 'link-btn',
-                      onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
-                    }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)')
-                  )
-                );
+              className: 'filter-chip active',
+              onclick: (e) => {
+                selectedPlotFilter = 'all';
+                filterChips.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                renderFilteredCards();
               }
-            } catch {
-              if (item.photo_url.startsWith('data:')) {
-                box.append(
-                  el('div', { className: 'activity-photo-row mt-8' },
-                    el('img', {
-                      src: item.photo_url,
-                      className: 'activity-photo-thumb',
-                      alt: `ภาพกิจกรรม ${item.kind || ''}`.trim(),
-                      onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
-                    }),
-                    el('button', {
-                      type: 'button',
-                      className: 'link-btn',
-                      onclick: () => openPhotoPreviewModal(item.photo_url, `${item.kind || 'กิจกรรม'} • ${item.plot_name || ''}`.trim())
-                    }, icon('camera', 13), ' ดูภาพตัวอย่าง (ในเครื่อง Demo)')
-                  )
-                );
+            }, `ทั้งหมด (${rows.length})`),
+            ...uniquePlots.map(plotName => el('button', {
+              type: 'button',
+              className: 'filter-chip',
+              onclick: (e) => {
+                selectedPlotFilter = plotName;
+                filterChips.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                renderFilteredCards();
               }
-            }
-          }
-          nodes.push(box);
-        }
+            }, plotName))
+          )
+        );
+
+        nodes.push(
+          el('div', { className: 'row between align-center mb-8' },
+            el('b', { className: 'ics-section-title' }, icon('calendar', 15), ' กิจกรรมของเกษตรกรในความดูแล'),
+            el('span', { className: 'pill success' }, `บันทึกแล้ว ${rows.length} รายการ`)
+          ),
+          uniquePlots.length > 1 ? filterChips : null,
+          cardsContainer
+        );
+        renderFilteredCards();
       }
     } else if (tab === 'approval') {
       const rows = await api('/approvals');
@@ -1822,15 +2006,6 @@ async function loadTab() {
                   comment: commentText || undefined,
                 });
                 notify(`บันทึกผลการพิจารณาเป็น "${selectedStatus === 'approved' ? 'อนุมัติ' : 'ไม่อนุมัติ'}" เรียบร้อย`);
-                pushLineNotification({
-                  title: selectedStatus === 'approved' ? 'คำขอใช้ปัจจัยได้รับการอนุมัติ ✅' : 'คำขอใช้ปัจจัยไม่ผ่านการอนุมัติ ❌',
-                  body: selectedStatus === 'approved'
-                    ? `คำขอ "${item.input_name}" ได้รับการอนุมัติแล้ว พร้อมใช้งานในแปลง`
-                    : `คำขอ "${item.input_name}" ไม่ผ่านการอนุมัติ: ${commentText || 'ปรับปรุงสูตรก่อนส่งใหม่'}`,
-                  type: selectedStatus === 'approved' ? 'approved' : 'rejected',
-                  targetTab: 'approval',
-                  user: me
-                });
                 await loadTab();
               } catch (err) {
                 if (!err.handled) notify(err.message);

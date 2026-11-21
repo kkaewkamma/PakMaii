@@ -276,4 +276,28 @@ test.describe('PakMaii Critical Workflows (Demo-First & LIFF Compatibility)', ()
     await expect(page.locator('#farmerSubNav')).not.toBeVisible();
     await expect(page.locator('#farmerPrimaryRecordBtn')).toBeVisible();
   });
+
+  test('Rich Menu Deep-Link (?tab=record) enforces Login first, lands on target tab once, and clears URL param', async ({ page }) => {
+    // 1. Open with Rich Menu deep link while unauthenticated -> blocked at Login first
+    await page.goto('/?tab=record');
+    await expect(page.locator('#demoLoginForm')).toBeVisible();
+    await expect(page.locator('#recordForm')).toHaveCount(0);
+
+    // 2. Log in as Farmer -> lands directly on Activity Recording tab once
+    await page.fill('#demoCode', 'F-STG-001');
+    await page.click('#demoLoginButton');
+    await expect(page.locator('#recordForm')).toBeVisible();
+
+    // 3. Pending tab and ?tab= URL parameter are consumed & cleaned once
+    const remainingTabParam = new URL(page.url()).searchParams.has('tab');
+    expect(remainingTabParam).toBe(false);
+    const remainingPending = await page.evaluate(() => sessionStorage.getItem('pending_tab'));
+    expect(remainingPending).toBeNull();
+
+    // 4. Switching persona via Demo Tools goes to Home (does not bounce back to ?tab=record)
+    await page.locator('#demoToolsBtn').click();
+    await page.locator('.demo-persona-btn:has-text("ICS-STG-001")').click();
+    await expect(page.locator('#welcome')).toContainText('Demo ICS Officer 01');
+    await expect(page.locator('#recordForm')).toHaveCount(0);
+  });
 });

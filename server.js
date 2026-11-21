@@ -43,6 +43,13 @@ import {
   formatCorrectiveActionRisk,
   sortRisksBySeverity,
 } from './shared/audit-domain.js';
+import {
+  initNotificationTable,
+  notifyInputApprovalSubmitted,
+  notifyApprovalDecided,
+  scanAndNotifyRhythmOverdue,
+  scanAndNotifyCapaDeadlines
+} from './lib/notification-dispatcher.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -72,6 +79,7 @@ CREATE TABLE IF NOT EXISTS corrective_actions(id INTEGER PRIMARY KEY, plot_id IN
 CREATE INDEX IF NOT EXISTS idx_corrective_actions_plot ON corrective_actions(plot_id, status, due_date);
 CREATE INDEX IF NOT EXISTS idx_corrective_actions_review ON corrective_actions(review_id);
 CREATE INDEX IF NOT EXISTS idx_corrective_actions_due ON corrective_actions(status, due_date);`);
+initNotificationTable(db);
 const evidenceStorage = createLocalEvidenceStorage(process.env.EVIDENCE_DIR || path.join(__dirname, 'data', 'evidence'));
 if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").get() || !db.prepare('SELECT 1 FROM schema_migrations WHERE version=2').get()) {
   db.close();
@@ -555,8 +563,46 @@ app.get('/api/approvals', auth, wrap((req, res) => {
   if (req.user.role === 'ics') return res.json(db.prepare(`${base} JOIN farmer_assignments fa ON fa.farmer_user_id=p.owner_id AND fa.ics_user_id=? AND fa.ends_at IS NULL ORDER BY a.id DESC`).all(req.user.id));
   res.json(db.prepare('SELECT a.*,p.name plot_name FROM approvals a JOIN plots p ON p.id=a.plot_id WHERE a.user_id=? ORDER BY a.id DESC').all(req.user.id));
 }));
-app.post('/api/approvals', auth, wrap((req, res) => { if (req.user.role !== 'farmer') throw new HttpError(403, 'เฉพาะเกษตรกร'); const plot = ownPlot(req, req.body.plot_id), inputName = text(req.body.input_name, 'ชื่อปัจจัยการผลิต', 200), details = text(req.body.details, 'รายละเอียด', 2000); const result = db.prepare('INSERT INTO approvals(plot_id,user_id,input_name,details) VALUES(?,?,?,?)').run(plot.id, req.user.id, inputName, details); res.status(201).json({ id: result.lastInsertRowid }); }));
-app.patch('/api/approvals/:id', auth, ics, wrap((req, res) => { const id = positiveId(req.params.id), approval = db.prepare('SELECT * FROM approvals WHERE id=?').get(id); if (!approval) throw new HttpError(404, 'ไม่พบคำขอ'); ownPlot(req, approval.plot_id); const status = req.body.status, comment = optionalText(req.body.comment, 'ความเห็น', 1000); if (!['approved', 'rejected'].includes(status)) throw new HttpError(400, 'สถานะไม่ถูกต้อง'); if (status === 'rejected' && !comment) throw new HttpError(400, 'กรุณาระบุเหตุผลกรณีไม่อนุมัติ'); db.transaction(() => { const result = db.prepare("UPDATE approvals SET status=?,comment=?,reviewer_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'").run(status, comment, req.user.id, id); if (!result.changes) throw new HttpError(404, 'รายการนี้ถูกพิจารณาแล้วหรือไม่พบ'); writeAudit('approval.reviewed', req.user.id, 'approval', id, { status }); }).immediate(); res.json({ ok: true }); }));
+app.post('/api/approvals', auth, wrap((req, res) => {
+  if (req.user.role !== 'farmer') throw new HttpError(403, 'เฉพาะเกษตรกร');
+  const plot = ownPlot(req, req.body.plot_id), inputName = text(req.body.input_name, 'ชื่อปัจจัยการผลิต', 200), details = text(req.body.details, 'รายละเอียด', 2000);
+  const result = db.prepare('INSERT INTO approvals(plot_id,user_id,input_name,details) VALUES(?,?,?,?)').run(plot.id, req.user.id, inputName, details);
+  const approvalId = result.lastInsertRowid;
+  notifyInputApprovalSubmitted({
+    db,
+    approvalId,
+    farmerId: req.user.id,
+    plotId: plot.id,
+    inputName,
+    details,
+    liffId: process.env.LIFF_ID,
+    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN
+  }).catch(() => {});
+  res.status(201).json({ id: approvalId });
+}));
+app.patch('/api/approvals/:id', auth, ics, wrap((req, res) => {
+  const id = positiveId(req.params.id), approval = db.prepare('SELECT * FROM approvals WHERE id=?').get(id);
+  if (!approval) throw new HttpError(404, 'ไม่พบคำขอ');
+  ownPlot(req, approval.plot_id);
+  const status = req.body.status, comment = optionalText(req.body.comment, 'ความเห็น', 1000);
+  if (!['approved', 'rejected'].includes(status)) throw new HttpError(400, 'สถานะไม่ถูกต้อง');
+  if (status === 'rejected' && !comment) throw new HttpError(400, 'กรุณาระบุเหตุผลกรณีไม่อนุมัติ');
+  db.transaction(() => {
+    const result = db.prepare("UPDATE approvals SET status=?,comment=?,reviewer_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'").run(status, comment, req.user.id, id);
+    if (!result.changes) throw new HttpError(404, 'รายการนี้ถูกพิจารณาแล้วหรือไม่พบ');
+    writeAudit('approval.reviewed', req.user.id, 'approval', id, { status });
+  }).immediate();
+  notifyApprovalDecided({
+    db,
+    approvalId: id,
+    status,
+    comment,
+    reviewerId: req.user.id,
+    liffId: process.env.LIFF_ID,
+    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN
+  }).catch(() => {});
+  res.json({ ok: true });
+}));
 app.get('/api/lots', auth, wrap((req, res) => {
   const base = 'SELECT l.*,p.name plot_name,u.name farmer FROM lots l JOIN plots p ON p.id=l.plot_id JOIN users u ON u.id=p.owner_id';
   if (req.user.role === 'admin') return res.json(db.prepare(`${base} ORDER BY l.id DESC`).all());

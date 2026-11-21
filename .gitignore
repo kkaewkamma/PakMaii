@@ -15,6 +15,7 @@ backups/
 .wrangler/
 .wrangler*
 wrangler.staging.jsonc
+wrangler.pakmaii.jsonc
 staging-seed*.sql
 staging-identities*.json
 !staging-identities.example.json

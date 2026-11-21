@@ -168,9 +168,9 @@ test('login UI is demo-first with Farmer/ICS choice, Demo button and small Admin
   // logout clears demo session and token, then returns to the main login page
   assert.match(appSource, /function clearSession\(\) \{[^}]*demoUser = null[^}]*demoSession\?\.logout\(\)/s);
   assert.match(appSource, /async function acceptLogin\(data\) \{\s*demoUser = null;/);
-  // LINE flow resumes only after explicit Admin Login
+  // LINE flow resumes automatically only when permitted by environment/in-app/explicit-login guard
   assert.match(appSource, /sessionStorage\.setItem\('admin_login', '1'\)/);
-  assert.match(appSource, /sessionStorage\.getItem\('admin_login'\) !== '1'\) return showLogin/);
+  assert.match(appSource, /if \(!shouldAttemptLiffAutoLogin\(\{ cfg, storage: sessionStorage, userAgent: navigator\.userAgent \}\)\) \{\s*return showLogin\(Boolean\(cfg\.development\)\);\s*\}/s);
 });
 
 test('backend has no demo login and rejects demo codes as bearer credentials', async () => {

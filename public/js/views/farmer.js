@@ -7,7 +7,6 @@ import { createFarmerAvatarSvg } from '../core/graphics.js';
 import { createPhotoUploader, openEvidenceViewer, openPhotoPreviewModal } from '../core/photo.js';
 import { create14DayRhythmTrack } from '../core/rhythm.js';
 import { AUDIT_STANDARD_LABELS } from './admin.js';
-import { pushLineNotification } from './line-oa.js';
 
 export function createVoiceInput(textarea) {
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -111,27 +110,6 @@ export function buildFarmerHomeView({ me = null, plots = [], activities = [], ap
     : 'เกษตรกร • ยังไม่มีแปลงปลูก';
 
   // 1. User Greeting & Identity (deep forest green banking-app hero banner)
-  const greetingActions = el('div', { className: 'farmer-greeting-actions' },
-    el('button', {
-      type: 'button',
-      className: 'farmer-line-btn',
-      'aria-label': 'แชท LINE OA ถามสถานะด่วน',
-      onclick: () => {
-        const lineBtn = document.getElementById('lineOaBtn');
-        if (lineBtn) lineBtn.click();
-      }
-    }, '💬 LINE OA'),
-    el('button', {
-      type: 'button',
-      className: 'farmer-bell-btn',
-      'aria-label': 'การแจ้งเตือน LINE',
-      onclick: () => {
-        const bellBtn = document.getElementById('notifBellBtn');
-        if (bellBtn) bellBtn.click();
-      }
-    }, icon('bell', 18))
-  );
-
   const greetingSection = el('section', {
     className: 'farmer-home-greeting farmer-home-hero-banner',
     'aria-label': 'ข้อมูลเกษตรกร'
@@ -141,8 +119,7 @@ export function buildFarmerHomeView({ me = null, plots = [], activities = [], ap
       el('span', { className: 'farmer-greeting-time' }, timeGreeting),
       el('h2', { className: 'farmer-greeting-name' }, farmerDisplayName),
       el('p', { className: 'farmer-greeting-meta' }, heroIdentityMeta)
-    ),
-    greetingActions
+    )
   );
 
   // 2. One Recommended Primary Task Card
@@ -1103,13 +1080,6 @@ export function buildFarmerApprovalView({ plots = [], rows = [], me = null, plot
           details: detailsVal
         });
         notify('ส่งคำขอให้เจ้าหน้าที่ ICS พิจารณาเรียบร้อย');
-        pushLineNotification({
-          title: 'ส่งคำขอใช้ปัจจัยใหม่แล้ว 📋',
-          body: `คำขอ "${nameVal}" ถูกส่งให้เจ้าหน้าที่ ICS ตรวจสอบแล้ว ระบบจะแจ้งเตือนเมื่อมีผลการพิจารณา`,
-          type: 'pending',
-          targetTab: 'approval',
-          user: me
-        });
         if (typeof reloadTab === 'function') await reloadTab();
       } catch (err) {
         if (!err.handled) notify(err.message);

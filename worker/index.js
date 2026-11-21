@@ -1,6 +1,15 @@
 import { D1Repository } from './repository/d1.js';
 import { agencyCodeDigests, verifyAdminPassword } from './auth.js';
 import {
+  notifyInputApprovalSubmitted,
+  notifyApprovalDecided,
+  scanAndNotifyRhythmOverdue
+} from '../lib/notification-dispatcher.js';
+import {
+  sendLineReplyMessage,
+  fetchChannelAccessToken
+} from '../shared/line-messaging.js';
+import {
   MAX_EVIDENCE_BYTES,
   detectImageContentType,
   extensionForContentType,
@@ -143,7 +152,7 @@ async function validatePendingEvidenceForEntity(repository, user, rawEvidenceId,
 
 const seenWorkerTutorialIps = new Set();
 
-export async function handleApi(request, env) {
+export async function handleApi(request, env, ctx) {
   const url = new URL(request.url);
   const { pathname } = url;
 
@@ -172,8 +181,28 @@ export async function handleApi(request, env) {
     for (const evt of events) {
       if (evt.type === 'message' && evt.message?.type === 'text') {
         const userMsg = (evt.message.text || '').trim();
+        const lineUserId = evt.source?.userId;
         let replyText = '🌱 ระบบบริหารมาตรฐานเกษตรอินทรีย์ผักไหม ยินดีให้บริการครับ แตะเมนูลัดเพื่อถามสถานะได้ทันที';
-        if (/คำขอ|approval|ปัจจัย/.test(userMsg)) {
+
+        if (/^ไอดี$|^myid$|^id$/i.test(userMsg)) {
+          replyText = `🆔 รหัส LINE User ID ของคุณคือ:\n${lineUserId || 'ไม่พบ ID'}\n\n💡 วิธีเปิดรับแจ้งเตือน Realtime:\n• พิมพ์ "ผูก ics" เพื่อรับแจ้งเตือนเมื่อมีคำขอใหม่\n• พิมพ์ "ผูก เกษตรกร" เพื่อรับแจ้งเตือนผลการอนุมัติ`;
+        } else if (/^ผูก\s*ics$|^ผูกบัญชี\s*ics$/i.test(userMsg) && lineUserId) {
+          await repository.run("UPDATE users SET line_id = ?, status = 'active' WHERE id = 910101", lineUserId);
+          replyText = `✅ ผูกบัญชี LINE กับ "คุณวิชัย ผักไหม (เจ้าหน้าที่ ICS)" สำเร็จแล้ว!\n\nจากนี้เมื่อเกษตรกรส่งคำขอใช้ปุ๋ย/ปัจจัยการผลิต ระบบจะส่งข้อความแจ้งเตือนมาที่นี่แบบ Real-time ทันทีครับ 🔔`;
+        } else if (/^ผูก\s*เกษตรกร$|^ผูกบัญชี\s*เกษตรกร$/i.test(userMsg) && lineUserId) {
+          await repository.run("UPDATE users SET line_id = ?, status = 'active' WHERE id = 911001", lineUserId);
+          replyText = `✅ ผูกบัญชี LINE กับ "คุณสมปอง คำภา (เกษตรกร)" สำเร็จแล้ว!\n\nจากนี้เมื่อเจ้าหน้าที่ ICS อนุมัติหรือปฏิเสธคำขอ ระบบจะส่งข้อความแจ้งเตือนผลมาที่นี่แบบ Real-time ทันทีครับ 🔔`;
+        } else if (/เตือนแปลง|เตือนบันทึก|เตือนเกษตรกร|ลืมบันทึก|remind/i.test(userMsg)) {
+          const overdueResults = await scanAndNotifyRhythmOverdue({
+            db: env.DB,
+            liffId: env.LIFF_ID,
+            channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+            channelId: env.LINE_MESSAGING_CHANNEL_ID || env.LINE_CHANNEL_ID,
+            channelSecret: env.LINE_MESSAGING_CHANNEL_SECRET || env.LINE_CHANNEL_SECRET,
+            fetchImpl: fetch
+          }).catch(err => { console.error('Remind error:', err); return []; });
+          replyText = `⏰ ระบบ Ready to Grow ตรวจสอบแปลงในความดูแลแล้ว:\n\n• เกณฑ์: ขาดการบันทึกเกิน 14 วัน (ตามเกณฑ์ PGS ผักไหม)\n• ส่งการแจ้งเตือนเตือนเกษตรกรสำเร็จ: ${overdueResults.length} รายการ 🔔`;
+        } else if (/คำขอ|approval|ปัจจัย/.test(userMsg)) {
           replyText = '🌱 ตรวจสอบสถานะคำขอ: คุณมีคำขอใช้ปัจจัยรอพิจารณา เจ้าหน้าที่ ICS กำลังตรวจสอบความสอดคล้องตามเกณฑ์อินทรีย์';
         } else if (/แปลง|สถานะ|plot/.test(userMsg)) {
           replyText = '🌾 สรุปสถานะแปลง: แปลง A-03 ข้าวหอมมะลิ 105 (ระยะปรับเปลี่ยน) มีการบันทึกสม่ำเสมอตามเกณฑ์ PGS';
@@ -184,24 +213,40 @@ export async function handleApi(request, env) {
         } else if (/ics|เจ้าหน้าที่|ติดต่อ/.test(userMsg)) {
           replyText = '🧑‍🌾 เจ้าหน้าที่ ICS ผู้รับผิดชอบ: คุณวิชัย ผักไหม โทร. 081-234-5678';
         }
-        replies.push({
-          replyToken: evt.replyToken,
-          messages: [{
-            type: 'text',
-            text: replyText,
-            quickReply: {
-              items: [
-                { type: 'action', action: { type: 'message', label: '🔍 เช็คสถานะคำขอ', text: 'เช็คสถานะคำขอ' } },
-                { type: 'action', action: { type: 'message', label: '🌾 สรุปสถานะแปลง', text: 'สรุปสถานะแปลง' } },
-                { type: 'action', action: { type: 'message', label: '📝 บันทึกแปลง', text: 'บันทึกแปลง' } },
-                { type: 'action', action: { type: 'message', label: '🛡️ เช็คผลตรวจแปลง', text: 'เช็คผลตรวจแปลง' } },
-                { type: 'action', action: { type: 'message', label: '📞 ติดต่อ ICS', text: 'ติดต่อ ics' } }
-              ]
-            }
-          }]
-        });
+
+        if (evt.replyToken) {
+          replies.push({
+            replyToken: evt.replyToken,
+            messages: [{
+              type: 'text',
+              text: replyText
+            }]
+          });
+        }
       }
     }
+
+    if (replies.length > 0) {
+      let token = env.LINE_CHANNEL_ACCESS_TOKEN;
+      if (!token && env.LINE_MESSAGING_CHANNEL_ID && env.LINE_MESSAGING_CHANNEL_SECRET) {
+        token = await fetchChannelAccessToken({
+          channelId: env.LINE_MESSAGING_CHANNEL_ID,
+          channelSecret: env.LINE_MESSAGING_CHANNEL_SECRET,
+          fetchImpl: fetch
+        });
+      }
+      if (token) {
+        for (const item of replies) {
+          await sendLineReplyMessage({
+            channelAccessToken: token,
+            replyToken: item.replyToken,
+            messages: item.messages,
+            fetchImpl: fetch
+          });
+        }
+      }
+    }
+
     return json({
       ok: true,
       service: 'PakMaii LINE Webhook',
@@ -211,7 +256,7 @@ export async function handleApi(request, env) {
         source: evt.source?.userId ? 'line_user' : 'simulator',
         status: 'mapped_to_activity_log'
       })),
-      replies,
+      replies_count: replies.length,
       timestamp: new Date().toISOString()
     }, 200, { 'Cache-Control': 'no-store' });
   }
@@ -454,7 +499,23 @@ export async function handleApi(request, env) {
     if (denied) return denied;
     const body = await requestBody(request);
     const plot = await ownPlot(repository, user, body.plot_id);
-    const id = await repository.createApproval(plot.id, user.id, text(body.input_name, 'ชื่อปัจจัยการผลิต', 200), text(body.details, 'รายละเอียด', 2000));
+    const inputName = text(body.input_name, 'ชื่อปัจจัยการผลิต', 200);
+    const details = text(body.details, 'รายละเอียด', 2000);
+    const id = await repository.createApproval(plot.id, user.id, inputName, details);
+    const notifyTask = notifyInputApprovalSubmitted({
+      db: env.DB,
+      approvalId: id,
+      farmerId: user.id,
+      plotId: plot.id,
+      inputName,
+      details,
+      liffId: env.LIFF_ID,
+      channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      channelId: env.LINE_MESSAGING_CHANNEL_ID || env.LINE_CHANNEL_ID,
+      channelSecret: env.LINE_MESSAGING_CHANNEL_SECRET || env.LINE_CHANNEL_SECRET,
+      fetchImpl: fetch
+    }).catch(err => console.error('Worker submit approval notification error:', err));
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(notifyTask);
     return json({ id }, 201);
   }
   if (approvalPatch) {
@@ -470,6 +531,19 @@ export async function handleApi(request, env) {
     if (!['approved','rejected'].includes(status)) throw new HttpError(400, 'สถานะไม่ถูกต้อง');
     if (status === 'rejected' && !comment) throw new HttpError(400, 'กรุณาระบุเหตุผลกรณีไม่อนุมัติ');
     if (await repository.reviewApproval(id, user.id, status, comment) !== 1) throw new HttpError(404, 'รายการนี้ถูกพิจารณาแล้วหรือไม่พบ');
+    const notifyTask = notifyApprovalDecided({
+      db: env.DB,
+      approvalId: id,
+      status,
+      comment,
+      reviewerId: user.id,
+      liffId: env.LIFF_ID,
+      channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      channelId: env.LINE_MESSAGING_CHANNEL_ID || env.LINE_CHANNEL_ID,
+      channelSecret: env.LINE_MESSAGING_CHANNEL_SECRET || env.LINE_CHANNEL_SECRET,
+      fetchImpl: fetch
+    }).catch(err => console.error('Worker review approval notification error:', err));
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(notifyTask);
     return json({ ok: true });
   }
   if (request.method === 'POST' && pathname === '/api/lots') {
@@ -524,6 +598,18 @@ export async function handleApi(request, env) {
       ...(standardCode ? { standard_code: standardCode } : {}),
       ...(created.correctiveActionIds.length ? { corrective_action_ids: created.correctiveActionIds } : {}),
     }, 201);
+  }
+  if (request.method === 'POST' && pathname === '/api/notifications/remind-overdue') {
+    if (!['ics', 'admin'].includes(user.role)) return json({ error: 'เฉพาะเจ้าหน้าที่ ICS หรือผู้ดูแลระบบ' }, 403);
+    const results = await scanAndNotifyRhythmOverdue({
+      db: env.DB,
+      liffId: env.LIFF_ID,
+      channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      channelId: env.LINE_MESSAGING_CHANNEL_ID || env.LINE_CHANNEL_ID,
+      channelSecret: env.LINE_MESSAGING_CHANNEL_SECRET || env.LINE_CHANNEL_SECRET,
+      fetchImpl: fetch
+    });
+    return json({ ok: true, sent: results.length, details: results });
   }
   if (request.method === 'POST' && pathname === '/api/checklists') {
     if (!['ics', 'admin'].includes(user.role)) return json({ error: 'เฉพาะเจ้าหน้าที่ ICS หรือผู้ดูแลระบบ' }, 403);
@@ -743,12 +829,17 @@ export async function handleApi(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const noStore = ['/api/login','/api/auth/admin/password-login','/api/auth/register/invite','/api/logout','/api/me'].includes(url.pathname);
     try {
-      if (url.pathname.startsWith('/api/')) return await handleApi(request, env);
-      return env.ASSETS.fetch(request);
+      if (url.pathname.startsWith('/api/')) return await handleApi(request, env, ctx);
+      const assetResponse = await env.ASSETS.fetch(request);
+      if (assetResponse.status === 404 && request.method === 'GET' && !url.pathname.includes('.')) {
+        const indexRequest = new Request(new URL('/index.html', request.url), request);
+        return await env.ASSETS.fetch(indexRequest);
+      }
+      return assetResponse;
     } catch (error) {
       if (error?.expose && Number.isInteger(error.status)) return json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status, noStore ? { 'Cache-Control': 'no-store' } : {});
       if (/UNIQUE constraint failed/i.test(String(error?.message))) return json({ error: 'ข้อมูลนี้มีอยู่แล้ว' }, 409, noStore ? { 'Cache-Control': 'no-store' } : {});
@@ -756,4 +847,15 @@ export default {
       return json({ error: 'เกิดข้อผิดพลาดภายในระบบ' }, 500, noStore ? { 'Cache-Control': 'no-store' } : {});
     }
   },
+  async scheduled(event, env, ctx) {
+    const scanTask = scanAndNotifyRhythmOverdue({
+      db: env.DB,
+      liffId: env.LIFF_ID,
+      channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      channelId: env.LINE_MESSAGING_CHANNEL_ID || env.LINE_CHANNEL_ID,
+      channelSecret: env.LINE_MESSAGING_CHANNEL_SECRET || env.LINE_CHANNEL_SECRET,
+      fetchImpl: fetch
+    }).catch(err => console.error('Scheduled rhythm overdue scan error:', err));
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(scanTask);
+  }
 };
