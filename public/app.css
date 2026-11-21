@@ -261,7 +261,7 @@ body {
    ========================================================================== */
 header#main-header {
   background: #173D2C;
-  border-bottom: 1px solid rgba(168, 189, 165, 0.22);
+  border-bottom: 2.5px solid #EAB308;
   box-shadow: 0 4px 20px -2px rgba(15, 42, 29, 0.35);
   color: var(--white);
   padding: 15px 0;
@@ -297,7 +297,7 @@ header#main-header {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(245, 158, 11, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 0 1.5px #EAB308;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -325,11 +325,12 @@ header#main-header {
   font-weight: 700;
   padding: 2px 9px;
   border-radius: var(--radius-full);
-  background: rgba(245, 158, 11, 0.18);
-  color: #FDE68A;
-  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: #FEF08A;
+  color: #713F12;
+  border: 1px solid #FACC15;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  box-shadow: 0 1px 4px rgba(234, 179, 8, 0.25);
 }
 
 .brand-org {
@@ -668,13 +669,14 @@ nav#tabs button:hover {
 nav#tabs button.active {
   background: var(--deep-forest);
   border-color: var(--deep-forest);
+  border-bottom: 3px solid #EAB308;
   color: var(--white);
   font-weight: 600;
   box-shadow: var(--shadow-xs);
 }
 
 nav#tabs button.active svg {
-  stroke: #c7dec9;
+  stroke: #FDE047;
 }
 
 @media (min-width: 1024px) {
@@ -2734,11 +2736,13 @@ body.is-login .hero {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--forest-green);
-  color: var(--white);
+  background: #EAB308;
+  color: #173D2C;
   display: none;
   align-items: center;
   justify-content: center;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .role-option[aria-checked="true"] .role-check-indicator {
@@ -6531,13 +6535,26 @@ body {
 
 /* 8. Bottom Navigation Dock Active States */
 #mobile-dock .dock-btn.active {
-  color: var(--ref-green-primary) !important;
+  color: #15803D !important;
   font-weight: 700 !important;
+  position: relative;
+}
+
+#mobile-dock .dock-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 3px;
+  background: #EAB308;
+  border-radius: 9999px;
 }
 
 #mobile-dock .dock-btn.active svg {
-  color: var(--ref-green-primary) !important;
-  stroke: var(--ref-green-primary) !important;
+  color: #15803D !important;
+  stroke: #15803D !important;
 }
 
 /* 9. Contact Officer Modal Sheet */
@@ -7258,7 +7275,7 @@ body.role-farmer #mobile-dock:not(.hide) {
   }
 }
 
-/* Farmer Home — Section 1: Deep Forest Green Hero Banner */
+/* Farmer Home — Section 1: Deep Forest Green Hero Banner with Golden Harvest Accent */
 .farmer-home-greeting.farmer-home-hero-banner {
   display: flex;
   align-items: center;
@@ -7268,7 +7285,8 @@ body.role-farmer #mobile-dock:not(.hide) {
   border-radius: 20px;
   padding: 16px 18px;
   margin-bottom: 14px;
-  box-shadow: 0 3px 12px rgba(23, 69, 46, 0.14);
+  border: 1.5px solid #EAB308;
+  box-shadow: 0 4px 16px rgba(23, 69, 46, 0.16), 0 0 0 1px rgba(234, 179, 8, 0.2);
 }
 
 .farmer-greeting-avatar {
@@ -7307,7 +7325,8 @@ body.role-farmer #mobile-dock:not(.hide) {
 .farmer-greeting-meta {
   margin: 0;
   font-size: 13px;
-  color: #D8ECE0;
+  color: #FEF08A;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -7434,6 +7453,31 @@ body.role-farmer #mobile-dock:not(.hide) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+#content .farmer-shortcut-btn:nth-child(1) .farmer-shortcut-icon {
+  background: #EAF5EE;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+#content .farmer-shortcut-btn:nth-child(2) .farmer-shortcut-icon {
+  background: #FEF9C3;
+  color: #B45309;
+  border: 1px solid #FDE047;
+}
+
+#content .farmer-shortcut-btn:nth-child(3) .farmer-shortcut-icon {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+#content .farmer-shortcut-btn:nth-child(4) .farmer-shortcut-icon {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
 }
 
 .farmer-shortcut-label {
@@ -8258,6 +8302,7 @@ body.role-farmer .next-action-grid {
   background: #FFFFFF !important;
   color: #0B6B38 !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+  border-bottom: 2.5px solid #EAB308 !important;
 }
 
 .ics-home-pane {
@@ -8423,9 +8468,9 @@ body.role-farmer .next-action-grid {
 }
 
 .voice-scenario-chip {
-  background: #FFFFFF;
-  border: 1px solid #86EFAC;
-  color: #15803D;
+  background: #FEF9C3;
+  border: 1px solid #FACC15;
+  color: #854D0E;
   font-size: 11.5px;
   font-weight: 600;
   padding: 5px 10px;
@@ -8436,9 +8481,9 @@ body.role-farmer .next-action-grid {
 }
 
 .voice-scenario-chip:hover {
-  background: #15803D;
-  color: #FFFFFF;
-  border-color: #15803D;
+  background: #FACC15;
+  color: #713F12;
+  border-color: #EAB308;
 }
 
 /* Parsed Result Preview Box */
@@ -8502,9 +8547,9 @@ body.role-farmer .next-action-grid {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: #ECFDF5;
-  color: #047857;
-  border: 1.5px solid #6EE7B7;
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1.5px solid #FCD34D;
   border-radius: 12px;
   padding: 10px 16px;
   font-size: 14px;
@@ -8515,6 +8560,6 @@ body.role-farmer .next-action-grid {
 }
 
 .farmer-voice-cta:hover {
-  background: #D1FAE5;
-  border-color: #059669;
+  background: #FEF3C7;
+  border-color: #F59E0B;
 }

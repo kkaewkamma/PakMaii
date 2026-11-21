@@ -1,6 +1,7 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="512" height="512" rx="112" fill="#183F32"/>
   <circle cx="256" cy="256" r="190" fill="#143429"/>
+  <circle cx="256" cy="256" r="192" stroke="#EAB308" stroke-width="6" stroke-opacity="0.85" fill="none"/>
   <g transform="translate(106, 106) scale(8.33)">
     <!-- Main leaf -->
     <path d="M6 28C6 16 14 6 24 4C24 16 16 26 6 28Z" fill="#15803D"/>
