@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'pakmaii-app-v1';
+const CACHE_NAME = 'pakmaii-app-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -22,6 +22,7 @@ const STATIC_ASSETS = [
   '/js/core/photo.js',
   '/js/core/rhythm.js',
   '/js/core/state.js',
+  '/js/core/voice-parser.js',
   '/js/views/admin.js',
   '/js/views/farmer.js',
   '/js/views/ics.js',

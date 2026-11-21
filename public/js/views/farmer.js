@@ -8,6 +8,191 @@ import { createPhotoUploader, openEvidenceViewer, openPhotoPreviewModal } from '
 import { create14DayRhythmTrack } from '../core/rhythm.js';
 import { AUDIT_STANDARD_LABELS } from './admin.js';
 import { savePendingActivity, getPendingActivities } from '../core/offline-store.js';
+import { parseThaiVoiceActivity, SAMPLE_VOICE_SCENARIOS } from '../core/voice-parser.js';
+
+export function createSmartVoiceAssistant({ plots = [], onApplyParsed }) {
+  const SpeechRec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+  const container = el('div', { className: 'smart-voice-assistant-card', 'aria-label': 'ผู้ช่วยเสียงอัจฉริยะบันทึกแปลง' });
+
+  const badge = el('span', { className: 'voice-badge' }, icon('mic', 13), ' ผู้ช่วยเสียง AI อัจฉริยะ');
+  const title = el('h4', { className: 'voice-title' }, 'บันทึกแปลงด้วยเสียงภาษาไทย (แปลงผักไหม)');
+  const desc = el('p', { className: 'voice-desc' }, 'พูดประโยคเดียว เช่น "วันนี้ใส่ปุ๋ยหมักแหนแดง 50 กิโล ในแปลง A-03" ระบบจะเลือกแปลง กิจกรรม ปัจจัย ปริมาณ และกรอกลงฟิลด์ให้อัตโนมัติทันที');
+
+  const micText = el('span', { className: 'voice-mic-text' }, 'แตะเพื่อพูดบันทึกแปลง');
+  const micBtn = el('button', {
+    type: 'button',
+    className: 'voice-mic-hero-btn',
+    'aria-label': 'กดเพื่อเริ่มหรือหยุดพูดภาษาไทย'
+  },
+    icon('mic', 22),
+    micText
+  );
+
+  const statusMsg = el('div', { className: 'voice-status-msg hide' });
+  const liveTranscriptBox = el('div', { className: 'voice-live-transcript hide' });
+  const previewBox = el('div', { className: 'voice-parse-preview hide' });
+
+  function showParsedResult(parsed) {
+    if (!parsed) return;
+    previewBox.classList.remove('hide');
+    previewBox.replaceChildren(
+      el('div', { className: 'row between align-center mb-8' },
+        el('strong', { className: 'voice-result-heading text-emerald' }, icon('checkCircle', 14), ' ถอดความและจำแนกข้อมูลสำเร็จ'),
+        el('span', { className: 'pill success' }, parsed.kind)
+      ),
+      el('div', { className: 'voice-result-grid' },
+        el('div', { className: 'voice-result-item' },
+          el('span', { className: 'voice-item-label' }, '📍 แปลง:'),
+          el('strong', { className: 'voice-item-value' }, parsed.plotName || parsed.plotId || '-')
+        ),
+        el('div', { className: 'voice-result-item' },
+          el('span', { className: 'voice-item-label' }, '🌱 กิจกรรม:'),
+          el('strong', { className: 'voice-item-value' }, parsed.kind)
+        ),
+        parsed.inputUsed ? el('div', { className: 'voice-result-item' },
+          el('span', { className: 'voice-item-label' }, '📦 ปัจจัย:'),
+          el('strong', { className: 'voice-item-value' }, parsed.inputUsed)
+        ) : null,
+        parsed.amountQty ? el('div', { className: 'voice-result-item' },
+          el('span', { className: 'voice-item-label' }, '⚖️ ปริมาณ:'),
+          el('strong', { className: 'voice-item-value' }, parsed.amountQty)
+        ) : null,
+        el('div', { className: 'voice-result-item' },
+          el('span', { className: 'voice-item-label' }, '📅 วันที่:'),
+          el('strong', { className: 'voice-item-value' }, parsed.activityDate)
+        )
+      ),
+      el('div', { className: 'voice-result-transcript mt-8' },
+        el('small', { className: 'muted' }, 'ข้อความที่พูด: '),
+        el('span', { className: 'italic' }, `"${parsed.rawTranscript}"`)
+      ),
+      el('div', { className: 'row gap-8 mt-12' },
+        el('button', {
+          type: 'button',
+          className: 'approval-btn-primary',
+          onclick: () => {
+            onApplyParsed(parsed);
+          }
+        }, icon('check', 14), ' นำข้อมูลลงฟอร์มและไปหน้าสรุป'),
+        el('button', {
+          type: 'button',
+          className: 'btn-secondary',
+          onclick: () => {
+            previewBox.classList.add('hide');
+            liveTranscriptBox.classList.add('hide');
+          }
+        }, 'ปิด')
+      )
+    );
+  }
+
+  const chipContainer = el('div', { className: 'voice-scenario-chips' },
+    el('span', { className: 'voice-chips-label' }, 'แตะประโยคตัวอย่าง:'),
+    ...SAMPLE_VOICE_SCENARIOS.map(sc => {
+      return el('button', {
+        type: 'button',
+        className: 'voice-scenario-chip',
+        title: sc.speech,
+        onclick: () => {
+          liveTranscriptBox.classList.remove('hide');
+          liveTranscriptBox.textContent = `"${sc.speech}"`;
+          const parsed = parseThaiVoiceActivity(sc.speech, plots);
+          showParsedResult(parsed);
+        }
+      }, sc.title);
+    })
+  );
+
+  let recognition = null;
+  let isListening = false;
+
+  if (SpeechRec) {
+    try {
+      recognition = new SpeechRec();
+      recognition.lang = 'th-TH';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add('is-recording');
+        micText.textContent = 'กำลังฟังเสียง... (พูดได้เลย)';
+        statusMsg.classList.remove('hide');
+        statusMsg.textContent = '🎙️ กำลังรับฟังเสียงภาษาไทย... แตะอีกครั้งเมื่อพูดเสร็จ';
+        liveTranscriptBox.classList.remove('hide');
+        liveTranscriptBox.textContent = '...';
+      };
+
+      recognition.onresult = (e) => {
+        let interim = '';
+        let final = '';
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+          if (e.results[i].isFinal) {
+            final += e.results[i][0].transcript;
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        const text = final || interim;
+        if (text) {
+          liveTranscriptBox.textContent = `"${text}"`;
+        }
+        if (final) {
+          const parsed = parseThaiVoiceActivity(final, plots);
+          showParsedResult(parsed);
+        }
+      };
+
+      recognition.onerror = () => {
+        isListening = false;
+        micBtn.classList.remove('is-recording');
+        micText.textContent = 'แตะเพื่อพูดบันทึกแปลง';
+        statusMsg.classList.remove('hide');
+        statusMsg.textContent = 'ระบบไม่ได้รับเสียงหรือการอนุญาตไมโครโฟนถูกปิด สามารถแตะประโยคตัวอย่างด้านล่างได้';
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        micBtn.classList.remove('is-recording');
+        micText.textContent = 'แตะเพื่อพูดบันทึกแปลง';
+        statusMsg.classList.add('hide');
+      };
+    } catch {
+      recognition = null;
+    }
+  }
+
+  micBtn.onclick = () => {
+    if (isListening) {
+      try { recognition?.stop(); } catch {}
+      return;
+    }
+    if (recognition) {
+      try {
+        recognition.start();
+      } catch {
+        statusMsg.classList.remove('hide');
+        statusMsg.textContent = 'กำลังเริ่มต้นไมโครโฟน...';
+      }
+    } else {
+      statusMsg.classList.remove('hide');
+      statusMsg.textContent = 'อุปกรณ์นี้ไม่รองรับ Speech Recognition โดยตรง สามารถแตะประโยคตัวอย่างด้านล่างเพื่อทดลองระบบได้ทันที';
+    }
+  };
+
+  container.append(
+    el('div', { className: 'voice-header-row' }, badge),
+    title,
+    desc,
+    micBtn,
+    statusMsg,
+    liveTranscriptBox,
+    chipContainer,
+    previewBox
+  );
+
+  return container;
+}
 
 export function createVoiceInput(textarea) {
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -163,14 +348,25 @@ export function buildFarmerHomeView({ me = null, plots = [], activities = [], ap
     ),
     el('h3', { className: 'farmer-task-title' }, taskTitle),
     el('p', { className: 'farmer-task-desc' }, taskDesc),
-    el('button', {
-      type: 'button',
-      id: 'farmerPrimaryRecordBtn',
-      className: 'farmer-primary-cta',
-      onclick: () => navigateTab(plots.length === 0 ? 'plots' : 'record')
-    },
-      icon(plots.length === 0 ? 'plus' : 'sprout', 20),
-      el('span', {}, plots.length === 0 ? 'เพิ่มแปลงปลูกแรก' : 'บันทึกกิจกรรมวันนี้')
+    el('div', { className: 'farmer-primary-cta-group' },
+      el('button', {
+        type: 'button',
+        id: 'farmerPrimaryRecordBtn',
+        className: 'farmer-primary-cta',
+        onclick: () => navigateTab(plots.length === 0 ? 'plots' : 'record')
+      },
+        icon(plots.length === 0 ? 'plus' : 'sprout', 20),
+        el('span', {}, plots.length === 0 ? 'เพิ่มแปลงปลูกแรก' : 'บันทึกกิจกรรมวันนี้')
+      ),
+      plots.length > 0 ? el('button', {
+        type: 'button',
+        id: 'farmerVoiceRecordBtn',
+        className: 'farmer-voice-cta',
+        onclick: () => navigateTab('record')
+      },
+        icon('mic', 18),
+        el('span', {}, 'พูดบันทึกแปลงด้วยเสียง')
+      ) : null
     )
   );
 
@@ -420,8 +616,48 @@ export function buildFarmerActivityWizard({ plots = [], plotSelect, reloadTab, n
     if (wizardStep === 3) renderReviewBox();
   };
 
+  const applyParsedVoiceData = (parsed) => {
+    if (!parsed) return;
+    if (parsed.plotId) {
+      const sel = plotSel.querySelector('select[name="plot_id"]');
+      if (sel) sel.value = parsed.plotId;
+    }
+    if (parsed.kind) {
+      kindInput.value = parsed.kind;
+      kindChoiceGrid.querySelectorAll('.kind-choice-card').forEach(c => c.classList.remove('selected'));
+      const targetCat = kindCategories.find(c => c.kind === parsed.kind);
+      if (targetCat) {
+        const idx = kindCategories.indexOf(targetCat);
+        const cards = kindChoiceGrid.querySelectorAll('.kind-choice-card');
+        if (cards[idx]) cards[idx].classList.add('selected');
+      }
+    }
+    if (parsed.activityDate) {
+      const dInput = dateField.querySelector('input[name="activity_date"]');
+      if (dInput) dInput.value = parsed.activityDate;
+    }
+    if (parsed.inputUsed) {
+      inputUsedField.value = parsed.inputUsed;
+    }
+    if (parsed.amountQty) {
+      amountField.value = parsed.amountQty;
+    }
+    if (parsed.details) {
+      detailsArea.value = parsed.details;
+      detailsError.classList.add('hide');
+    }
+    notify(`กรอกข้อมูลจากเสียงสำเร็จ: แปลง ${parsed.plotName || parsed.plotId || ''} (${parsed.kind})`);
+    setWizardStep(3);
+  };
+
+  const smartVoiceAssistant = createSmartVoiceAssistant({
+    plots,
+    onApplyParsed: applyParsedVoiceData
+  });
+
   const recordForm = el('form', { id: 'recordForm', className: 'card approval-form-card', novalidate: true },
-    el('h3', { className: 'approval-form-title' }, icon('calendar', 18), ' บันทึกกิจกรรมแปลง'),
+    smartVoiceAssistant,
+    el('h3', { className: 'approval-form-title mt-16' }, icon('calendar', 18), ' บันทึกกิจกรรมแปลง (ขั้นตอนทีละสเต็ป)'),
     el('div', { className: 'wizard-steps' }, ...stepTabs),
     step1Panel,
     step2Panel,

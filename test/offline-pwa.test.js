@@ -30,7 +30,7 @@ test('index.html links PWA manifest, app icons, and offline banner', () => {
 });
 
 test('Service Worker caches App Shell and avoids caching mutating requests', () => {
-  assert.match(swCode, /CACHE_NAME\s*=\s*['"]pakmaii-app-v1['"]/);
+  assert.match(swCode, /CACHE_NAME\s*=\s*['"]pakmaii-app-v\d+['"]/);
   assert.match(swCode, /self\.addEventListener\(['"]install['"]/);
   assert.match(swCode, /self\.addEventListener\(['"]activate['"]/);
   assert.match(swCode, /self\.addEventListener\(['"]fetch['"]/);
