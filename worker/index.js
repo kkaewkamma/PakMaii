@@ -7,7 +7,9 @@ import {
 } from '../lib/notification-dispatcher.js';
 import {
   sendLineReplyMessage,
-  fetchChannelAccessToken
+  fetchChannelAccessToken,
+  buildChatAutoReply,
+  PAKMAII_QUICK_REPLIES
 } from '../shared/line-messaging.js';
 import {
   MAX_EVIDENCE_BYTES,
@@ -182,17 +184,14 @@ export async function handleApi(request, env, ctx) {
       if (evt.type === 'message' && evt.message?.type === 'text') {
         const userMsg = (evt.message.text || '').trim();
         const lineUserId = evt.source?.userId;
-        let replyText = '🌱 ระบบบริหารมาตรฐานเกษตรอินทรีย์ผักไหม ยินดีให้บริการครับ แตะเมนูลัดเพื่อถามสถานะได้ทันที';
+        const autoReply = buildChatAutoReply(userMsg, { liffId: env.LIFF_ID, lineUserId });
+        let replyText = autoReply.text;
 
-        if (/^ไอดี$|^myid$|^id$/i.test(userMsg)) {
-          replyText = `🆔 รหัส LINE User ID ของคุณคือ:\n${lineUserId || 'ไม่พบ ID'}\n\n💡 วิธีเปิดรับแจ้งเตือน Realtime:\n• พิมพ์ "ผูก ics" เพื่อรับแจ้งเตือนเมื่อมีคำขอใหม่\n• พิมพ์ "ผูก เกษตรกร" เพื่อรับแจ้งเตือนผลการอนุมัติ`;
-        } else if (/^ผูก\s*ics$|^ผูกบัญชี\s*ics$/i.test(userMsg) && lineUserId) {
+        if (autoReply.type === 'bind_ics' && lineUserId) {
           await repository.run("UPDATE users SET line_id = ?, status = 'active' WHERE id = 910101", lineUserId);
-          replyText = `✅ ผูกบัญชี LINE กับ "คุณวิชัย ผักไหม (เจ้าหน้าที่ ICS)" สำเร็จแล้ว!\n\nจากนี้เมื่อเกษตรกรส่งคำขอใช้ปุ๋ย/ปัจจัยการผลิต ระบบจะส่งข้อความแจ้งเตือนมาที่นี่แบบ Real-time ทันทีครับ 🔔`;
-        } else if (/^ผูก\s*เกษตรกร$|^ผูกบัญชี\s*เกษตรกร$/i.test(userMsg) && lineUserId) {
+        } else if (autoReply.type === 'bind_farmer' && lineUserId) {
           await repository.run("UPDATE users SET line_id = ?, status = 'active' WHERE id = 911001", lineUserId);
-          replyText = `✅ ผูกบัญชี LINE กับ "คุณสมปอง คำภา (เกษตรกร)" สำเร็จแล้ว!\n\nจากนี้เมื่อเจ้าหน้าที่ ICS อนุมัติหรือปฏิเสธคำขอ ระบบจะส่งข้อความแจ้งเตือนผลมาที่นี่แบบ Real-time ทันทีครับ 🔔`;
-        } else if (/เตือนแปลง|เตือนบันทึก|เตือนเกษตรกร|ลืมบันทึก|remind/i.test(userMsg)) {
+        } else if (autoReply.type === 'scan_remind') {
           const overdueResults = await scanAndNotifyRhythmOverdue({
             db: env.DB,
             liffId: env.LIFF_ID,
@@ -202,16 +201,6 @@ export async function handleApi(request, env, ctx) {
             fetchImpl: fetch
           }).catch(err => { console.error('Remind error:', err); return []; });
           replyText = `⏰ ระบบ Ready to Grow ตรวจสอบแปลงในความดูแลแล้ว:\n\n• เกณฑ์: ขาดการบันทึกเกิน 14 วัน (ตามเกณฑ์ PGS ผักไหม)\n• ส่งการแจ้งเตือนเตือนเกษตรกรสำเร็จ: ${overdueResults.length} รายการ 🔔`;
-        } else if (/คำขอ|approval|ปัจจัย/.test(userMsg)) {
-          replyText = '🌱 ตรวจสอบสถานะคำขอ: คุณมีคำขอใช้ปัจจัยรอพิจารณา เจ้าหน้าที่ ICS กำลังตรวจสอบความสอดคล้องตามเกณฑ์อินทรีย์';
-        } else if (/แปลง|สถานะ|plot/.test(userMsg)) {
-          replyText = '🌾 สรุปสถานะแปลง: แปลง A-03 ข้าวหอมมะลิ 105 (ระยะปรับเปลี่ยน) มีการบันทึกสม่ำเสมอตามเกณฑ์ PGS';
-        } else if (/บันทึก|กิจกรรม/.test(userMsg)) {
-          replyText = '📝 แตะเพื่อเปิดแอปบันทึกแปลงผ่าน LINE LIFF: https://liff.line.me/' + (env.LIFF_ID || '');
-        } else if (/ตรวจ|ผลตรวจ|pgs/.test(userMsg)) {
-          replyText = '🛡️ ผลตรวจแปลงล่าสุด: ผ่านเกณฑ์มาตรฐานเกษตรอินทรีย์แบบมีส่วนร่วม (PGS)';
-        } else if (/ics|เจ้าหน้าที่|ติดต่อ/.test(userMsg)) {
-          replyText = '🧑‍🌾 เจ้าหน้าที่ ICS ผู้รับผิดชอบ: คุณวิชัย ผักไหม โทร. 081-234-5678';
         }
 
         if (evt.replyToken) {
@@ -219,7 +208,8 @@ export async function handleApi(request, env, ctx) {
             replyToken: evt.replyToken,
             messages: [{
               type: 'text',
-              text: replyText
+              text: replyText,
+              quickReply: PAKMAII_QUICK_REPLIES
             }]
           });
         }

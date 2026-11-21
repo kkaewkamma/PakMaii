@@ -6,6 +6,8 @@ import { DatabaseSync } from 'node:sqlite';
 
 import {
   LINE_EVENT_TYPES,
+  PAKMAII_QUICK_REPLIES,
+  buildChatAutoReply,
   buildInputSubmittedMessage,
   buildApprovalApprovedMessage,
   buildApprovalRejectedMessage,
@@ -337,5 +339,103 @@ test('Method 2 (OAuth v2.1): fetchChannelAccessToken retrieves, caches, and auto
   const pushCall = oauthCalls.find(c => c.url.includes('/bot/message/push'));
   assert.ok(pushCall);
   assert.equal(pushCall.options.headers.Authorization, 'Bearer live-generated-access-token-method2');
+});
+
+test('PAKMAII_QUICK_REPLIES conforms strictly to LINE Messaging API constraints', () => {
+  assert.ok(Array.isArray(PAKMAII_QUICK_REPLIES.items));
+  assert.equal(PAKMAII_QUICK_REPLIES.items.length, 6);
+  assert.ok(PAKMAII_QUICK_REPLIES.items.length <= 13, 'LINE Quick Reply allows at most 13 items');
+
+  for (const item of PAKMAII_QUICK_REPLIES.items) {
+    assert.equal(item.type, 'action');
+    assert.ok(item.action);
+    assert.equal(item.action.type, 'message');
+    assert.ok(typeof item.action.label === 'string');
+    assert.ok(item.action.label.length > 0);
+    assert.ok(item.action.label.length <= 20, `Label "${item.action.label}" exceeds LINE max 20 chars`);
+    assert.ok(typeof item.action.text === 'string');
+    assert.ok(item.action.text.length > 0);
+  }
+
+  const labels = PAKMAII_QUICK_REPLIES.items.map(i => i.action.label);
+  assert.ok(labels.includes('🌾 สถานะแปลง'));
+  assert.ok(labels.includes('🧪 สูตรปุ๋ยหมัก'));
+  assert.ok(labels.includes('⚠️ ข้อห้าม PGS'));
+  assert.ok(labels.includes('💧 ธนาคารน้ำ'));
+  assert.ok(labels.includes('🎙️ บันทึกด้วยเสียง'));
+  assert.ok(labels.includes('📞 ติดต่อ ICS'));
+});
+
+test('buildChatAutoReply provides accurate agricultural guidance across all domain categories', () => {
+  const liffId = '2012022503-PE16sYjU';
+
+  // 1. Organic Recipes (สูตรปุ๋ย & น้ำหมักชีวภาพ)
+  const recipe1 = buildChatAutoReply('ขอสูตรปุ๋ยหมักหน่อยครับ', { liffId });
+  assert.equal(recipe1.type, 'recipe');
+  assert.ok(recipe1.text.includes('สูตรปุ๋ยหมัก & น้ำหมักชีวภาพ'));
+  assert.ok(recipe1.text.includes('ปุ๋ยหมักแหนแดง'));
+  assert.ok(recipe1.text.includes('น้ำหมักสะเดาไล่แมลง'));
+  assert.ok(recipe1.text.includes('พด.1'));
+
+  const recipe2 = buildChatAutoReply('แหนแดงใส่ข้าวยังไง', { liffId });
+  assert.equal(recipe2.type, 'recipe');
+
+  // 2. Prohibited Inputs & PGS Rules (สารต้องห้าม)
+  const rules = buildChatAutoReply('มีสารต้องห้ามอะไรบ้าง ทำไมไม่ผ่าน pgs', { liffId });
+  assert.equal(rules.type, 'prohibited_standards');
+  assert.ok(rules.text.includes('5 ข้อห้ามเด็ดขาด'));
+  assert.ok(rules.text.includes('ห้ามใช้ยาฆ่าหญ้า'));
+  assert.ok(rules.text.includes('ห้ามใช้ปุ๋ยเคมีสังเคราะห์'));
+  assert.ok(rules.text.includes('แนวกันชน (Buffer Zone)'));
+
+  // 3. Groundwater Bank & Crop Calendar (ธนาคารน้ำใต้ดิน & ปฏิทิน)
+  const water = buildChatAutoReply('ธนาคารน้ำใต้ดินทำอย่างไร และรอบปลูกข้าวเป็นอย่างไร', { liffId });
+  assert.equal(water.type, 'water_bank_calendar');
+  assert.ok(water.text.includes('ธนาคารน้ำใต้ดิน'));
+  assert.ok(water.text.includes('บ่อดักน้ำลึก 1.5-2 เมตร'));
+  assert.ok(water.text.includes('ปอเทือง'));
+  assert.ok(water.text.includes('พ.ค.-มิ.ย.'));
+
+  // 4. Voice Input Tutorial (Smart Voice Assistant)
+  const voice = buildChatAutoReply('สอนวิธีพิมพ์ด้วยเสียงหน่อย voice', { liffId });
+  assert.equal(voice.type, 'voice_guide');
+  assert.ok(voice.text.includes('Smart Voice Assistant'));
+  assert.ok(voice.text.includes('ไมโครโฟนสีทอง'));
+  assert.ok(voice.text.includes('วันนี้ใส่ปุ๋ยหมักแหนแดง 50 กิโลกรัม ที่แปลง A-03'));
+
+  // 5. User Guide (คู่มือ)
+  const guide = buildChatAutoReply('คู่มือใช้งานระบบ', { liffId });
+  assert.equal(guide.type, 'user_guide');
+  assert.ok(guide.text.includes('5 ขั้นตอนง่ายๆ'));
+  assert.ok(guide.text.includes(`https://liff.line.me/${liffId}`));
+
+  // 6. Plots and approvals
+  const plot = buildChatAutoReply('สถานะแปลงของฉัน', { liffId });
+  assert.equal(plot.type, 'plot_summary');
+  assert.ok(plot.text.includes('แปลง A-03 ข้าวหอมมะลิ 105'));
+
+  const approval = buildChatAutoReply('เช็คคำขอปัจจัย', { liffId });
+  assert.equal(approval.type, 'approval_status');
+  assert.ok(approval.text.includes('คำขอใช้ปัจจัยรอพิจารณา'));
+
+  // 7. Identity & Binds
+  const idMsg = buildChatAutoReply('ไอดี', { liffId, lineUserId: 'U123456789' });
+  assert.equal(idMsg.type, 'id_query');
+  assert.ok(idMsg.text.includes('U123456789'));
+
+  const bindIcs = buildChatAutoReply('ผูก ics', { liffId, lineUserId: 'U123456789' });
+  assert.equal(bindIcs.type, 'bind_ics');
+  assert.ok(bindIcs.text.includes('เจ้าหน้าที่ ICS'));
+
+  const bindFarmer = buildChatAutoReply('ผูก เกษตรกร', { liffId, lineUserId: 'U123456789' });
+  assert.equal(bindFarmer.type, 'bind_farmer');
+  assert.ok(bindFarmer.text.includes('เกษตรกร'));
+
+  // 8. Default fallback
+  const def = buildChatAutoReply('สวัสดีครับ อยากสอบถามหน่อย', { liffId });
+  assert.equal(def.type, 'default_welcome');
+  assert.ok(def.text.includes('ระบบบริหารมาตรฐานเกษตรอินทรีย์ตำบลผักไหม ยินดีให้บริการครับ'));
+  assert.ok(def.text.includes('สูตรปุ๋ย'));
+  assert.ok(def.text.includes('ธนาคารน้ำ'));
 });
 

@@ -50,6 +50,12 @@ import {
   scanAndNotifyRhythmOverdue,
   scanAndNotifyCapaDeadlines
 } from './lib/notification-dispatcher.js';
+import {
+  sendLineReplyMessage,
+  fetchChannelAccessToken,
+  buildChatAutoReply,
+  PAKMAII_QUICK_REPLIES
+} from './shared/line-messaging.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -206,42 +212,61 @@ const redeemLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHead
 const adminLoginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'ลองใหม่ภายหลัง' } });
 const genericRegistrationError = () => new HttpError(400, 'ข้อมูลลงทะเบียนหรือคำเชิญไม่ถูกต้อง');
 
-app.post('/api/webhook/line', wrap((req, res) => {
+app.post('/api/webhook/line', wrap(async (req, res) => {
   const events = Array.isArray(req.body?.events) ? req.body.events : [];
   const replies = [];
   for (const evt of events) {
     if (evt.type === 'message' && evt.message?.type === 'text') {
       const userMsg = (evt.message.text || '').trim();
-      let replyText = '🌱 ระบบบริหารมาตรฐานเกษตรอินทรีย์ผักไหม ยินดีให้บริการครับ แตะเมนูลัดเพื่อถามสถานะได้ทันที';
-      if (/คำขอ|approval|ปัจจัย/.test(userMsg)) {
-        replyText = '🌱 ตรวจสอบสถานะคำขอ: คุณมีคำขอใช้ปัจจัยรอพิจารณา เจ้าหน้าที่ ICS กำลังตรวจสอบความสอดคล้องตามเกณฑ์อินทรีย์';
-      } else if (/แปลง|สถานะ|plot/.test(userMsg)) {
-        replyText = '🌾 สรุปสถานะแปลง: แปลง A-03 ข้าวหอมมะลิ 105 (ระยะปรับเปลี่ยน) มีการบันทึกสม่ำเสมอตามเกณฑ์ PGS';
-      } else if (/บันทึก|กิจกรรม/.test(userMsg)) {
-        replyText = '📝 แตะเพื่อเปิดแอปบันทึกแปลงผ่าน LINE LIFF: https://liff.line.me/' + (process.env.LIFF_ID || '');
-      } else if (/ตรวจ|ผลตรวจ|pgs/.test(userMsg)) {
-        replyText = '🛡️ ผลตรวจแปลงล่าสุด: ผ่านเกณฑ์มาตรฐานเกษตรอินทรีย์แบบมีส่วนร่วม (PGS)';
-      } else if (/ics|เจ้าหน้าที่|ติดต่อ/.test(userMsg)) {
-        replyText = '🧑‍🌾 เจ้าหน้าที่ ICS ผู้รับผิดชอบ: คุณวิชัย ผักไหม โทร. 081-234-5678';
+      const lineUserId = evt.source?.userId;
+      const autoReply = buildChatAutoReply(userMsg, { liffId: process.env.LIFF_ID, lineUserId });
+      let replyText = autoReply.text;
+
+      if (autoReply.type === 'bind_ics' && lineUserId) {
+        db.prepare("UPDATE users SET line_id = ? WHERE role = 'ics' LIMIT 1").run(lineUserId);
+      } else if (autoReply.type === 'bind_farmer' && lineUserId) {
+        db.prepare("UPDATE users SET line_id = ? WHERE role = 'farmer' LIMIT 1").run(lineUserId);
+      } else if (autoReply.type === 'scan_remind') {
+        const overdueResults = await scanAndNotifyRhythmOverdue({
+          db,
+          liffId: process.env.LIFF_ID,
+          channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+          channelId: process.env.LINE_CHANNEL_ID,
+          channelSecret: process.env.LINE_CHANNEL_SECRET
+        }).catch(err => { console.error('Remind error:', err); return []; });
+        replyText = `⏰ ระบบ Ready to Grow ตรวจสอบแปลงในความดูแลแล้ว:\n\n• เกณฑ์: ขาดการบันทึกเกิน 14 วัน (ตามเกณฑ์ PGS ผักไหม)\n• ส่งการแจ้งเตือนเตือนเกษตรกรสำเร็จ: ${overdueResults.length} รายการ 🔔`;
       }
+
       replies.push({
         replyToken: evt.replyToken,
         messages: [{
           type: 'text',
           text: replyText,
-          quickReply: {
-            items: [
-              { type: 'action', action: { type: 'message', label: '🔍 เช็คสถานะคำขอ', text: 'เช็คสถานะคำขอ' } },
-              { type: 'action', action: { type: 'message', label: '🌾 สรุปสถานะแปลง', text: 'สรุปสถานะแปลง' } },
-              { type: 'action', action: { type: 'message', label: '📝 บันทึกแปลง', text: 'บันทึกแปลง' } },
-              { type: 'action', action: { type: 'message', label: '🛡️ เช็คผลตรวจแปลง', text: 'เช็คผลตรวจแปลง' } },
-              { type: 'action', action: { type: 'message', label: '📞 ติดต่อ ICS', text: 'ติดต่อ ics' } }
-            ]
-          }
+          quickReply: PAKMAII_QUICK_REPLIES
         }]
       });
     }
   }
+
+  if (replies.length > 0) {
+    let token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!token && process.env.LINE_CHANNEL_ID && process.env.LINE_CHANNEL_SECRET) {
+      token = await fetchChannelAccessToken({
+        channelId: process.env.LINE_CHANNEL_ID,
+        channelSecret: process.env.LINE_CHANNEL_SECRET
+      });
+    }
+    if (token) {
+      for (const item of replies) {
+        await sendLineReplyMessage({
+          channelAccessToken: token,
+          replyToken: item.replyToken,
+          messages: item.messages
+        });
+      }
+    }
+  }
+
   res.json({
     ok: true,
     service: 'PakMaii LINE Webhook',
@@ -251,7 +276,7 @@ app.post('/api/webhook/line', wrap((req, res) => {
       source: evt.source?.userId ? 'line_user' : 'simulator',
       status: 'mapped_to_activity_log'
     })),
-    replies,
+    replies_count: replies.length,
     timestamp: new Date().toISOString()
   });
 }));
